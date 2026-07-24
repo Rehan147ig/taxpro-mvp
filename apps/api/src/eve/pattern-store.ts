@@ -79,10 +79,11 @@ export async function findSimilarPatterns(
   // of the stored account_name_tokens, or vice-versa
   const results = await db.execute(sql`
     SELECT * FROM classification_patterns
-    WHERE (
-      account_name_tokens @> ${JSON.stringify(tokens)}::jsonb
-      OR ${JSON.stringify(tokens)}::jsonb @> account_name_tokens
-    )
+    WHERE tenant_id = ${tenantId}
+      AND (
+        account_name_tokens @> ${JSON.stringify(tokens)}::jsonb
+        OR ${JSON.stringify(tokens)}::jsonb @> account_name_tokens
+      )
     ORDER BY created_at DESC
     LIMIT ${limit * 3}
   `);

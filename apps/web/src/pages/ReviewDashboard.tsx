@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { provision as provApi } from '../api/client';
+import AiFindingsPanel from '../components/AiFindingsPanel';
 
 interface RunSummary {
   run: {
@@ -35,10 +36,22 @@ export default function ReviewDashboard() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [evePrompt, setEvePrompt] = useState('');
   const [eveAnswer, setEveAnswer] = useState('');
+  const [aiFindings, setAiFindings] = useState<{ pending: boolean; agents: any[] } | null>(null);
 
   useEffect(() => {
     load();
   }, []);
+
+  // Poll AI findings while subagents are still writing results
+  useEffect(() => {
+    if (!selectedRun || !aiFindings?.pending) return;
+    const timer = setTimeout(async () => {
+      try {
+        setAiFindings(await provApi.aiFindings(selectedRun));
+      } catch { /* retry on next poll cycle */ }
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, [selectedRun, aiFindings]);
 
   const load = async () => {
     setLoading(true);
@@ -58,11 +71,17 @@ export default function ReviewDashboard() {
 
   const selectRun = async (runId: string) => {
     setSelectedRun(runId);
+    setAiFindings(null);
     try {
       const items = await provApi.runReviewItems(runId);
       setSelectedRunItems(items);
     } catch {
       setSelectedRunItems([]);
+    }
+    try {
+      setAiFindings(await provApi.aiFindings(runId));
+    } catch {
+      setAiFindings(null);
     }
   };
 
@@ -323,6 +342,10 @@ export default function ReviewDashboard() {
                 >
                   {actionLoading === 'finalize' ? '...' : 'Finalize'}
                 </button>
+              </div>
+
+              <div className="mt-6">
+                <AiFindingsPanel findings={aiFindings} />
               </div>
             </div>
           ) : (

@@ -92,6 +92,18 @@ export const mappings = {
     apiClient<any>(`/mapping/mappings/${accountId}/override`, { method: 'POST', body: JSON.stringify(payload) }),
 };
 
+export interface AiAgentRun {
+  workflowName: string;
+  status: string;
+  promptVersion: string;
+  provider: string | null;
+  model: string | null;
+  errorMessage: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  output: any;
+}
+
 // Provision
 export const provision = {
   run: (payload: { period: string; endPeriod?: string; entityId?: string }) =>
@@ -101,6 +113,8 @@ export const provision = {
   exportPackage: (id: string) => blobClient(`/provision/results/${id}/package`),
   runs: () => apiClient<any[]>('/provision/runs'),
   runReviewItems: (runId: string) => apiClient<any[]>(`/provision/runs/${runId}/review-items`),
+  aiFindings: (runId: string) =>
+    apiClient<{ provisionRunId: string; pending: boolean; agents: AiAgentRun[] }>(`/provision/runs/${runId}/ai-findings`),
   resolveItem: (runId: string, itemId: string, payload: { resolution: string; resolutionNote?: string }) =>
     apiClient<any>(`/provision/runs/${runId}/review-items/${itemId}/resolve`, { method: 'POST', body: JSON.stringify(payload) }),
   bulkResolve: (runId: string, payload: { resolution: string; resolutionNote?: string }) =>

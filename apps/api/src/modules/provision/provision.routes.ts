@@ -7,6 +7,7 @@ import { trialBalance } from '../../db/schema/trial-balance.js';
 import { taxMappings } from '../../db/schema/tax-mappings.js';
 import { provisionResults } from '../../db/schema/provision-results.js';
 import { provisionRuns } from '../../db/schema/provision-runs.js';
+import { aiRuns } from '../../db/schema/ai-runs.js';
 import { reviewItems } from '../../db/schema/review-items.js';
 import { entities } from '../../db/schema/entities.js';
 import { accounts } from '../../db/schema/accounts.js';
