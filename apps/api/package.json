@@ -11,7 +11,8 @@
     "db:migrate": "tsx scripts/schema.ts",
     "db:seed": "tsx src/db/seed.ts",
     "db:synthetic": "tsx scripts/synthetic-seed.ts",
-    "db:synthetic-q1": "tsx scripts/synthetic-seed.ts q1-only"
+    "db:synthetic-q1": "tsx scripts/synthetic-seed.ts q1-only",
+    "eval": "tsx scripts/eval/run-eval.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.19",

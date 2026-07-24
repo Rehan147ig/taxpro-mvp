@@ -5,3 +5,5 @@ dist/
 .DS_Store
 coverage/
 .turbo/
+apps/api/scripts/eval/cache/
+tsconfig.tsbuildinfo  
