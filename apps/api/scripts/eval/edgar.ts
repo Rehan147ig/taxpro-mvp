@@ -27,7 +27,13 @@ async function fetchJson(url: string, cacheName: string): Promise<any> {
   if (existsSync(cached)) {
     return JSON.parse(readFileSync(cached, 'utf-8'));
   }
-  const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
+  if (process.env.OFFLINE) {
+    throw new Error(`OFFLINE mode: no cached data for ${cacheName}`);
+  }
+  const res = await fetch(url, {
+    headers: { 'User-Agent': USER_AGENT },
+    signal: AbortSignal.timeout(15_000),
+  });
   if (!res.ok) throw new Error(`EDGAR ${res.status} for ${url}`);
   const data = await res.json();
   writeFileSync(cached, JSON.stringify(data));

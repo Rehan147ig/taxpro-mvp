@@ -1,7 +1,4 @@
-// archiver CJS module — use createRequire for ESM compatibility
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-const archiver = require('archiver');
+import { ZipArchive } from 'archiver';
 import { Readable } from 'stream';
 import { generateProvisionWorkbook } from './excel-generator.js';
 import type { AuditTrailEntry } from './audit-log.js';
@@ -21,7 +18,7 @@ export interface WorkpaperPackageInput {
 }
 
 export async function generateWorkpaperPackage(input: WorkpaperPackageInput): Promise<Buffer> {
-  const archive = archiver('zip', { zlib: { level: 9 } });
+  const archive = new ZipArchive({ zlib: { level: 9 } });
   const chunks: Buffer[] = [];
 
   archive.on('data', (chunk: Buffer) => chunks.push(chunk));

@@ -845,6 +845,133 @@ provisionRoutes.post('/runs/:runId/finalize', async (c) => {
   return c.json({ runId, status: 'finalized' });
 });
 
+// Phase 2 Governance Endpoints
+
+// Submit for partner approval
+provisionRoutes.post('/runs/:runId/submit-for-approval', async (c) => {
+  const user = c.get('user');
+  const { runId } = c.req.param();
+
+  const [run] = await db.select().from(provisionRuns)
+    .where(and(eq(provisionRuns.id, runId), eq(provisionRuns.tenantId, user.tenantId))).limit(1);
+  if (!run) throw new BadRequestError('Provision run not found');
+
+  await db.update(provisionRuns).set({
+    approvalStatus: 'pending_partner_review',
+    updatedAt: new Date(),
+  }).where(eq(provisionRuns.id, runId));
+
+  return c.json({ runId, approvalStatus: 'pending_partner_review' });
+});
+
+// Partner approval
+provisionRoutes.post('/runs/:runId/partner-approve', async (c) => {
+  const user = c.get('user');
+  const { runId } = c.req.param();
+
+  const [run] = await db.select().from(provisionRuns)
+    .where(and(eq(provisionRuns.id, runId), eq(provisionRuns.tenantId, user.tenantId))).limit(1);
+  if (!run) throw new BadRequestError('Provision run not found');
+
+  await db.update(provisionRuns).set({
+    approvalStatus: 'approved',
+    updatedAt: new Date(),
+  }).where(eq(provisionRuns.id, runId));
+
+  return c.json({ runId, approvalStatus: 'approved' });
+});
+
+// Lock run
+provisionRoutes.post('/runs/:runId/lock', async (c) => {
+  const user = c.get('user');
+  const { runId } = c.req.param();
+
+  const [run] = await db.select().from(provisionRuns)
+    .where(and(eq(provisionRuns.id, runId), eq(provisionRuns.tenantId, user.tenantId))).limit(1);
+  if (!run) throw new BadRequestError('Provision run not found');
+
+  if (run.approvalStatus !== 'approved') {
+    throw new BadRequestError('Run must be approved by a partner before locking');
+  }
+
+  await db.update(provisionRuns).set({
+    status: 'locked',
+    finalizedAt: new Date(),
+    updatedAt: new Date(),
+  }).where(eq(provisionRuns.id, runId));
+
+  return c.json({ runId, status: 'locked' });
+});
+
+// Get trial balance detail for a run
+provisionRoutes.get('/runs/:runId/trial-balance-detail', async (c) => {
+  const user = c.get('user');
+  const { runId } = c.req.param();
+  
+  const [run] = await db.select().from(provisionRuns)
+    .where(and(eq(provisionRuns.id, runId), eq(provisionRuns.tenantId, user.tenantId))).limit(1);
+  if (!run) throw new BadRequestError('Provision run not found');
+
+  const tbData = await db.select({
+    accountId: trialBalance.accountId,
+    accountName: accounts.name,
+    accountNumber: accounts.accountNumber,
+    type: accounts.type,
+    balance: trialBalance.balance,
+    taxAccountType: taxMappings.taxAccountType,
+    bookTreatment: taxMappings.bookTreatment,
+    confidenceScore: taxMappings.confidenceScore,
+    suggestedByAi: taxMappings.suggestedByAi,
+    mappingVersion: taxMappings.version,
+  }).from(trialBalance)
+    .innerJoin(accounts, eq(trialBalance.accountId, accounts.id))
+    .leftJoin(taxMappings, and(
+      eq(taxMappings.accountId, accounts.id),
+      eq(taxMappings.isActive, true)
+    ))
+    .where(and(
+      eq(trialBalance.tenantId, user.tenantId),
+      gte(trialBalance.period, run.period),
+      lte(trialBalance.period, run.endPeriod ?? run.period),
+      run.entityId ? eq(trialBalance.entityId, run.entityId) : undefined
+    ));
+
+  // Group by account to sum balances across entities/periods
+  const grouped = new Map<string, any>();
+  for (const row of tbData) {
+    if (!grouped.has(row.accountId)) {
+      grouped.set(row.accountId, {
+        accountId: row.accountId,
+        accountName: row.accountName,
+        accountNumber: row.accountNumber,
+        type: row.type,
+        balance: 0,
+        taxAccountType: row.taxAccountType,
+        bookTreatment: row.bookTreatment,
+        confidenceScore: row.confidenceScore ? Number(row.confidenceScore) : null,
+        suggestedByAi: row.suggestedByAi,
+      });
+    }
+    grouped.get(row.accountId)!.balance += Number(row.balance);
+  }
+
+  // Also include the review items for this run so the UI can flag them
+  const items = await db.select().from(reviewItems)
+    .where(eq(reviewItems.provisionRunId, runId));
+  
+  const results = Array.from(grouped.values()).map(row => {
+    const reviewItem = items.find(i => i.accountId === row.accountId);
+    return {
+      ...row,
+      reviewItemId: reviewItem?.id,
+      reviewItemStatus: reviewItem?.status,
+      reviewItemSeverity: reviewItem?.severity,
+    };
+  });
+
+  return c.json(results);
+});
+
 // Review queue summary — all runs needing review across tenant
 provisionRoutes.get('/review/queue', async (c) => {
   const user = c.get('user');

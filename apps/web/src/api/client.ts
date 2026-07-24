@@ -121,6 +121,14 @@ export const provision = {
     apiClient<any>(`/provision/runs/${runId}/review-items/bulk-resolve`, { method: 'POST', body: JSON.stringify(payload) }),
   finalize: (runId: string) =>
     apiClient<any>(`/provision/runs/${runId}/finalize`, { method: 'POST' }),
+  submitForApproval: (runId: string) =>
+    apiClient<any>(`/provision/runs/${runId}/submit-for-approval`, { method: 'POST' }),
+  partnerApprove: (runId: string) =>
+    apiClient<any>(`/provision/runs/${runId}/partner-approve`, { method: 'POST' }),
+  lockRun: (runId: string) =>
+    apiClient<any>(`/provision/runs/${runId}/lock`, { method: 'POST' }),
+  runTrialBalanceDetail: (runId: string) =>
+    apiClient<any[]>(`/provision/runs/${runId}/trial-balance-detail`),
   reviewQueue: () => apiClient<any[]>('/provision/review/queue'),
   eveAsk: (prompt: string) =>
     apiClient<{ answer: string; suggestedAction?: string }>('/provision/eve/ask', { method: 'POST', body: JSON.stringify({ prompt }) }),

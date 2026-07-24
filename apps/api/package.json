@@ -12,7 +12,8 @@
     "db:seed": "tsx src/db/seed.ts",
     "db:synthetic": "tsx scripts/synthetic-seed.ts",
     "db:synthetic-q1": "tsx scripts/synthetic-seed.ts q1-only",
-    "eval": "tsx scripts/eval/run-eval.ts"
+    "eval": "tsx scripts/eval/run-eval.ts",
+    "test:integration": "tsx scripts/test-provision-flow.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.19",
@@ -36,6 +37,7 @@
     "zod": "^3.24.0"
   },
   "devDependencies": {
+    "@types/archiver": "^8.0.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/jsonwebtoken": "^9.0.7",
     "@types/node": "^22.0.0",
