@@ -1,0 +1,32 @@
+{
+  "name": "@taxpro/tax-engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./*": {
+      "import": "./dist/*.js",
+      "types": "./dist/*.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "@types/decimal.js": "^0.0.32",
+    "vitest": "^4.1.0"
+  },
+  "dependencies": {
+    "decimal.js": "^10.6.0",
+    "typescript": "^7.0.2"
+  }
+}

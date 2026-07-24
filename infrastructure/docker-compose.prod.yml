@@ -1,0 +1,102 @@
+# ── Production Docker Compose for TaxPro ──
+# Usage: docker compose -f infrastructure/docker-compose.prod.yml up -d
+# Requires: .env file at project root with production values
+
+services:
+  # ── PostgreSQL ──
+  postgres:
+    image: postgres:16-alpine
+    container_name: taxpro-db
+    restart: unless-stopped
+    networks:
+      - taxpro
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./infrastructure/init-db.sh:/docker-entrypoint-initdb.d/init-db.sh:ro
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-taxpro}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?error}
+      POSTGRES_DB: ${POSTGRES_DB:-taxpro}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-taxpro}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ── Redis ──
+  redis:
+    image: redis:7-alpine
+    container_name: taxpro-redis
+    restart: unless-stopped
+    networks:
+      - taxpro
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # ── API ──
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: taxpro-api
+    restart: unless-stopped
+    networks:
+      - taxpro
+    ports:
+      - "${API_PORT:-3001}:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: postgres://${POSTGRES_USER:-taxpro}:${POSTGRES_PASSWORD:?error}@postgres:5432/${POSTGRES_DB:-taxpro}
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:?error}
+      DATA_ENCRYPTION_KEY: ${DATA_ENCRYPTION_KEY:?error}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:80}
+      AI_PROVIDER: ${AI_PROVIDER:-openai}
+      AI_BASE_URL: ${AI_BASE_URL:-}
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-}
+      RUN_MIGRATIONS: "${RUN_MIGRATIONS:-true}"
+      RUN_SEED: "${RUN_SEED:-false}"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  # ── Web (nginx + static assets) ──
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    container_name: taxpro-web
+    restart: unless-stopped
+    networks:
+      - taxpro
+    ports:
+      - "${WEB_PORT:-80}:80"
+    depends_on:
+      api:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+networks:
+  taxpro:
+    driver: bridge
+
+volumes:
+  pgdata:
