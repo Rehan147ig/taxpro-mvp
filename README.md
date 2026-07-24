@@ -1,229 +1,231 @@
-# TaxPro — AI-Native Direct Corporate Tax Provision
+# TaxPro - AI-Native Corporate Tax Provision
 
-**Connect any financial data source. AI maps your accounts. ASC 740 provision workpapers in minutes.**
+TaxPro is an AI-native, outcome-as-a-service platform for ASC 740 corporate income tax provision. Instead of asking tax teams to operate another complex tax SaaS tool, TaxPro turns financial trial balance data into review-ready provision workpapers, audit support, and governance artifacts.
 
-TaxPro is an AI-native platform that automates corporate income tax provision (ASC 740) workflows. It ingests trial balance data from any source (CSV, Excel, NetSuite, QuickBooks, Xero, SAP), uses AI to semantically classify accounts into tax categories, and generates complete provision workpapers — current tax, deferred tax, rollforward schedules, ETR reconciliation, and proposed journal entries.
+The core model is simple:
 
----
-
-## Quick Start
-
-```bash
-# Prerequisites: Docker, Node.js 22+
-
-# 1. Setup
-cp .env.example .env                # Edit with your AI API key
-docker compose up -d                 # Start PostgreSQL + Redis
-npm install --include=dev
-
-# 2. Database
-npm run db:migrate                   # Create tables
-npm run db:seed                      # (Optional) Load demo data
-
-# 3. Run
-npm run dev                          # API: :3001, Web: :5173
+```text
+Trial balance import
+-> Eve AI analysis and account mapping
+-> Human review queue
+-> Deterministic Decimal.js tax engine
+-> Excel workpapers and audit package
+-> Finalized provision delivery
 ```
 
-Open `http://localhost:5173`. **Demo login:** `demo@taxpro.ai` / `TaxProDemo123!`
+Eve is the operating layer. She can classify accounts, explain book-tax differences, draft audit-support narratives, identify credit opportunities, and guide review. Final calculations remain deterministic in the TypeScript tax engine.
 
----
+## What It Does
+
+| Area | Capability |
+|---|---|
+| Data ingestion | CSV trial balance import and NetSuite connector foundation |
+| AI mapping | Eve account classification with fallback rules and active learning |
+| Review governance | Provision run lifecycle, review queue, resolve/reject/finalize workflow |
+| Tax math | ASC 740 current tax, deferred tax, ETR reconciliation, rollforwards, journal entries |
+| Subagents | Mapping agent, audit-defense memo agent, credit-miner agent |
+| Deliverables | Excel workpaper export and ZIP package with audit trail |
+| Validation | Synthetic provision scenario suite and SEC EDGAR evaluation harness |
 
 ## Architecture
 
+```text
+apps/web
+  React + Vite + Tailwind UI
+  Dashboard, Data Sources, Mapping, Provision, Review
+
+apps/api
+  Hono API
+  Auth, Import, Mapping, NetSuite, Provision, Export
+  Eve runtime, subagents, trace logging, pattern memory
+
+packages/tax-engine
+  Pure deterministic tax calculation package
+  Decimal.js monetary primitives
 ```
-Frontend (React + Vite + Tailwind)       ← port 5173
-       │ REST API
-Backend (Hono.js + TypeScript)           ← port 3001
-       │
-  ┌────┼────┬────┬────┬────┐
- Auth CSV  NS   AI   Prov Export
-       │          │
- PostgreSQL   NVIDIA/OpenAI
- + Redis
-       │
- Tax Engine (Pure TypeScript)
- Current │ Deferred │ Rollforward │ ETR │ JE
+
+Key invariant:
+
+```text
+AI = classification, explanation, review assistance, opportunity detection
+Code = tax math, validation, journal entries, export totals
+Human = approval, override, final signoff
 ```
 
-See [ARCHITECTURE.md](./ARCHITECTURE.md) for the full mermaid diagram.
+## Eve Runtime
 
----
+TaxPro does not require Vercel hosting or the Vercel AI SDK. Eve uses a self-hosted OpenAI-compatible runtime:
 
-## Features
+- `apps/api/src/eve/model-client.ts` - JSON model caller with timeout and retry
+- `apps/api/src/eve/trace-store.ts` - `ai_runs` and `ai_steps` logging
+- `apps/api/src/eve/pattern-store.ts` - active-learning memory from CPA review decisions
+- `apps/api/src/agent/agent.ts` - Eve provision analyzer
+- `apps/api/src/agent/subagents/*` - specialized provision subagents
 
-| Feature | Description |
+Supported providers are configured through environment variables:
+
+```env
+AI_PROVIDER=openai|nvidia|custom
+AI_API_KEY=...
+AI_BASE_URL=...
+AI_MODEL=...
+```
+
+## Provision Workflow
+
+`POST /api/provision/run` runs Eve by default.
+
+Use `?direct=true` to bypass Eve and run deterministic provision only.
+
+The workflow creates a `provision_runs` record and tracks:
+
+- period and entity
+- input data hash
+- mapping version hash
+- engine version
+- approval status
+- review items
+- AI findings
+- finalization state
+
+If Eve fails or times out, the provision route falls back to deterministic mode and records the exception on the run.
+
+## Review And Governance
+
+The Review page gives tax reviewers a queue for low-confidence or missing mappings.
+
+Important endpoints:
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/api/provision/runs` | List provision runs |
+| `GET` | `/api/provision/review/queue` | Runs that need review |
+| `GET` | `/api/provision/runs/:id/review-items` | Review items for a run |
+| `GET` | `/api/provision/runs/:id/ai-findings` | Eve/subagent outputs for UI panels |
+| `POST` | `/api/provision/runs/:runId/review-items/:itemId/resolve` | Approve, reject, or override one item |
+| `POST` | `/api/provision/runs/:runId/review-items/bulk-resolve` | Bulk resolve open items |
+| `POST` | `/api/provision/runs/:runId/finalize` | Lock a reviewed run as finalized |
+
+Human review decisions feed the `classification_patterns` table so similar future accounts can inherit confidence from prior CPA decisions.
+
+## Outputs
+
+| Endpoint | Output |
 |---|---|
-| **CSV/GL Import** | Upload trial balance from any ERP. Auto-detects field names, creates entities + accounts + mappings |
-| **NetSuite Connector** | OAuth 1.0 HMAC-SHA1 signing, SuiteQL trial balance queries, encrypted credential storage |
-| **AI Account Mapping** | LLM-powered classification (NVIDIA/OpenAI) with rule-based fallback. Human-overridable |
-| **Current Tax Calc** | ASC 740-10: book income → permanent differences → federal/state tax → credits → NOL |
-| **Deferred Tax Calc** | ASC 740-30: temporary differences × enacted rate → DTA/DTL by category |
-| **Rollforward Schedules** | DTA/DTL, NOL, tax credit, and valuation allowance rollforwards |
-| **ETR Reconciliation** | Statutory rate → effective rate with line-item explanations |
-| **Journal Entries** | Proposed current tax, deferred tax, and valuation allowance JEs |
-| **Workpaper Export** | CSV download of provision results |
+| `GET /api/provision/results/:id/export` | Excel provision workbook |
+| `GET /api/provision/results/:id/package` | ZIP package with workbook, audit trail CSV, and summary |
 
----
+## Quick Start
 
-## Tech Stack
+Prerequisites:
 
-| Layer | Choice |
-|---|---|
-| HTTP Server | Hono.js |
-| Database | PostgreSQL 16 + Drizzle ORM |
-| AI/LLM | Provider-agnostic (OpenAI, NVIDIA NIM, custom) |
-| Queue | BullMQ + Redis 7 |
-| Auth | JWT + bcrypt, AES-256-GCM for secrets |
-| Frontend | React 19 + Vite + Tailwind CSS + Zustand |
-| Monorepo | npm workspaces |
-| CI/CD | GitHub Actions |
-
----
-
-## Environment Variables
-
-| Variable | Required | Default | Description |
-|---|---|---|---|
-| `DATABASE_URL` | Yes | `postgres://...` | PostgreSQL connection string |
-| `REDIS_URL` | Yes | `redis://localhost:6379` | Redis connection string |
-| `JWT_SECRET` | **Production** | — | JWT signing key (min 32 chars) |
-| `DATA_ENCRYPTION_KEY` | **Production** | — | AES-256 key for credential encryption (min 32 chars) |
-| `CORS_ORIGIN` | No | `*` | Allowed CORS origin |
-| `AI_PROVIDER` | No | `openai` | `openai`, `nvidia`, or `custom` |
-| `AI_API_KEY` | Varies | — | API key for the AI provider |
-| `AI_MODEL` | No | `gpt-4o-mini` / `z-ai/glm-5.2` | Model name |
-| `AI_BASE_URL` | Varies | — | Base URL for the AI provider |
-| `PORT` | No | `3001` | API server port |
-| `NODE_ENV` | No | `development` | `development`, `production`, or `test` |
-
----
-
-## Development
-
-```bash
-# Start infrastructure
-docker compose up -d
-
-# Start dev servers (hot reload)
-npm run dev
-
-# Run tests (5 tests, all passing)
-npm test
-
-# TypeScript check
-npm run lint
-
-# Build for production
-npm run build
-```
-
-### Project Structure
-
-```
-taxpro-mvp/
-├── apps/
-│   ├── api/           # Hono.js backend (TypeScript)
-│   │   ├── src/config/    # Env, DB, AI config
-│   │   ├── src/db/schema/ # 11 Drizzle table definitions
-│   │   ├── src/modules/   # Auth, NetSuite, Mapping, Provision, Import
-│   │   └── src/lib/       # Errors, middleware, crypto, logger
-│   └── web/           # React frontend (Vite + Tailwind)
-│       └── src/pages/ # Dashboard, DataSources, Mapping, Provision
-├── packages/
-│   └── tax-engine/    # Pure calculation logic (no HTTP deps)
-│       └── src/       # Current tax, deferred tax, rollforward, ETR, JE
-├── infrastructure/    # nginx, docker compose, init scripts
-├── scripts/           # First-run setup
-└── .github/           # CI/CD pipelines
-```
-
----
-
-## Production Deployment
-
-### 1. Prerequisites
-
-- Docker Engine 24+ on your server
-- Docker Compose v2+
-- Domain name (optional, for HTTPS)
-- AI provider API key (NVIDIA NIM, OpenAI, or custom)
-
-### 2. Configure
+- Node.js 22+
+- Docker
+- PostgreSQL and Redis via Docker Compose
 
 ```bash
 cp .env.example .env
-# Edit .env with production values:
-#   JWT_SECRET=         ← generate: openssl rand -base64 32
-#   DATA_ENCRYPTION_KEY= ← generate: openssl rand -base64 32
-#   AI_API_KEY=         ← your NVIDIA/OpenAI key
-#   CORS_ORIGIN=https://yourdomain.com
-#   NODE_ENV=production
+docker compose up -d
+npm install --include=dev
+npm run db:migrate
+npm run db:seed
+npm run dev
 ```
 
-### 3. Deploy with Docker Compose
+Open:
+
+```text
+http://localhost:5173
+```
+
+Demo login:
+
+```text
+demo@taxpro.ai
+TaxProDemo123!
+```
+
+## Synthetic Data And Product Tests
+
+Create synthetic multi-entity provision data:
 
 ```bash
-# Pull and start all services
-docker compose -f infrastructure/docker-compose.prod.yml up -d
-
-# Run migrations
-docker compose -f infrastructure/docker-compose.prod.yml exec api sh -c \
-  'npx drizzle-kit migrate --config=apps/api/drizzle.config.ts'
-
-# (Optional) Seed demo data
-docker compose -f infrastructure/docker-compose.prod.yml exec api sh -c \
-  'node --import tsx apps/api/src/db/seed.ts'
+npm run db:synthetic -w apps/api
 ```
 
-The app will be available at `http://localhost:80`.
-
-### 4. Deploy with GitHub Actions
-
-Push a version tag to trigger the deploy pipeline:
+Run the synthetic provision suite:
 
 ```bash
-git tag v0.1.0
-git push origin v0.1.0
+npx -w apps/api tsx scripts/run-provision-tests.ts
 ```
 
-Images are published to `ghcr.io/<your-org>/taxpro-mvp/api` and `.../web`.
+This validates consolidated and entity-level provision runs across quarterly periods.
 
----
+## SEC EDGAR Evaluation
 
-## API Reference
+TaxPro includes a public-data evaluation harness that compares the tax engine's ETR calculations against audited SEC company facts.
 
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/health` | Health check |
-| `GET` | `/api/status` | Full status (includes DB check) |
-| `POST` | `/api/auth/register` | Register new tenant + user |
-| `POST` | `/api/auth/login` | Login, returns JWT |
-| `POST` | `/api/netsuite/connections` | Create NetSuite connection |
-| `GET` | `/api/netsuite/connections` | List connections |
-| `POST` | `/api/netsuite/connections/:id/sync` | Trigger full sync |
-| `GET` | `/api/mapping/mappings` | List tax mappings |
-| `POST` | `/api/mapping/mappings/run-ai` | Run AI/fallback mapping |
-| `POST` | `/api/mapping/mappings/:id/override` | Override a mapping |
-| `GET` | `/api/import/trial-balance/template` | Download CSV template |
-| `POST` | `/api/import/trial-balance` | Upload trial balance CSV |
-| `POST` | `/api/provision/run` | Run provision calculation |
-| `GET` | `/api/provision/results` | List provision results |
-| `GET` | `/api/provision/results/:id/export` | Export workpaper CSV |
+Run online:
 
----
+```bash
+npm run eval
+```
 
-## Demo
+Run from cache:
 
-A demo tenant with sample data is available:
+```bash
+OFFLINE=1 npm run eval
+```
 
-- **URL:** `http://localhost:5173`
-- **Email:** `demo@taxpro.ai`
-- **Password:** `TaxProDemo123!`
+The harness:
 
-The demo includes 8 accounts covering all tax treatment types (permanent differences, temporary differences, no difference) with pre-loaded AI mappings and trial balance data for FY 2026.
+- resolves CIKs
+- fetches SEC company facts
+- extracts pretax income, tax expense, and ETR reconciliation items
+- maps XBRL tags into engine inputs
+- reports pass, warn, fail, or skip by ETR basis-point delta
 
----
+This is an evaluation aid, not a substitute for tax professional review.
 
-## License
+## Verification
 
-MIT
+Recommended local checks:
+
+```bash
+npm run lint
+npm test
+npm run build
+npx -w apps/api tsx scripts/run-provision-tests.ts
+OFFLINE=1 npm run eval
+```
+
+Current expected baseline:
+
+- TypeScript lint passes
+- Tax-engine unit tests pass
+- Production build passes
+- Synthetic provision suite passes
+- EDGAR eval has no engine failures, with some skips due to public filing data limitations
+
+## Production Priorities
+
+Before serving real customers:
+
+1. Add API integration tests for import, provision, review, finalize, and package export.
+2. Strengthen CSV import with a production CSV parser and row-level validation report.
+3. Store generated packages in object storage with immutable links.
+4. Add role-based access control for preparer, reviewer, admin, and partner roles.
+5. Add prompt/output redaction and retention controls.
+6. Move from raw schema runner to versioned migrations.
+7. Expand public-data eval with curated SEC filings and manually verified ground truth.
+8. Add reviewer signoff certificates and locked run snapshots.
+
+## Positioning
+
+TaxPro is best positioned as:
+
+```text
+AI-assisted ASC 740 provision delivery for lean corporate tax teams.
+```
+
+The customer outcome is not "another dashboard." The outcome is a reviewed provision package that a tax team can use, inspect, defend, and deliver.

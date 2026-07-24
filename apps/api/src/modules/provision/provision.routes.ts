@@ -194,7 +194,13 @@ provisionRoutes.post('/run', zValidator('json', runProvisionSchema), async (c) =
 
     // ── Subagent swarm: run all 3 in parallel (fire-and-forget with tracing) ──
     const subagentPromises = Promise.allSettled([
-      runMappingAgent({
+      runTracedSubagent({
+        tenantId: user.tenantId,
+        userId: user.userId,
+        provisionRunId: run.id,
+        workflowName: 'subagent_mapping_agent',
+        promptVersion: 'mapping-agent-v1',
+        input: {
         tenantId: user.tenantId,
         tenantName: tenant.name,
         accounts: Array.from(grouped.entries()).map(([accountId, netBalance]) => {
@@ -208,17 +214,17 @@ provisionRoutes.post('/run', zValidator('json', runProvisionSchema), async (c) =
             netBalance,
           };
         }),
-      }).then(async (subResult) => {
-        if (subResult.success) {
-          const aiRunId = (await startAiRun({
-            tenantId: user.tenantId, userId: user.userId, provisionRunId: run.id,
-            workflowName: 'subagent_mapping_agent', promptVersion: 'mapping-agent-v1',
-          }, subResult)).id;
-          await completeAiRun(aiRunId, subResult);
-        }
+        },
+        execute: runMappingAgent,
       }),
 
-      draftAuditMemo({
+      runTracedSubagent({
+        tenantId: user.tenantId,
+        userId: user.userId,
+        provisionRunId: run.id,
+        workflowName: 'subagent_audit_defense',
+        promptVersion: 'audit-defense-v2',
+        input: {
         entityName: tenant.name,
         period,
         bookIncome: calculation.summary.bookIncome,
@@ -237,15 +243,17 @@ provisionRoutes.post('/run', zValidator('json', runProvisionSchema), async (c) =
           timingCategory: d.timingCategory ?? 'TEMP_OTHER',
           difference: d.difference,
         })),
-      }).then(async (subResult) => {
-        const aiRunId = (await startAiRun({
-          tenantId: user.tenantId, userId: user.userId, provisionRunId: run.id,
-          workflowName: 'subagent_audit_defense', promptVersion: 'audit-defense-v2',
-        }, subResult)).id;
-        await completeAiRun(aiRunId, subResult);
+        },
+        execute: draftAuditMemo,
       }),
 
-      mineCredits({
+      runTracedSubagent({
+        tenantId: user.tenantId,
+        userId: user.userId,
+        provisionRunId: run.id,
+        workflowName: 'subagent_credit_miner',
+        promptVersion: 'credit-miner-v1',
+        input: {
         tenantId: user.tenantId,
         tenantName: tenant.name,
         period,
@@ -260,12 +268,8 @@ provisionRoutes.post('/run', zValidator('json', runProvisionSchema), async (c) =
             balance,
           };
         }),
-      }).then(async (subResult) => {
-        const aiRunId = (await startAiRun({
-          tenantId: user.tenantId, userId: user.userId, provisionRunId: run.id,
-          workflowName: 'subagent_credit_miner', promptVersion: 'credit-miner-v1',
-        }, subResult)).id;
-        await completeAiRun(aiRunId, subResult);
+        },
+        execute: mineCredits,
       }),
     ]);
 
@@ -314,6 +318,51 @@ provisionRoutes.get('/runs/:id/review-items', async (c) => {
     ))
     .orderBy(reviewItems.createdAt);
   return c.json(items);
+});
+
+provisionRoutes.get('/runs/:id/ai-findings', async (c) => {
+  const user = c.get('user');
+  const provisionRunId = c.req.param('id');
+  const [run] = await db.select().from(provisionRuns)
+    .where(and(
+      eq(provisionRuns.id, provisionRunId),
+      eq(provisionRuns.tenantId, user.tenantId),
+    ))
+    .limit(1);
+
+  if (!run) throw new BadRequestError('Provision run not found');
+
+  const agentRuns = await db.select().from(aiRuns)
+    .where(and(
+      eq(aiRuns.tenantId, user.tenantId),
+      eq(aiRuns.provisionRunId, provisionRunId),
+    ))
+    .orderBy(aiRuns.startedAt);
+
+  const trackedSubagents = new Set([
+    'subagent_mapping_agent',
+    'subagent_audit_defense',
+    'subagent_credit_miner',
+  ]);
+  const hasPendingSubagent = agentRuns.some((agentRun) =>
+    trackedSubagents.has(agentRun.workflowName) && agentRun.status === 'started',
+  );
+
+  return c.json({
+    provisionRunId,
+    pending: hasPendingSubagent,
+    agents: agentRuns.map((agentRun) => ({
+      workflowName: agentRun.workflowName,
+      status: agentRun.status,
+      promptVersion: agentRun.promptVersion,
+      provider: agentRun.provider,
+      model: agentRun.model,
+      errorMessage: agentRun.errorMessage,
+      startedAt: agentRun.startedAt,
+      completedAt: agentRun.completedAt,
+      output: agentRun.outputJson,
+    })),
+  });
 });
 
 provisionRoutes.get('/results', async (c) => {
@@ -516,6 +565,33 @@ async function buildAgentCalculationInput(args: {
   }
 }
 
+async function runTracedSubagent<Input, Output>(args: {
+  tenantId: string;
+  userId: string;
+  provisionRunId: string;
+  workflowName: string;
+  promptVersion: string;
+  input: Input;
+  execute: (input: Input) => Promise<Output>;
+}) {
+  const aiRun = await startAiRun({
+    tenantId: args.tenantId,
+    userId: args.userId,
+    provisionRunId: args.provisionRunId,
+    workflowName: args.workflowName,
+    promptVersion: args.promptVersion,
+  }, args.input);
+
+  try {
+    const output = await args.execute(args.input);
+    await completeAiRun(aiRun.id, output);
+    return output;
+  } catch (err) {
+    await failAiRun(aiRun.id, err);
+    throw err;
+  }
+}
+
 async function createReviewItemsForRun(
   provisionRunId: string,
   tenantId: string,
@@ -668,8 +744,9 @@ provisionRoutes.post('/runs/:runId/review-items/:itemId/resolve', zValidator('js
     )).limit(1);
   if (!item) throw new BadRequestError('Review item not found');
 
+  const resolvedStatus = resolution === 'rejected' ? 'rejected' : 'resolved';
   await db.update(reviewItems).set({
-    status: resolution === 'approved' ? 'resolved' : 'rejected',
+    status: resolvedStatus,
     resolvedByUserId: user.userId,
     resolutionNote: resolutionNote ?? null,
     resolvedAt: new Date(),
@@ -711,7 +788,7 @@ provisionRoutes.post('/runs/:runId/review-items/:itemId/resolve', zValidator('js
     }).where(eq(provisionRuns.id, runId));
   }
 
-  return c.json({ itemId, status: resolution === 'approved' ? 'resolved' : 'rejected', openRemaining: openItems.length });
+  return c.json({ itemId, status: resolvedStatus, openRemaining: openItems.length });
 });
 
 // Bulk resolve all open items for a run
