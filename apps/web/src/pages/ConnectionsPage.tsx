@@ -15,13 +15,15 @@ export default function ConnectionsPage() {
   const [conns, setConns] = useState<Connection[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const loadConns = async () => {
     try {
       const data = await connApi.list();
       setConns(data);
-    } catch (err) {
-      console.error(err);
+      setLoadError(null);
+    } catch (err: any) {
+      setLoadError(err.message || 'Failed to load connections');
     } finally {
       setLoading(false);
     }
@@ -43,6 +45,10 @@ export default function ConnectionsPage() {
           {showForm ? 'Cancel' : '+ Add Connection'}
         </button>
       </div>
+
+      {loadError && (
+        <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-4 mb-4 text-sm">{loadError}</div>
+      )}
 
       <CsvImportPanel />
 

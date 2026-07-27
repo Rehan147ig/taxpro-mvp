@@ -14,8 +14,37 @@
  * workpaper package or audit response letter.
  */
 
+import { z } from 'zod';
 import { callJsonModel } from '../../eve/model-client.js';
 import { logger } from '../../lib/logger.js';
+
+const auditDefenseSchema = z.object({
+  executiveSummary: z.string(),
+  etrWalk: z.array(z.object({
+    description: z.string(),
+    amount: z.number(),
+    taxImpact: z.number(),
+    rateImpactPercent: z.number(),
+    narrative: z.string(),
+  })),
+  technicalMemos: z.array(z.object({
+    title: z.string(),
+    ircSection: z.string(),
+    bookTreatment: z.string(),
+    taxTreatment: z.string(),
+    amount: z.number(),
+    taxImpact: z.number(),
+    citation: z.string(),
+    narrative: z.string(),
+    riskLevel: z.enum(['low', 'medium', 'high']),
+  })),
+  riskFlags: z.array(z.object({
+    severity: z.enum(['low', 'medium', 'high']),
+    description: z.string(),
+    recommendation: z.string(),
+  })),
+  qualityScore: z.number(),
+});
 
 // ── Types ──
 
@@ -137,7 +166,8 @@ export async function draftAuditMemo(input: AuditDefenseInput): Promise<AuditDef
       previousYearETR: input.previousYearETR,
     };
 
-    const response = await callJsonModel<AuditDefenseResult>({
+    const response = await callJsonModel({
+      schema: auditDefenseSchema,
       system: AUDIT_DEFENSE_SYSTEM_PROMPT,
       user: `Draft audit defense workpapers for the following ASC 740 tax provision.${etrChangeNote}\n\nData:\n${JSON.stringify(prompt, null, 2)}`,
       promptVersion: 'audit-defense-v2',

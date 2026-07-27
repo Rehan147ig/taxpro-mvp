@@ -6,9 +6,23 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "lint": "tsc --noEmit",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@opentelemetry/api": "^1.9.1",
+    "@opentelemetry/context-zone": "^2.10.0",
+    "@opentelemetry/exporter-logs-otlp-http": "^0.221.0",
+    "@opentelemetry/exporter-metrics-otlp-http": "^0.221.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.221.0",
+    "@opentelemetry/instrumentation": "^0.221.0",
+    "@opentelemetry/instrumentation-document-load": "^0.66.0",
+    "@opentelemetry/instrumentation-fetch": "^0.221.0",
+    "@opentelemetry/resources": "^2.10.0",
+    "@opentelemetry/sdk-logs": "^0.221.0",
+    "@opentelemetry/sdk-metrics": "^2.10.0",
+    "@opentelemetry/sdk-trace-base": "^2.10.0",
+    "@opentelemetry/sdk-trace-web": "^2.10.0",
     "@tanstack/react-router": "^1.82.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -21,7 +35,7 @@
     "autoprefixer": "^10.4.0",
     "postcss": "^8.4.0",
     "tailwindcss": "^3.4.0",
-    "typescript": "^5.7.0",
+    "typescript": "^5.9.3",
     "vite": "^6.4.3"
   }
 }

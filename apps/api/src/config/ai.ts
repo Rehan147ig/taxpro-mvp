@@ -1,8 +1,10 @@
-import OpenAI from 'openai';
+import { createOpenAI } from '@ai-sdk/openai';
+import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
+import type { LanguageModel } from 'ai';
 import { env } from './env.js';
 
 /**
- * AI provider configuration.
+ * AI provider configuration (Vercel AI SDK).
  *
  * Supports any OpenAI-compatible API by setting:
  *   AI_PROVIDER  = openai | nvidia | custom
@@ -29,9 +31,8 @@ const PROVIDER_DEFAULTS: Record<string, { baseUrl: string; model: string }> = {
 };
 
 export interface AiConfig {
-  client: OpenAI;
-  model: string;
-  supportsJsonMode: boolean;
+  model: LanguageModel;
+  modelName: string;
   provider: string;
 }
 
@@ -50,7 +51,6 @@ function resolveConfig(): AiConfig {
   const provider = env.AI_PROVIDER || 'openai';
   const defaults = PROVIDER_DEFAULTS[provider] || PROVIDER_DEFAULTS.openai;
 
-  // Resolve API key
   const apiKey = env.AI_API_KEY || env.OPENAI_API_KEY;
   if (!apiKey) {
     throw new Error(
@@ -58,32 +58,31 @@ function resolveConfig(): AiConfig {
     );
   }
 
-  // Resolve base URL
   const baseUrl = env.AI_BASE_URL || defaults.baseUrl;
   if (!baseUrl && provider === 'custom') {
     throw new Error('AI_BASE_URL is required when AI_PROVIDER=custom');
   }
 
-  // Resolve model name
-  const model = env.AI_MODEL || defaults.model;
-  if (!model && provider === 'custom') {
+  const modelName = env.AI_MODEL || defaults.model;
+  if (!modelName && provider === 'custom') {
     throw new Error('AI_MODEL is required when AI_PROVIDER=custom');
   }
 
-  // Not all providers support response_format: { type: 'json_object' }
-  const supportsJsonMode = provider === 'openai';
+  // Native OpenAI provider for api.openai.com; OpenAI-compatible provider
+  // (chat completions) for NVIDIA / custom gateways that lack the Responses API.
+  const model: LanguageModel = provider === 'openai' && !env.AI_BASE_URL
+    ? createOpenAI({ apiKey })(modelName)
+    : createOpenAICompatible({ name: provider, apiKey, baseURL: baseUrl })(modelName);
 
-  const client = new OpenAI({ apiKey, baseURL: baseUrl });
-
-  cachedConfig = { client, model, supportsJsonMode, provider };
+  cachedConfig = { model, modelName, provider };
   return cachedConfig;
 }
 
 /**
- * Get the configured AI client.
+ * Get the configured AI SDK language model.
  * Throws if no API key is set.
  */
-export function getAiClient(): AiConfig {
+export function getAiModel(): AiConfig {
   return resolveConfig();
 }
 

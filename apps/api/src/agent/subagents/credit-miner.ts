@@ -15,8 +15,22 @@
  * ensures the credit amounts are auditable and reproducible.
  */
 
+import { z } from 'zod';
 import { callJsonModel } from '../../eve/model-client.js';
 import { logger } from '../../lib/logger.js';
+
+const creditIdentificationSchema = z.object({
+  accountMatches: z.array(z.object({
+    accountId: z.string(),
+    accountName: z.string(),
+    balance: z.number(),
+    creditType: z.string(),
+    category: z.string(),
+    confidence: z.string(),
+    description: z.string(),
+  })),
+  recommendations: z.array(z.string()),
+});
 
 // ── Types ──
 
@@ -142,13 +156,8 @@ export async function mineCredits(input: CreditMinerInput): Promise<CreditMinerR
 
   try {
     // Step 1: Identify qualifying accounts via LLM
-    const identificationResponse = await callJsonModel<{
-      accountMatches: Array<{
-        accountId: string; accountName: string; balance: number;
-        creditType: string; category: string; confidence: string; description: string;
-      }>;
-      recommendations: string[];
-    }>({
+    const identificationResponse = await callJsonModel({
+      schema: creditIdentificationSchema,
       system: CREDIT_IDENTIFICATION_SYSTEM_PROMPT,
       user: `Analyze this trial balance for potential tax credits. Fiscal year: ${input.fiscalYear}.\n\nAccounts:\n${JSON.stringify(input.trialBalance.map(a => ({ number: a.accountNumber, name: a.accountName, type: a.accountType, balance: a.balance })), null, 2)}\n\n${input.priorYearBalances ? `Prior year balances for comparison:\n${JSON.stringify(input.priorYearBalances.map(a => ({ name: a.accountName, balance: a.balance })), null, 2)}` : ''}`,
       promptVersion: 'credit-miner-id-v1',

@@ -20,7 +20,7 @@ RULES:
 6. For temporary taxable differences (DTL), the tax income comes AFTER the book income.
 7. When uncertain, prefer NO_DIFF over guessing a specific category.
 
-You must respond with a JSON array of classifications, one per account.`;
+You must respond with a JSON object: { "mappings": [ ... ] } — one mapping per account.`;
 
 export function buildUserPrompt(
   accounts: { id: string; accountNumber: string; name: string; type: string; detailType?: string }[],
@@ -29,7 +29,7 @@ export function buildUserPrompt(
     `ID: ${a.id} | #${a.accountNumber} | ${a.name} | Type: ${a.type}${a.detailType ? ` | Detail: ${a.detailType}` : ''}`
   ).join('\n');
 
-  return `Classify the following chart of accounts into tax categories.\n\nAccounts:\n${accountLines}\n\nReturn a JSON array of objects with: accountId, taxAccountType, bookTreatment, timingCategory (if temporary), confidenceScore (0.0-1.0), and explanation.`;
+  return `Classify the following chart of accounts into tax categories.\n\nAccounts:\n${accountLines}\n\nReturn a JSON object { "mappings": [...] } where each mapping has: accountId, taxAccountType, bookTreatment, timingCategory (if temporary), confidenceScore (0.0-1.0), and explanation.`;
 }
 
 /**

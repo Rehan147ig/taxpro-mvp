@@ -4,6 +4,7 @@ import { provision, connections as connApi, mappings as mappingApi } from '../ap
 export default function Dashboard() {
   const [stats, setStats] = useState({ connections: 0, mappings: 0, provisions: 0 });
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -14,7 +15,7 @@ export default function Dashboard() {
       .then(([conns, maps, provs]) => {
         setStats({ connections: conns, mappings: maps, provisions: provs });
       })
-      .catch(() => {})
+      .catch((err: any) => setLoadError(err.message || 'Failed to load dashboard data'))
       .finally(() => setLoading(false));
   }, []);
 
@@ -27,6 +28,10 @@ export default function Dashboard() {
   return (
     <div>
       <h2 className="text-2xl font-bold mb-6">Dashboard</h2>
+
+      {loadError && (
+        <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-4 mb-6 text-sm">{loadError}</div>
+      )}
 
       <div className="grid grid-cols-3 gap-4 mb-8">
         {cards.map((card) => (

@@ -26,3 +26,15 @@ export class BadRequestError extends AppError {
     super(400, message, details);
   }
 }
+
+export class ForbiddenError extends AppError {
+  constructor(message = 'Forbidden') {
+    super(403, message);
+  }
+}
+
+export class ConflictError extends AppError {
+  constructor(message: string) {
+    super(409, message);
+  }
+}

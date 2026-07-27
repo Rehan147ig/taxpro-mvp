@@ -1,9 +1,11 @@
 import { pgTable, uuid, varchar, decimal, date, timestamp } from 'drizzle-orm/pg-core';
 import { tenants } from './tenants.js';
+import { provisionRuns } from './provision-runs.js';
 
 export const provisionResults = pgTable('provision_results', {
   id: uuid('id').defaultRandom().primaryKey(),
   tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
+  provisionRunId: uuid('provision_run_id').references(() => provisionRuns.id),
   period: date('period').notNull(),
   status: varchar('status', { length: 20 }).default('draft'),
   currentTaxExpense: decimal('current_tax_expense', { precision: 18, scale: 2 }).default('0'),
@@ -15,6 +17,4 @@ export const provisionResults = pgTable('provision_results', {
   taxPayable: decimal('tax_payable', { precision: 18, scale: 2 }).default('0'),
   valuationAllowance: decimal('valuation_allowance', { precision: 18, scale: 2 }).default('0'),
   createdAt: timestamp('created_at').defaultNow(),
-}, (table) => ({
-  unq: { name: 'uq_provision_period', unique: true, columns: [table.tenantId, table.period] },
-}));
+});

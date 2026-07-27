@@ -1,4 +1,4 @@
-import { db, pool } from '../../../config/db.js';
+import { db, pool, withValidatedTenantContext } from '../../../config/db.js';
 import { entities } from '../../../db/schema/entities.js';
 import { accounts } from '../../../db/schema/accounts.js';
 import { trialBalance } from '../../../db/schema/trial-balance.js';
@@ -13,7 +13,7 @@ import { logger } from '../../../lib/logger.js';
  * from NetSuite and stores them in the local database.
  *
  * Uses Postgres advisory locks to prevent concurrent syncs for the same connection.
- * Runs inside a database transaction for atomicity.
+ * Runs inside a validated tenant context for RLS compliance.
  */
 
 interface SyncResult {
@@ -28,6 +28,13 @@ const LOCK_KEY_PREFIX = 0x10A5C0; // Namespace for advisory locks ('TAXPRO' in h
 export async function syncNetSuite(connectionId: string): Promise<SyncResult> {
   const start = Date.now();
   const lockKey = LOCK_KEY_PREFIX + hashCode(connectionId);
+
+  // ── Resolve connection to get tenantId ──
+  const [conn] = await db.select().from(connections)
+    .where(eq(connections.id, connectionId))
+    .limit(1);
+  if (!conn) throw new Error(`Connection ${connectionId} not found`);
+  const tenantId = conn.tenantId;
 
   // ── Advisory lock to prevent concurrent syncs ──
   const lockClient = await pool.connect();
@@ -46,14 +53,9 @@ export async function syncNetSuite(connectionId: string): Promise<SyncResult> {
   }
 
   try {
-    // ── Run sync inside a transaction ──
-    return await db.transaction(async (tx) => {
-      // 1. Get connection config from DB
-      const [conn] = await tx.select().from(connections)
-        .where(eq(connections.id, connectionId))
-        .limit(1);
-      if (!conn) throw new Error(`Connection ${connectionId} not found`);
-
+    // ── Run sync inside validated tenant context ──
+    return await withValidatedTenantContext(tenantId, async (tx) => {
+      // 1. Update connection sync status
       await tx.update(connections).set({
         syncStatus: 'syncing',
         updatedAt: new Date(),
@@ -77,7 +79,7 @@ export async function syncNetSuite(connectionId: string): Promise<SyncResult> {
       for (const sub of nsEntities) {
         try {
           await tx.insert(entities).values({
-            tenantId: conn.tenantId,
+            tenantId,
             externalId: sub.id,
             name: (sub.name as string) || `Subsidiary ${sub.id}`,
             type: 'domestic',
@@ -105,7 +107,7 @@ export async function syncNetSuite(connectionId: string): Promise<SyncResult> {
         try {
           const acctType = mapNetSuiteAccountType(acct.accttype);
           await tx.insert(accounts).values({
-            tenantId: conn.tenantId,
+            tenantId,
             externalId: acct.id,
             accountNumber: acct.acctnumber,
             name: acct.name,
@@ -132,7 +134,7 @@ export async function syncNetSuite(connectionId: string): Promise<SyncResult> {
       const endDate = `${currentYear}-12-31`;
 
       const syncedEntities = await tx.select().from(entities)
-        .where(eq(entities.tenantId, conn.tenantId));
+        .where(eq(entities.tenantId, tenantId));
       const entityMap = new Map(syncedEntities.map(e => [e.externalId, e.id]));
 
       let tbRowsSynced = 0;
@@ -144,7 +146,7 @@ export async function syncNetSuite(connectionId: string): Promise<SyncResult> {
           for (const row of rows) {
             const [acct] = await tx.select().from(accounts)
               .where(and(
-                eq(accounts.tenantId, conn.tenantId),
+                eq(accounts.tenantId, tenantId),
                 eq(accounts.externalId, row.account_id),
               ))
               .limit(1);
@@ -154,7 +156,7 @@ export async function syncNetSuite(connectionId: string): Promise<SyncResult> {
             if (!entityId) continue;
 
             await tx.insert(trialBalance).values({
-              tenantId: conn.tenantId,
+              tenantId,
               entityId,
               accountId: acct.id,
               period: startDate,
@@ -188,8 +190,7 @@ export async function syncNetSuite(connectionId: string): Promise<SyncResult> {
         updatedAt: new Date(),
       }).where(eq(connections.id, connectionId));
 
-      const durationMs = Date.now() - start;
-      return { entitiesSynced, accountsSynced, tbRowsSynced, durationMs };
+      return { entitiesSynced, accountsSynced, tbRowsSynced, durationMs: Date.now() - start };
     });
   } finally {
     // Release the advisory lock

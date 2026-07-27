@@ -1,11 +1,20 @@
 import React from 'react';
 import { useStore } from './stores/provision.store';
+import { pageViewCounter } from './observability';
 import LoginPage from './pages/LoginPage';
 import Dashboard from './pages/Dashboard';
 import ConnectionsPage from './pages/ConnectionsPage';
 import MappingPage from './pages/MappingPage';
 import ProvisionPage from './pages/ProvisionPage';
 import ReviewDashboard from './pages/ReviewDashboard';
+
+const ROUTE_LABELS: Record<string, string> = {
+  '/': 'dashboard',
+  '/connections': 'connections',
+  '/mapping': 'mapping',
+  '/provision': 'provision',
+  '/review': 'review',
+};
 
 function App() {
   const { isAuthenticated, logout } = useStore();
@@ -31,6 +40,12 @@ function App() {
     window.addEventListener('hashchange', handler);
     return () => window.removeEventListener('hashchange', handler);
   }, []);
+
+  // Track page views
+  React.useEffect(() => {
+    const label = ROUTE_LABELS[currentRoute] || 'unknown';
+    pageViewCounter.add(1, { route: label });
+  }, [currentRoute]);
 
   const NavLink = ({ to, children }: { to: string; children: React.ReactNode }) => (
     <button

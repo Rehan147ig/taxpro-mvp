@@ -5,7 +5,10 @@ config({ path: resolve(dirname(fileURLToPath(import.meta.url)), '../../../../.en
 import { z } from 'zod';
 
 const envSchema = z.object({
+  // Runtime database connection (non-owner NOBYPASSRLS role)
   DATABASE_URL: z.string().default('postgres://postgres:postgres@localhost:5432/taxpro'),
+  // Migration database connection (schema owner role — separate from runtime)
+  DATABASE_URL_MIGRATIONS: z.string().default('postgres://postgres:postgres@localhost:5432/taxpro'),
   REDIS_URL: z.string().default('redis://localhost:6379'),
   JWT_SECRET: z.string().default('dev-secret-change-in-production'),
   DATA_ENCRYPTION_KEY: z.string().min(32, 'DATA_ENCRYPTION_KEY must be at least 32 characters'),

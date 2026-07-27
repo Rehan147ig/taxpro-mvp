@@ -26,7 +26,6 @@
     "vitest": "^4.1.0"
   },
   "dependencies": {
-    "decimal.js": "^10.6.0",
-    "typescript": "^7.0.2"
+    "decimal.js": "^10.6.0"
   }
 }

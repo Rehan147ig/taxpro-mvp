@@ -1,22 +1,34 @@
-import { getAiClient } from '../../../config/ai.js';
+import { z } from 'zod';
+import { callJsonModel } from '../../../eve/model-client.js';
 import { SYSTEM_PROMPT, buildUserPrompt } from './prompt-templates.js';
-import OpenAI from 'openai';
 
 /**
  * AI Semantic Account Mapper.
  *
- * Uses LLM structured output to classify NetSuite accounts into canonical
- * tax categories. Works with any OpenAI-compatible provider (OpenAI, NVIDIA,
- * GLM, etc.) by reading AI_PROVIDER / AI_BASE_URL / AI_MODEL from env.
+ * Uses LLM structured output (Vercel AI SDK generateObject) to classify
+ * NetSuite accounts into canonical tax categories. Works with any
+ * OpenAI-compatible provider (OpenAI, NVIDIA, GLM, etc.) by reading
+ * AI_PROVIDER / AI_BASE_URL / AI_MODEL from env.
  *
  * Flow:
  * 1. Build system prompt with tax domain context
  * 2. Send account data in batches (50 per call)
- * 3. Parse JSON structured output from the LLM
+ * 3. Receive zod-validated structured mappings from the LLM
  * 4. Return typed mappings with confidence scores
  */
 
 const BATCH_SIZE = 50; // Accounts per LLM call
+
+const mappingBatchSchema = z.object({
+  mappings: z.array(z.object({
+    accountId: z.string(),
+    taxAccountType: z.string(),
+    bookTreatment: z.enum(['permanent', 'temporary', 'no_diff']),
+    timingCategory: z.enum(['deductible_temporary', 'taxable_temporary']).optional(),
+    confidenceScore: z.number(),
+    explanation: z.string(),
+  })),
+});
 
 export interface AIMappingResult {
   accountId: string;
@@ -37,17 +49,15 @@ export interface AIMappingInput {
 
 /**
  * Classify accounts using the configured AI provider.
- * Falls back to JSON-in-prompt when JSON mode isn't supported by the provider.
  */
 export async function classifyAccountsAI(
   accounts: AIMappingInput[],
 ): Promise<AIMappingResult[]> {
-  const { client, model, supportsJsonMode } = getAiClient();
   const allResults: AIMappingResult[] = [];
 
   for (let i = 0; i < accounts.length; i += BATCH_SIZE) {
     const batch = accounts.slice(i, i + BATCH_SIZE);
-    const batchResults = await classifyBatch(client, model, batch, supportsJsonMode);
+    const batchResults = await classifyBatch(batch);
     allResults.push(...batchResults);
   }
 
@@ -55,72 +65,17 @@ export async function classifyAccountsAI(
 }
 
 async function classifyBatch(
-  client: OpenAI,
-  model: string,
   accounts: AIMappingInput[],
-  supportsJsonMode: boolean,
 ): Promise<AIMappingResult[]> {
-  const messages: { role: 'system' | 'user'; content: string }[] = [
-    { role: 'system', content: SYSTEM_PROMPT },
-    { role: 'user', content: buildUserPrompt(accounts) },
-  ];
-
-  const requestOptions: any = {
-    model,
-    messages,
+  const response = await callJsonModel({
+    schema: mappingBatchSchema,
+    system: SYSTEM_PROMPT,
+    user: buildUserPrompt(accounts),
+    promptVersion: 'ai-mapper-v2',
     temperature: 0.1,
-    max_tokens: 4096,
-  };
+  });
 
-  // Only request JSON mode if the provider supports it
-  if (supportsJsonMode) {
-    requestOptions.response_format = { type: 'json_object' };
-  } else {
-    // For providers without JSON mode, append a reminder in the user message
-    messages[1] = {
-      role: 'user',
-      content: buildUserPrompt(accounts) +
-        '\n\n⚠ Respond ONLY with a valid JSON array. No markdown, no code fences, no explanation outside the JSON.',
-    };
-  }
-
-  const response = await client.chat.completions.create(requestOptions);
-
-  const content = response.choices[0]?.message?.content;
-  if (!content) {
-    throw new Error('AI returned empty response');
-  }
-
-  return parseResult(content);
-}
-
-/**
- * Parse the LLM response, handling markdown fences and common quirks.
- */
-function parseResult(content: string): AIMappingResult[] {
-  // Strip markdown code fences if present (common with non-JSON-mode providers)
-  let cleaned = content.trim();
-  if (cleaned.startsWith('```')) {
-    cleaned = cleaned.replace(/```(?:json)?\s*/gi, '').replace(/\s*```/g, '');
-  }
-
-  try {
-    const parsed = JSON.parse(cleaned);
-
-    if (parsed.mappings && Array.isArray(parsed.mappings)) {
-      return parsed.mappings as AIMappingResult[];
-    }
-    if (Array.isArray(parsed)) {
-      return parsed as AIMappingResult[];
-    }
-
-    console.warn('[AI Mapper] Unexpected shape:', Object.keys(parsed));
-    return [];
-  } catch (err) {
-    console.error('[AI Mapper] Failed to parse response, falling back');
-    console.error('[AI Mapper] Raw (first 500 chars):', cleaned.slice(0, 500));
-    return [];
-  }
+  return response.parsed.mappings;
 }
 
 // ── Rule-based fallback (used when no LLM is available) ──

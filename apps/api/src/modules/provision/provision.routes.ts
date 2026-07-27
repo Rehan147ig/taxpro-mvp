@@ -1,19 +1,22 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { and, desc, eq, gte, inArray, lte } from 'drizzle-orm';
-import { db } from '../../config/db.js';
+import { and, desc, eq, gte, inArray, lte, not, getTableColumns } from 'drizzle-orm';
+import { withTenantContext } from '../../config/db.js';
 import { trialBalance } from '../../db/schema/trial-balance.js';
 import { taxMappings } from '../../db/schema/tax-mappings.js';
 import { provisionResults } from '../../db/schema/provision-results.js';
 import { provisionRuns } from '../../db/schema/provision-runs.js';
+import { provisionEvents } from '../../db/schema/provision-events.js';
 import { aiRuns } from '../../db/schema/ai-runs.js';
 import { reviewItems } from '../../db/schema/review-items.js';
 import { entities } from '../../db/schema/entities.js';
 import { accounts } from '../../db/schema/accounts.js';
 import { tenants } from '../../db/schema/tenants.js';
+import { users } from '../../db/schema/users.js';
 import { authMiddleware } from '../../lib/middleware/auth.js';
-import { BadRequestError } from '../../lib/errors.js';
+import { getUser, requireRole, requireRunAccess, assertRunIsMutable, canMutate } from '../../lib/middleware/rbac.js';
+import { BadRequestError, ForbiddenError } from '../../lib/errors.js';
 import { generateProvisionWorkbook } from '../export/excel-generator.js';
 import { generateWorkpaperPackage } from '../export/package-export.js';
 import { createAuditLog } from '../export/audit-log.js';
@@ -25,7 +28,11 @@ import { runMappingAgent } from '../../agent/subagents/mapping-agent.js';
 import { draftAuditMemo } from '../../agent/subagents/audit-defense.js';
 import { mineCredits } from '../../agent/subagents/credit-miner.js';
 import { completeAiRun, failAiRun, startAiRun } from '../../eve/trace-store.js';
+import { withSpan } from '@superlog/otel-helpers';
+import { tracer, agentRunCounter, provisionRunCounter, reviewResolutionCounter, packageExportCounter } from '../../lib/observability.js';
 import { runProvisionMath } from './provision-calculator.js';
+import { computeBookTaxDifferences, Decimal } from '@taxpro/tax-engine';
+import { recordProvisionEvent, getEventsForRun, EVENT_TYPES } from './provision-events.js';
 
 const INCOME_TYPES = new Set(['Income', 'Revenue', 'OtherIncome', 'Sales', 'ServiceRevenue']);
 const EXPENSE_TYPES = new Set(['Expense', 'COGS', 'OtherExpense', 'OperatingExpense', 'SG&A', 'CostOfSales']);
@@ -33,6 +40,15 @@ const LOW_CONFIDENCE_THRESHOLD = 0.75;
 
 export const provisionRoutes = new Hono();
 provisionRoutes.use('*', authMiddleware);
+
+provisionRoutes.get('/entities', async (c) => {
+  const user = c.get('user');
+  return withTenantContext(user.tenantId, async (tx) => {
+    const entityList = await tx.select({ id: entities.id, name: entities.name, type: entities.type })
+      .from(entities).where(eq(entities.tenantId, user.tenantId));
+    return c.json(entityList);
+  });
+});
 
 const runProvisionSchema = z.object({
   period: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -43,104 +59,123 @@ const runProvisionSchema = z.object({
 provisionRoutes.post('/run', zValidator('json', runProvisionSchema), async (c) => {
   const user = c.get('user');
   const { period, endPeriod, entityId } = c.req.valid('json');
-  // Eve runs by default. Use ?direct=true to bypass AI analysis.
   const useDirect = c.req.query('direct') === 'true';
   const mode = useDirect ? 'direct' : 'eve';
 
-  const [tenant] = await db.select().from(tenants).where(eq(tenants.id, user.tenantId)).limit(1);
-  if (!tenant) throw new BadRequestError('Tenant not found');
+  return withTenantContext(user.tenantId, async (tx) => {
+    const [tenant] = await tx.select().from(tenants).where(eq(tenants.id, user.tenantId)).limit(1);
+    if (!tenant) throw new BadRequestError('Tenant not found');
 
-  const periodEnd = endPeriod ?? period;
-  const tenantEntities = entityId
-    ? await db.select().from(entities).where(and(eq(entities.tenantId, user.tenantId), eq(entities.id, entityId))).limit(1)
-    : await db.select().from(entities).where(eq(entities.tenantId, user.tenantId));
-  if (tenantEntities.length === 0) throw new BadRequestError('No entities found. Import trial balance data first.');
+    const periodEnd = endPeriod ?? period;
+    const tenantEntities = entityId
+      ? await tx.select().from(entities).where(and(eq(entities.tenantId, user.tenantId), eq(entities.id, entityId))).limit(1)
+      : await tx.select().from(entities).where(eq(entities.tenantId, user.tenantId));
+    if (tenantEntities.length === 0) throw new BadRequestError('No entities found. Import trial balance data first.');
 
-  const tbData = await db.select().from(trialBalance)
-    .where(and(
-      eq(trialBalance.tenantId, user.tenantId),
-      gte(trialBalance.period, period),
-      lte(trialBalance.period, periodEnd),
-      ...(entityId ? [eq(trialBalance.entityId, entityId)] : []),
-    ));
-  if (tbData.length === 0) throw new BadRequestError('No trial balance data for this period.');
-
-  const mappings = await db.select().from(taxMappings)
-    .where(and(eq(taxMappings.tenantId, user.tenantId), eq(taxMappings.isActive, true)));
-  const mappingMap = new Map(mappings.map((m) => [m.accountId, m]));
-
-  const accountIds = [...new Set(tbData.map((t) => t.accountId))];
-  const provisionAccounts = accountIds.length > 0
-    ? await db.select().from(accounts)
-      .where(and(eq(accounts.tenantId, user.tenantId), inArray(accounts.id, accountIds)))
-    : [];
-  const accountMap = new Map(provisionAccounts.map((account) => [account.id, account]));
-
-  const inputDataHash = stableHash(tbData.map((row) => ({
-    entityId: row.entityId,
-    accountId: row.accountId,
-    period: row.period,
-    periodEnd: row.periodEnd,
-    balance: row.balance,
-  })));
-  const mappingVersionHash = stableHash(mappings.map((mapping) => ({
-    accountId: mapping.accountId,
-    taxAccountType: mapping.taxAccountType,
-    bookTreatment: mapping.bookTreatment,
-    timingCategory: mapping.timingCategory,
-    version: mapping.version,
-  })));
-
-  const [run] = await db.insert(provisionRuns).values({
-    tenantId: user.tenantId,
-    requestedByUserId: user.userId,
-    period,
-    endPeriod: periodEnd,
-    entityId,
-    mode,
-    status: 'normalized',
-    inputDataHash,
-    mappingVersionHash,
-  }).returning();
-
-  try {
-    // Auto-review: skip review queue if same data was previously approved
-    const previousRun = await db.select().from(provisionRuns)
+    const tbData = await tx.select().from(trialBalance)
       .where(and(
-        eq(provisionRuns.tenantId, user.tenantId),
-        eq(provisionRuns.period, period),
-        eq(provisionRuns.inputDataHash, inputDataHash),
-        eq(provisionRuns.approvalStatus, 'approved'),
-      ))
-      .orderBy(desc(provisionRuns.createdAt))
-      .limit(1);
+        eq(trialBalance.tenantId, user.tenantId),
+        gte(trialBalance.period, period),
+        lte(trialBalance.period, periodEnd),
+        ...(entityId ? [eq(trialBalance.entityId, entityId)] : []),
+      ));
+    if (tbData.length === 0) throw new BadRequestError('No trial balance data for this period.');
 
-    const reviewSummary = previousRun.length > 0
-      ? { openCount: 0 }
-      : await createReviewItemsForRun(run.id, user.tenantId, tbData, mappingMap, accountMap);
-    const grouped = groupTrialBalanceByAccount(tbData);
+    const mappings = await tx.select().from(taxMappings)
+      .where(and(eq(taxMappings.tenantId, user.tenantId), eq(taxMappings.isActive, true)));
+    const mappingMap = new Map(mappings.map((m) => [m.accountId, m]));
 
-    const calculationInput = !useDirect
-      ? await buildAgentCalculationInput({
-        tenant,
-        userId: user.userId,
-        provisionRunId: run.id,
-        tenantId: user.tenantId,
-        period,
-        endPeriod: periodEnd,
-        entityId,
-        grouped,
-        mappings,
-        accountMap,
-      }).catch(async (err) => {
-        // Eve unavailable (rate limit, API down) — fall back to direct path
-        logger.warn({ err }, '[Provision] Eve agent failed, falling back to direct');
-        await db.update(provisionRuns).set({
-          status: 'needs_review',
-          exceptionSummary: `Eve agent unavailable: ${err instanceof Error ? err.message : 'Unknown error'}. Run processed in direct mode.`,
-          updatedAt: new Date(),
-        }).where(eq(provisionRuns.id, run.id));
-        return buildDeterministicCalculationInput({
+    const accountIds = [...new Set(tbData.map((t) => t.accountId))];
+    const provisionAccounts = accountIds.length > 0
+      ? await tx.select().from(accounts)
+        .where(and(eq(accounts.tenantId, user.tenantId), inArray(accounts.id, accountIds)))
+      : [];
+    const accountMap = new Map(provisionAccounts.map((account) => [account.id, account]));
+
+    const inputDataHash = stableHash(tbData.map((row) => ({
+      entityId: row.entityId,
+      accountId: row.accountId,
+      period: row.period,
+      periodEnd: row.periodEnd,
+      balance: row.balance,
+    })));
+    const mappingVersionHash = stableHash(mappings.map((mapping) => ({
+      accountId: mapping.accountId,
+      taxAccountType: mapping.taxAccountType,
+      bookTreatment: mapping.bookTreatment,
+      timingCategory: mapping.timingCategory,
+      version: mapping.version,
+    })));
+
+    const [run] = await tx.insert(provisionRuns).values({
+      tenantId: user.tenantId,
+      requestedByUserId: user.userId,
+      preparedByUserId: user.userId,
+      period,
+      endPeriod: periodEnd,
+      entityId,
+      mode,
+      status: 'normalized',
+      inputDataHash,
+      mappingVersionHash,
+    }).returning();
+
+    await recordProvisionEvent({
+      tenantId: user.tenantId,
+      provisionRunId: run.id,
+      eventType: EVENT_TYPES.RUN_CREATED,
+      actorType: 'user',
+      actorUserId: user.userId,
+      reason: `Provision run created for period ${period}`,
+      metadata: { mode, entityId, period },
+    }, tx);
+
+    try {
+      const previousRun = await tx.select().from(provisionRuns)
+        .where(and(
+          eq(provisionRuns.tenantId, user.tenantId),
+          eq(provisionRuns.period, period),
+          eq(provisionRuns.inputDataHash, inputDataHash),
+          eq(provisionRuns.approvalStatus, 'approved'),
+        ))
+        .orderBy(desc(provisionRuns.createdAt))
+        .limit(1);
+
+      const reviewSummary = previousRun.length > 0
+        ? { openCount: 0 }
+        : await createReviewItemsForRun(tx, run.id, user.tenantId, tbData, mappingMap, accountMap);
+      const grouped = groupTrialBalanceByAccount(tbData);
+
+      const calculationInput = !useDirect
+        ? await buildAgentCalculationInput(tx, {
+          tenant,
+          userId: user.userId,
+          provisionRunId: run.id,
+          tenantId: user.tenantId,
+          period,
+          endPeriod: periodEnd,
+          entityId,
+          grouped,
+          mappings,
+          accountMap,
+        }).catch(async (err) => {
+          logger.warn({ err }, '[Provision] Eve agent failed, falling back to direct');
+          await tx.update(provisionRuns).set({
+            status: 'needs_review',
+            exceptionSummary: `Eve agent unavailable: ${err instanceof Error ? err.message : 'Unknown error'}. Run processed in direct mode.`,
+            updatedAt: new Date(),
+          }).where(eq(provisionRuns.id, run.id));
+          return buildDeterministicCalculationInput({
+            period,
+            entityId,
+            grouped,
+            mappingMap,
+            accountMap,
+            tbData,
+            tenant,
+          });
+        })
+        : buildDeterministicCalculationInput({
           period,
           entityId,
           grouped,
@@ -149,268 +184,318 @@ provisionRoutes.post('/run', zValidator('json', runProvisionSchema), async (c) =
           tbData,
           tenant,
         });
-      })
-      : buildDeterministicCalculationInput({
+
+      await tx.update(provisionRuns).set({
+        status: reviewSummary.openCount > 0 ? 'needs_review' : 'calculated',
+        approvalStatus: reviewSummary.openCount > 0 ? 'pending' : 'not_required',
+        exceptionSummary: reviewSummary.openCount > 0 ? `${reviewSummary.openCount} review item(s) require attention` : null,
+        updatedAt: new Date(),
+      }).where(eq(provisionRuns.id, run.id));
+
+      const calculation = runProvisionMath(calculationInput);
+      const resultValues = {
+        tenantId: user.tenantId,
+        provisionRunId: run.id,
         period,
-        entityId,
-        grouped,
-        mappingMap,
-        accountMap,
-        tbData,
-        tenant,
+        currentTaxExpense: String(calculation.summary.currentTaxExpense),
+        deferredTaxExpense: String(calculation.summary.deferredTaxExpense),
+        totalTaxExpense: String(calculation.summary.totalTaxExpense),
+        bookIncome: String(calculation.summary.bookIncome),
+        effectiveTaxRate: String(calculation.summary.effectiveTaxRate),
+        statutoryRate: String(Number(tenant.taxRate)),
+        taxPayable: String(calculation.summary.taxPayable),
+        status: reviewSummary.openCount > 0 ? 'review_required' : 'draft',
+      };
+
+      const [result] = await tx.insert(provisionResults).values(resultValues).returning();
+
+      await tx.update(provisionRuns).set({
+        resultId: result.id,
+        status: reviewSummary.openCount > 0 ? 'needs_review' : 'workpapers_generated',
+        updatedAt: new Date(),
+      }).where(eq(provisionRuns.id, run.id));
+
+      const subagentPromises = Promise.allSettled([
+        runTracedSubagent(tx, {
+          tenantId: user.tenantId,
+          userId: user.userId,
+          provisionRunId: run.id,
+          workflowName: 'subagent_mapping_agent',
+          promptVersion: 'mapping-agent-v1',
+          input: {
+          tenantId: user.tenantId,
+          tenantName: tenant.name,
+          accounts: Array.from(grouped.entries()).map(([accountId, netBalance]) => {
+            const acct = accountMap.get(accountId);
+            return {
+              id: accountId,
+              accountNumber: acct?.accountNumber ?? '',
+              name: acct?.name ?? '',
+              type: acct?.type ?? '',
+              detailType: acct?.detailType ?? undefined,
+              netBalance,
+            };
+          }),
+          },
+          execute: runMappingAgent,
+        }),
+
+        runTracedSubagent(tx, {
+          tenantId: user.tenantId,
+          userId: user.userId,
+          provisionRunId: run.id,
+          workflowName: 'subagent_audit_defense',
+          promptVersion: 'audit-defense-v2',
+          input: {
+          entityName: tenant.name,
+          period,
+          bookIncome: calculation.summary.bookIncome,
+          effectiveTaxRate: calculation.summary.effectiveTaxRate,
+          statutoryRate: calculation.etr.statutoryRate,
+          totalTaxExpense: calculation.summary.totalTaxExpense,
+          currentTaxExpense: calculation.summary.currentTaxExpense,
+          deferredTaxExpense: calculation.summary.deferredTaxExpense,
+          taxPayable: calculation.summary.taxPayable,
+          etrLines: calculation.etr.lines,
+          permanentDifferences: (calculationInput.permanentDifferences ?? []).map(d => ({
+            label: d.label,
+            amount: d.amount,
+          })),
+          temporaryDifferences: (calculationInput.temporaryDifferences ?? []).map(d => ({
+            timingCategory: d.timingCategory ?? 'TEMP_OTHER',
+            difference: d.difference,
+          })),
+          },
+          execute: draftAuditMemo,
+        }),
+
+        runTracedSubagent(tx, {
+          tenantId: user.tenantId,
+          userId: user.userId,
+          provisionRunId: run.id,
+          workflowName: 'subagent_credit_miner',
+          promptVersion: 'credit-miner-v1',
+          input: {
+          tenantId: user.tenantId,
+          tenantName: tenant.name,
+          period,
+          fiscalYear: new Date(period).getFullYear(),
+          trialBalance: Array.from(grouped.entries()).map(([accountId, balance]) => {
+            const acct = accountMap.get(accountId);
+            return {
+              accountId,
+              accountName: acct?.name ?? '',
+              accountNumber: acct?.accountNumber ?? '',
+              accountType: acct?.type ?? '',
+              balance,
+            };
+          }),
+          },
+          execute: mineCredits,
+        }),
+      ]);
+
+      subagentPromises.then((results) => {
+        const failed = results.filter(r => r.status === 'rejected');
+        if (failed.length > 0) {
+          logger.warn({ failed: failed.length }, '[SubagentSwarm] Some subagents failed');
+        }
+        agentRunCounter.add(3, { outcome: failed.length === 0 ? 'success' : 'partial' });
+      }).catch(() => {
+        agentRunCounter.add(3, { outcome: 'error' });
       });
 
-    await db.update(provisionRuns).set({
-      status: reviewSummary.openCount > 0 ? 'needs_review' : 'calculated',
-      approvalStatus: reviewSummary.openCount > 0 ? 'pending' : 'not_required',
-      exceptionSummary: reviewSummary.openCount > 0 ? `${reviewSummary.openCount} review item(s) require attention` : null,
-      updatedAt: new Date(),
-    }).where(eq(provisionRuns.id, run.id));
-
-    const calculation = runProvisionMath(calculationInput);
-    const resultValues = {
-      tenantId: user.tenantId,
-      period,
-      currentTaxExpense: String(calculation.summary.currentTaxExpense),
-      deferredTaxExpense: String(calculation.summary.deferredTaxExpense),
-      totalTaxExpense: String(calculation.summary.totalTaxExpense),
-      bookIncome: String(calculation.summary.bookIncome),
-      effectiveTaxRate: String(calculation.summary.effectiveTaxRate),
-      statutoryRate: String(Number(tenant.taxRate)),
-      taxPayable: String(calculation.summary.taxPayable),
-      status: reviewSummary.openCount > 0 ? 'review_required' : 'draft',
-    };
-
-    const [result] = await db.insert(provisionResults).values(resultValues).onConflictDoUpdate({
-      target: [provisionResults.tenantId, provisionResults.period],
-      set: resultValues,
-    }).returning();
-
-    await db.update(provisionRuns).set({
-      resultId: result.id,
-      status: reviewSummary.openCount > 0 ? 'needs_review' : 'workpapers_generated',
-      updatedAt: new Date(),
-    }).where(eq(provisionRuns.id, run.id));
-
-    // ── Subagent swarm: run all 3 in parallel (fire-and-forget with tracing) ──
-    const subagentPromises = Promise.allSettled([
-      runTracedSubagent({
+      await recordProvisionEvent({
         tenantId: user.tenantId,
-        userId: user.userId,
         provisionRunId: run.id,
-        workflowName: 'subagent_mapping_agent',
-        promptVersion: 'mapping-agent-v1',
-        input: {
-        tenantId: user.tenantId,
-        tenantName: tenant.name,
-        accounts: Array.from(grouped.entries()).map(([accountId, netBalance]) => {
-          const acct = accountMap.get(accountId);
-          return {
-            id: accountId,
-            accountNumber: acct?.accountNumber ?? '',
-            name: acct?.name ?? '',
-            type: acct?.type ?? '',
-            detailType: acct?.detailType ?? undefined,
-            netBalance,
-          };
-        }),
-        },
-        execute: runMappingAgent,
-      }),
+        eventType: EVENT_TYPES.CALCULATION_COMPLETED,
+        actorType: 'system',
+        actorUserId: user.userId,
+        reason: `Calculation completed with status ${reviewSummary.openCount > 0 ? 'needs_review' : 'calculated'}`,
+        metadata: { resultId: result.id, openReviewItems: reviewSummary.openCount },
+      }, tx);
 
-      runTracedSubagent({
-        tenantId: user.tenantId,
-        userId: user.userId,
+      const outcome = reviewSummary.openCount > 0 ? 'needs_review' : 'success';
+      provisionRunCounter.add(1, { outcome, mode: mode as string });
+      return c.json({
+        id: result.id,
         provisionRunId: run.id,
-        workflowName: 'subagent_audit_defense',
-        promptVersion: 'audit-defense-v2',
-        input: {
-        entityName: tenant.name,
-        period,
-        bookIncome: calculation.summary.bookIncome,
-        effectiveTaxRate: calculation.summary.effectiveTaxRate,
-        statutoryRate: calculation.etr.statutoryRate,
-        totalTaxExpense: calculation.summary.totalTaxExpense,
-        currentTaxExpense: calculation.summary.currentTaxExpense,
-        deferredTaxExpense: calculation.summary.deferredTaxExpense,
-        taxPayable: calculation.summary.taxPayable,
-        etrLines: calculation.etr.lines,
-        permanentDifferences: (calculationInput.permanentDifferences ?? []).map(d => ({
-          label: d.label,
-          amount: d.amount,
-        })),
-        temporaryDifferences: (calculationInput.temporaryDifferences ?? []).map(d => ({
-          timingCategory: d.timingCategory ?? 'TEMP_OTHER',
-          difference: d.difference,
-        })),
-        },
-        execute: draftAuditMemo,
-      }),
-
-      runTracedSubagent({
+        mode,
+        status: reviewSummary.openCount > 0 ? 'needs_review' : 'draft',
+        review: reviewSummary,
+        ...calculation,
+        agent: !useDirect,
+        agentReasoning: 'agentReasoning' in calculationInput ? calculationInput.agentReasoning : undefined,
+      });
+    } catch (err) {
+      provisionRunCounter.add(1, { outcome: 'error', mode: mode as string });
+      await tx.update(provisionRuns).set({
+        status: 'failed',
+        exceptionSummary: err instanceof Error ? err.message : String(err),
+        updatedAt: new Date(),
+      }).where(eq(provisionRuns.id, run.id));
+      await recordProvisionEvent({
         tenantId: user.tenantId,
-        userId: user.userId,
         provisionRunId: run.id,
-        workflowName: 'subagent_credit_miner',
-        promptVersion: 'credit-miner-v1',
-        input: {
-        tenantId: user.tenantId,
-        tenantName: tenant.name,
-        period,
-        fiscalYear: new Date(period).getFullYear(),
-        trialBalance: Array.from(grouped.entries()).map(([accountId, balance]) => {
-          const acct = accountMap.get(accountId);
-          return {
-            accountId,
-            accountName: acct?.name ?? '',
-            accountNumber: acct?.accountNumber ?? '',
-            accountType: acct?.type ?? '',
-            balance,
-          };
-        }),
-        },
-        execute: mineCredits,
-      }),
-    ]);
-
-    // Run subagents but don't block the response
-    subagentPromises.then((results) => {
-      const failed = results.filter(r => r.status === 'rejected');
-      if (failed.length > 0) {
-        logger.warn({ failed: failed.length }, '[SubagentSwarm] Some subagents failed');
-      }
-    });
-
-    return c.json({
-      id: result.id,
-      provisionRunId: run.id,
-      mode,
-      status: reviewSummary.openCount > 0 ? 'needs_review' : 'draft',
-      review: reviewSummary,
-      ...calculation,
-      agent: !useDirect,
-      agentReasoning: 'agentReasoning' in calculationInput ? calculationInput.agentReasoning : undefined,
-    });
-  } catch (err) {
-    await db.update(provisionRuns).set({
-      status: 'failed',
-      exceptionSummary: err instanceof Error ? err.message : String(err),
-      updatedAt: new Date(),
-    }).where(eq(provisionRuns.id, run.id));
-    throw err;
-  }
+        eventType: EVENT_TYPES.RUN_FAILED,
+        actorType: 'system',
+        actorUserId: user.userId,
+        reason: err instanceof Error ? err.message : 'Unknown error',
+        metadata: { error: err instanceof Error ? err.message : String(err) },
+      }, tx);
+      throw err;
+    }
+  });
 });
 
 provisionRoutes.get('/runs', async (c) => {
-  const user = c.get('user');
-  const runs = await db.select().from(provisionRuns)
-    .where(eq(provisionRuns.tenantId, user.tenantId))
-    .orderBy(desc(provisionRuns.createdAt));
-  return c.json(runs);
+  const user = getUser(c);
+  return withTenantContext(user.tenantId, async (tx) => {
+    const runs = await tx.select({
+      ...getTableColumns(provisionRuns),
+      approvedByUserEmail: users.email,
+    })
+      .from(provisionRuns)
+      .leftJoin(users, eq(provisionRuns.approvedByUserId, users.id))
+      .where(eq(provisionRuns.tenantId, user.tenantId))
+      .orderBy(desc(provisionRuns.createdAt));
+    return c.json(runs);
+  });
 });
 
 provisionRoutes.get('/runs/:id/review-items', async (c) => {
   const user = c.get('user');
-  const items = await db.select().from(reviewItems)
-    .where(and(
-      eq(reviewItems.tenantId, user.tenantId),
-      eq(reviewItems.provisionRunId, c.req.param('id')),
-    ))
-    .orderBy(reviewItems.createdAt);
-  return c.json(items);
+  return withTenantContext(user.tenantId, async (tx) => {
+    const items = await tx.select().from(reviewItems)
+      .where(and(
+        eq(reviewItems.tenantId, user.tenantId),
+        eq(reviewItems.provisionRunId, c.req.param('id')),
+      ))
+      .orderBy(reviewItems.createdAt);
+    return c.json(items);
+  });
 });
 
 provisionRoutes.get('/runs/:id/ai-findings', async (c) => {
   const user = c.get('user');
   const provisionRunId = c.req.param('id');
-  const [run] = await db.select().from(provisionRuns)
-    .where(and(
-      eq(provisionRuns.id, provisionRunId),
-      eq(provisionRuns.tenantId, user.tenantId),
-    ))
-    .limit(1);
+  return withTenantContext(user.tenantId, async (tx) => {
+    const [run] = await tx.select().from(provisionRuns)
+      .where(and(
+        eq(provisionRuns.id, provisionRunId),
+        eq(provisionRuns.tenantId, user.tenantId),
+      ))
+      .limit(1);
 
-  if (!run) throw new BadRequestError('Provision run not found');
+    if (!run) throw new BadRequestError('Provision run not found');
 
-  const agentRuns = await db.select().from(aiRuns)
-    .where(and(
-      eq(aiRuns.tenantId, user.tenantId),
-      eq(aiRuns.provisionRunId, provisionRunId),
-    ))
-    .orderBy(aiRuns.startedAt);
+    const agentRuns = await tx.select().from(aiRuns)
+      .where(and(
+        eq(aiRuns.tenantId, user.tenantId),
+        eq(aiRuns.provisionRunId, provisionRunId),
+      ))
+      .orderBy(aiRuns.startedAt);
 
-  const trackedSubagents = new Set([
-    'subagent_mapping_agent',
-    'subagent_audit_defense',
-    'subagent_credit_miner',
-  ]);
-  const hasPendingSubagent = agentRuns.some((agentRun) =>
-    trackedSubagents.has(agentRun.workflowName) && agentRun.status === 'started',
-  );
+    const trackedSubagents = new Set([
+      'subagent_mapping_agent',
+      'subagent_audit_defense',
+      'subagent_credit_miner',
+    ]);
+    const hasPendingSubagent = agentRuns.some((agentRun) =>
+      trackedSubagents.has(agentRun.workflowName) && agentRun.status === 'started',
+    );
 
-  return c.json({
-    provisionRunId,
-    pending: hasPendingSubagent,
-    agents: agentRuns.map((agentRun) => ({
-      workflowName: agentRun.workflowName,
-      status: agentRun.status,
-      promptVersion: agentRun.promptVersion,
-      provider: agentRun.provider,
-      model: agentRun.model,
-      errorMessage: agentRun.errorMessage,
-      startedAt: agentRun.startedAt,
-      completedAt: agentRun.completedAt,
-      output: agentRun.outputJson,
-    })),
+    return c.json({
+      provisionRunId,
+      pending: hasPendingSubagent,
+      agents: agentRuns.map((agentRun) => ({
+        workflowName: agentRun.workflowName,
+        status: agentRun.status,
+        promptVersion: agentRun.promptVersion,
+        provider: agentRun.provider,
+        model: agentRun.model,
+        errorMessage: agentRun.errorMessage,
+        startedAt: agentRun.startedAt,
+        completedAt: agentRun.completedAt,
+        output: agentRun.outputJson,
+      })),
+    });
   });
 });
 
 provisionRoutes.get('/results', async (c) => {
   const user = c.get('user');
-  const results = await db.select().from(provisionResults)
-    .where(eq(provisionResults.tenantId, user.tenantId))
-    .orderBy(desc(provisionResults.createdAt));
-  return c.json(results);
+  return withTenantContext(user.tenantId, async (tx) => {
+    const results = await tx.select().from(provisionResults)
+      .where(eq(provisionResults.tenantId, user.tenantId))
+      .orderBy(desc(provisionResults.createdAt));
+    return c.json(results);
+  });
 });
 
 provisionRoutes.get('/results/:id', async (c) => {
   const user = c.get('user');
-  const [result] = await db.select().from(provisionResults)
-    .where(and(
-      eq(provisionResults.id, c.req.param('id')),
-      eq(provisionResults.tenantId, user.tenantId),
-    )).limit(1);
+  return withTenantContext(user.tenantId, async (tx) => {
+    const [result] = await tx.select().from(provisionResults)
+      .where(and(
+        eq(provisionResults.id, c.req.param('id')),
+        eq(provisionResults.tenantId, user.tenantId),
+      )).limit(1);
 
-  if (!result) throw new BadRequestError('Provision result not found');
-  return c.json(result);
+    if (!result) throw new BadRequestError('Provision result not found');
+    return c.json(result);
+  });
 });
 
 provisionRoutes.get('/results/:id/export', async (c) => {
-  const user = c.get('user');
-  const [result] = await db.select().from(provisionResults)
-    .where(and(
-      eq(provisionResults.id, c.req.param('id')),
-      eq(provisionResults.tenantId, user.tenantId),
-    )).limit(1);
+  const user = getUser(c);
+  return withTenantContext(user.tenantId, async (tx) => {
+    const [result] = await tx.select().from(provisionResults)
+      .where(and(
+        eq(provisionResults.id, c.req.param('id')),
+        eq(provisionResults.tenantId, user.tenantId),
+      )).limit(1);
 
-  if (!result) throw new BadRequestError('Provision result not found');
+    if (!result) throw new BadRequestError('Provision result not found');
 
-  const buf = await generateProvisionWorkbook({
-    period: result.period,
-    bookIncome: Number(result.bookIncome ?? 0),
-    currentTaxExpense: Number(result.currentTaxExpense ?? 0),
-    deferredTaxExpense: Number(result.deferredTaxExpense ?? 0),
-    totalTaxExpense: Number(result.totalTaxExpense ?? 0),
-    effectiveTaxRate: Number(result.effectiveTaxRate ?? 0),
-    statutoryRate: Number(result.statutoryRate ?? 0),
-    taxPayable: Number(result.taxPayable ?? 0),
-    valuationAllowance: Number(result.valuationAllowance ?? 0),
-    createdAt: result.createdAt?.toISOString?.() ?? String(result.createdAt ?? ''),
+    const [run] = await tx.select({ id: provisionRuns.id, status: provisionRuns.status, approvalStatus: provisionRuns.approvalStatus }).from(provisionRuns)
+      .where(and(eq(provisionRuns.tenantId, user.tenantId), eq(provisionRuns.resultId, result.id))).limit(1);
+
+    if (!canMutate(user.role) && run) {
+      if (run.approvalStatus !== 'approved' && run.status !== 'locked') {
+        throw new ForbiddenError('Read-only roles may only export approved or locked provision results');
+      }
+    }
+
+    if (run) {
+      await recordProvisionEvent({
+        tenantId: user.tenantId,
+        provisionRunId: run.id,
+        eventType: EVENT_TYPES.EXPORT_WORKPAPER,
+        actorType: 'user',
+        actorUserId: user.userId,
+        reason: `Workpaper export for period ${result.period}`,
+        metadata: { resultId: result.id },
+      }, tx);
+    }
+
+    const buf = await generateProvisionWorkbook({
+      period: result.period,
+      bookIncome: Number(result.bookIncome ?? 0),
+      currentTaxExpense: Number(result.currentTaxExpense ?? 0),
+      deferredTaxExpense: Number(result.deferredTaxExpense ?? 0),
+      totalTaxExpense: Number(result.totalTaxExpense ?? 0),
+      effectiveTaxRate: Number(result.effectiveTaxRate ?? 0),
+      statutoryRate: Number(result.statutoryRate ?? 0),
+      taxPayable: Number(result.taxPayable ?? 0),
+      valuationAllowance: Number(result.valuationAllowance ?? 0),
+      createdAt: result.createdAt?.toISOString?.() ?? String(result.createdAt ?? ''),
+    });
+
+    c.header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    c.header('Content-Disposition', `attachment; filename="taxpro-provision-${result.period}.xlsx"`);
+    return c.body(buf as any);
   });
-
-  c.header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-  c.header('Content-Disposition', `attachment; filename="taxpro-provision-${result.period}.xlsx"`);
-  return c.body(buf as any);
 });
 
 function groupTrialBalanceByAccount(tbData: Array<typeof trialBalance.$inferSelect>) {
@@ -454,13 +539,22 @@ function buildDeterministicCalculationInput(args: {
     if (mapping.bookTreatment === 'permanent') {
       permanentDifferences.push({ amount: balance, label: mapping.taxAccountType });
     } else if (mapping.bookTreatment === 'temporary') {
+      const entityId = args.tbData.find((t) => t.accountId === accountId)?.entityId ?? args.entityId ?? 'consolidated';
+      const computedList = computeBookTaxDifferences(
+        [{ accountId, entityId, period: args.period, balance: new Decimal(balance) }],
+        [],
+        new Map([[accountId, { accountId, taxAccountType: mapping.taxAccountType, bookTreatment: mapping.bookTreatment, timingCategory: mapping.timingCategory ?? undefined } as any]]),
+        args.period
+      );
+      const computed = computedList[0];
+
       temporaryDifferences.push({
         accountId,
-        entityId: args.tbData.find((t) => t.accountId === accountId)?.entityId ?? args.entityId ?? 'consolidated',
+        entityId,
         period: args.period,
         bookBalance: balance,
-        taxBalance: 0,
-        difference: balance,
+        taxBalance: computed ? computed.taxBalance.toNumber() : 0,
+        difference: computed ? computed.difference.toNumber() : balance,
         diffType: 'temporary',
         timingCategory: mapping.timingCategory ?? undefined,
       });
@@ -481,7 +575,7 @@ function buildDeterministicCalculationInput(args: {
   };
 }
 
-async function buildAgentCalculationInput(args: {
+async function buildAgentCalculationInput(tx: any, args: {
   tenant: typeof tenants.$inferSelect;
   tenantId: string;
   userId: string;
@@ -523,7 +617,7 @@ async function buildAgentCalculationInput(args: {
     })),
   };
 
-  const aiRun = await startAiRun({
+  const aiRun = await startAiRun(tx, {
     tenantId: args.tenantId,
     userId: args.userId,
     provisionRunId: args.provisionRunId,
@@ -534,7 +628,7 @@ async function buildAgentCalculationInput(args: {
   try {
     const agentResult = await analyzeProvision(agentInput);
     if (!agentResult.success) throw new BadRequestError(`Agent analysis failed: ${agentResult.error ?? 'Unknown error'}`);
-    await completeAiRun(aiRun.id, agentResult);
+    await completeAiRun(aiRun.id, agentResult, tx);
 
     return {
       bookIncome: agentResult.bookIncome,
@@ -559,13 +653,13 @@ async function buildAgentCalculationInput(args: {
       agentReasoning: agentResult.reasoning,
     };
   } catch (err) {
-    await failAiRun(aiRun.id, err);
+    await failAiRun(aiRun.id, err, tx);
     logger.error({ err, provisionRunId: args.provisionRunId }, '[Provision] Eve workflow failed');
     throw err;
   }
 }
 
-async function runTracedSubagent<Input, Output>(args: {
+async function runTracedSubagent<Input, Output>(tx: any, args: {
   tenantId: string;
   userId: string;
   provisionRunId: string;
@@ -574,25 +668,41 @@ async function runTracedSubagent<Input, Output>(args: {
   input: Input;
   execute: (input: Input) => Promise<Output>;
 }) {
-  const aiRun = await startAiRun({
-    tenantId: args.tenantId,
-    userId: args.userId,
-    provisionRunId: args.provisionRunId,
-    workflowName: args.workflowName,
-    promptVersion: args.promptVersion,
-  }, args.input);
+  return withSpan(
+    `subagent.${args.workflowName}`,
+    async () => {
+      const aiRun = await startAiRun(tx, {
+        tenantId: args.tenantId,
+        userId: args.userId,
+        provisionRunId: args.provisionRunId,
+        workflowName: args.workflowName,
+        promptVersion: args.promptVersion,
+      }, args.input);
 
-  try {
-    const output = await args.execute(args.input);
-    await completeAiRun(aiRun.id, output);
-    return output;
-  } catch (err) {
-    await failAiRun(aiRun.id, err);
-    throw err;
-  }
+      try {
+        const output = await args.execute(args.input);
+        await completeAiRun(aiRun.id, output, tx);
+        agentRunCounter.add(1, { workflow: args.workflowName, outcome: 'success' });
+        return output;
+      } catch (err) {
+        await failAiRun(aiRun.id, err, tx);
+        agentRunCounter.add(1, { workflow: args.workflowName, outcome: 'failure' });
+        throw err;
+      }
+    },
+    {
+      tracer,
+      attributes: {
+        'taxpro.tenant_id': args.tenantId,
+        'taxpro.provision_run_id': args.provisionRunId,
+        'taxpro.workflow_name': args.workflowName,
+      },
+    },
+  );
 }
 
 async function createReviewItemsForRun(
+  tx: any,
   provisionRunId: string,
   tenantId: string,
   tbData: Array<typeof trialBalance.$inferSelect>,
@@ -607,7 +717,7 @@ async function createReviewItemsForRun(
     const account = accountMap.get(accountId);
     if (!mapping) {
       openCount++;
-      await db.insert(reviewItems).values({
+      await tx.insert(reviewItems).values({
         tenantId,
         provisionRunId,
         itemType: 'missing_mapping',
@@ -623,7 +733,7 @@ async function createReviewItemsForRun(
     const confidence = Number(mapping.confidenceScore ?? 1);
     if (mapping.suggestedByAi && confidence < LOW_CONFIDENCE_THRESHOLD) {
       openCount++;
-      await db.insert(reviewItems).values({
+      await tx.insert(reviewItems).values({
         tenantId,
         provisionRunId,
         itemType: 'low_confidence_mapping',
@@ -646,49 +756,72 @@ async function createReviewItemsForRun(
 }
 
 // ── Package export: zip with .xlsx + audit trail ──
+// Exports remain allowed for all authenticated roles.
+// client_readonly and auditor may only export approved or locked results.
 provisionRoutes.get('/results/:id/package', async (c) => {
-  const user = c.get('user');
-  const [result] = await db.select().from(provisionResults)
-    .where(and(
-      eq(provisionResults.id, c.req.param('id')),
-      eq(provisionResults.tenantId, user.tenantId),
-    )).limit(1);
-  if (!result) throw new BadRequestError('Provision result not found');
+  const user = getUser(c);
+  return withTenantContext(user.tenantId, async (tx) => {
+    const [result] = await tx.select().from(provisionResults)
+      .where(and(
+        eq(provisionResults.id, c.req.param('id')),
+        eq(provisionResults.tenantId, user.tenantId),
+      )).limit(1);
+    if (!result) throw new BadRequestError('Provision result not found');
 
-  const [run] = await db.select().from(provisionRuns)
-    .where(and(
-      eq(provisionRuns.tenantId, user.tenantId),
-      eq(provisionRuns.resultId, result.id),
-    )).limit(1);
+    const [run] = await tx.select().from(provisionRuns)
+      .where(and(
+        eq(provisionRuns.tenantId, user.tenantId),
+        eq(provisionRuns.resultId, result.id),
+      )).limit(1);
 
-  const auditLog = createAuditLog();
-  auditLog.add('provision_run', `Provision run for ${result.period}`, { mode: run?.mode ?? 'unknown' });
-
-  if (run) {
-    const reviewItemsData = await db.select().from(reviewItems)
-      .where(eq(reviewItems.provisionRunId, run.id));
-    for (const item of reviewItemsData) {
-      auditLog.add(`review_item:${item.itemType}`, item.title, item.metadata as Record<string, unknown> ?? {}, 'system');
+    if (!canMutate(user.role) && run) {
+      if (run.approvalStatus !== 'approved' && run.status !== 'locked') {
+        throw new ForbiddenError('Read-only roles may only export approved or locked provision results');
+      }
     }
-  }
 
-  const buf = await generateWorkpaperPackage({
-    period: result.period,
-    bookIncome: Number(result.bookIncome ?? 0),
-    currentTaxExpense: Number(result.currentTaxExpense ?? 0),
-    deferredTaxExpense: Number(result.deferredTaxExpense ?? 0),
-    totalTaxExpense: Number(result.totalTaxExpense ?? 0),
-    effectiveTaxRate: Number(result.effectiveTaxRate ?? 0),
-    statutoryRate: Number(result.statutoryRate ?? 0),
-    taxPayable: Number(result.taxPayable ?? 0),
-    valuationAllowance: Number(result.valuationAllowance ?? 0),
-    createdAt: result.createdAt?.toISOString?.() ?? String(result.createdAt ?? ''),
-    auditEntries: auditLog.entries,
+    const auditLog = createAuditLog();
+    auditLog.add('provision_run', `Provision run for ${result.period}`, { mode: run?.mode ?? 'unknown' });
+
+    if (run) {
+      const reviewItemsData = await tx.select().from(reviewItems)
+        .where(eq(reviewItems.provisionRunId, run.id));
+      for (const item of reviewItemsData) {
+        auditLog.add(`review_item:${item.itemType}`, item.title, item.metadata as Record<string, unknown> ?? {}, 'system');
+      }
+    }
+
+    if (run) {
+      await recordProvisionEvent({
+        tenantId: user.tenantId,
+        provisionRunId: run.id,
+        eventType: EVENT_TYPES.EXPORT_PACKAGE,
+        actorType: 'user',
+        actorUserId: user.userId,
+        reason: `Package export for period ${result.period}`,
+        metadata: { resultId: result.id },
+      }, tx);
+    }
+
+    const buf = await generateWorkpaperPackage({
+      period: result.period,
+      bookIncome: Number(result.bookIncome ?? 0),
+      currentTaxExpense: Number(result.currentTaxExpense ?? 0),
+      deferredTaxExpense: Number(result.deferredTaxExpense ?? 0),
+      totalTaxExpense: Number(result.totalTaxExpense ?? 0),
+      effectiveTaxRate: Number(result.effectiveTaxRate ?? 0),
+      statutoryRate: Number(result.statutoryRate ?? 0),
+      taxPayable: Number(result.taxPayable ?? 0),
+      valuationAllowance: Number(result.valuationAllowance ?? 0),
+      createdAt: result.createdAt?.toISOString?.() ?? String(result.createdAt ?? ''),
+      auditEntries: auditLog.entries,
+    });
+
+    packageExportCounter.add(1, { outcome: 'success' });
+    c.header('Content-Type', 'application/zip');
+    c.header('Content-Disposition', `attachment; filename="taxpro-package-${result.period}.zip"`);
+    return c.body(buf as any);
   });
-
-  c.header('Content-Type', 'application/zip');
-  c.header('Content-Disposition', `attachment; filename="taxpro-package-${result.period}.zip"`);
-  return c.body(buf as any);
 });
 
 // ── Eve assistant: conversational workflow operator ──
@@ -697,13 +830,16 @@ provisionRoutes.post('/eve/ask', async (c) => {
   const { prompt } = await c.req.json() as { prompt: string };
   if (!prompt) throw new BadRequestError('Missing "prompt" in request body');
 
-  const [tenant] = await db.select().from(tenants).where(eq(tenants.id, user.tenantId)).limit(1);
-  if (!tenant) throw new BadRequestError('Tenant not found');
+  const { tenant, recentRuns } = await withTenantContext(user.tenantId, async (tx) => {
+    const [tenant] = await tx.select().from(tenants).where(eq(tenants.id, user.tenantId)).limit(1);
+    if (!tenant) throw new BadRequestError('Tenant not found');
 
-  const recentRuns = await db.select().from(provisionRuns)
-    .where(eq(provisionRuns.tenantId, user.tenantId))
-    .orderBy(desc(provisionRuns.createdAt))
-    .limit(5);
+    const recentRuns = await tx.select().from(provisionRuns)
+      .where(eq(provisionRuns.tenantId, user.tenantId))
+      .orderBy(desc(provisionRuns.createdAt))
+      .limit(5);
+    return { tenant, recentRuns };
+  });
 
   const systemContext = `You are Eve, TaxPro's AI provision assistant. You help corporate tax professionals run and review ASC 740 tax provisions.
 
@@ -713,7 +849,11 @@ Recent provision runs: ${recentRuns.length > 0 ? recentRuns.map(r => `- ${r.peri
 You can answer questions about provision results, suggest next steps, and flag items needing review.`;
 
   const { callJsonModel } = await import('../../eve/model-client.js');
-  const response = await callJsonModel<{ answer: string; suggestedAction?: string }>({
+  const response = await callJsonModel({
+    schema: z.object({
+      answer: z.string(),
+      suggestedAction: z.string().optional(),
+    }),
     system: systemContext,
     user: prompt,
     promptVersion: 'eve-assistant-v1',
@@ -725,273 +865,443 @@ You can answer questions about provision results, suggest next steps, and flag i
 
 // ── Review endpoints ──
 
-// Resolve a single review item (approve/override)
 const resolveReviewItemSchema = z.object({
   resolution: z.enum(['approved', 'rejected', 'override']),
   resolutionNote: z.string().optional(),
 });
 
-provisionRoutes.post('/runs/:runId/review-items/:itemId/resolve', zValidator('json', resolveReviewItemSchema), async (c) => {
-  const user = c.get('user');
-  const { runId, itemId } = c.req.param();
-  const { resolution, resolutionNote } = c.req.valid('json');
+provisionRoutes.post('/runs/:runId/review-items/:itemId/resolve',
+  requireRole('preparer', 'reviewer', 'partner', 'admin'),
+  zValidator('json', resolveReviewItemSchema), async (c) => {
+    const user = getUser(c);
+    const { runId, itemId } = c.req.param();
+    const { resolution, resolutionNote } = c.req.valid('json');
 
-  const [item] = await db.select().from(reviewItems)
-    .where(and(
-      eq(reviewItems.id, itemId),
-      eq(reviewItems.provisionRunId, runId),
-      eq(reviewItems.tenantId, user.tenantId),
-    )).limit(1);
-  if (!item) throw new BadRequestError('Review item not found');
+    return withTenantContext(user.tenantId, async (tx) => {
+      await assertRunIsMutable(runId, user.tenantId, tx);
+      const [item] = await tx.select().from(reviewItems)
+        .where(and(
+          eq(reviewItems.id, itemId),
+          eq(reviewItems.provisionRunId, runId),
+          eq(reviewItems.tenantId, user.tenantId),
+        )).limit(1);
+      if (!item) throw new BadRequestError('Review item not found');
 
-  const resolvedStatus = resolution === 'rejected' ? 'rejected' : 'resolved';
-  await db.update(reviewItems).set({
-    status: resolvedStatus,
-    resolvedByUserId: user.userId,
-    resolutionNote: resolutionNote ?? null,
-    resolvedAt: new Date(),
-    updatedAt: new Date(),
-  }).where(eq(reviewItems.id, itemId));
+      const resolvedStatus = resolution === 'rejected' ? 'rejected' : 'resolved';
+      reviewResolutionCounter.add(1, { resolution: resolution as string });
 
-  // Record classification pattern for learning
-  if (item.accountId && resolution !== 'rejected') {
-    recordClassificationPattern({
-      tenantId: user.tenantId,
-      accountId: item.accountId,
-      resolution: resolution as any,
-      resolvedByUserId: user.userId,
-      resolutionNote: resolutionNote ?? undefined,
-    }).catch((err) => logger.error({ err }, '[Pattern] Failed to record'));
-  }
+      await tx.update(reviewItems).set({
+        status: resolvedStatus,
+        resolvedByUserId: user.userId,
+        resolutionNote: resolutionNote ?? null,
+        resolvedAt: new Date(),
+        updatedAt: new Date(),
+      }).where(eq(reviewItems.id, itemId));
 
-  // Check if all items resolved, then update run
-  const openItems = await db.select().from(reviewItems)
-    .where(and(
-      eq(reviewItems.provisionRunId, runId),
-      eq(reviewItems.status, 'open'),
-    ));
-  const resolvedItems = await db.select().from(reviewItems)
-    .where(and(
-      eq(reviewItems.provisionRunId, runId),
-      eq(reviewItems.status, 'resolved'),
-    ));
-  const rejectedItems = await db.select().from(reviewItems)
-    .where(and(
-      eq(reviewItems.provisionRunId, runId),
-      eq(reviewItems.status, 'rejected'),
-    ));
+      const eventType = resolution === 'rejected' ? EVENT_TYPES.REVIEW_ITEM_REJECTED : EVENT_TYPES.REVIEW_ITEM_RESOLVED;
+      await recordProvisionEvent({
+        tenantId: user.tenantId,
+        provisionRunId: runId,
+        eventType,
+        actorType: 'user',
+        actorUserId: user.userId,
+        reason: resolutionNote || `Review item ${resolvedStatus}`,
+        metadata: { itemId, itemType: item.itemType, resolution, accountId: item.accountId },
+      }, tx);
 
-  if (openItems.length === 0) {
-    await db.update(provisionRuns).set({
-      approvalStatus: 'approved',
-      updatedAt: new Date(),
-    }).where(eq(provisionRuns.id, runId));
-  }
+      if (item.accountId && resolution !== 'rejected') {
+        recordClassificationPattern({
+          tenantId: user.tenantId,
+          accountId: item.accountId,
+          resolution: resolution as any,
+          resolvedByUserId: user.userId,
+          resolutionNote: resolutionNote ?? undefined,
+        }).catch((err) => logger.error({ err }, '[Pattern] Failed to record'));
+      }
 
-  return c.json({ itemId, status: resolvedStatus, openRemaining: openItems.length });
+      const openItems = await tx.select().from(reviewItems)
+        .where(and(
+          eq(reviewItems.provisionRunId, runId),
+          eq(reviewItems.status, 'open'),
+        ));
+
+      if (openItems.length === 0) {
+        await tx.update(provisionRuns).set({
+          approvalStatus: 'approved',
+          updatedAt: new Date(),
+        }).where(eq(provisionRuns.id, runId));
+      }
+
+      return c.json({ itemId, status: resolvedStatus, openRemaining: openItems.length });
+    });
 });
 
-// Bulk resolve all open items for a run
-provisionRoutes.post('/runs/:runId/review-items/bulk-resolve', async (c) => {
-  const user = c.get('user');
-  const { runId } = c.req.param();
-  const { resolution, resolutionNote } = await c.req.json() as { resolution: string; resolutionNote?: string };
+provisionRoutes.post('/runs/:runId/review-items/bulk-resolve',
+  requireRole('preparer', 'reviewer', 'partner', 'admin'),
+  async (c) => {
+    const user = getUser(c);
+    const { runId } = c.req.param();
+    const { resolution, resolutionNote } = await c.req.json() as { resolution: string; resolutionNote?: string };
 
-  const openItems = await db.select().from(reviewItems)
-    .where(and(
-      eq(reviewItems.provisionRunId, runId),
-      eq(reviewItems.tenantId, user.tenantId),
-      eq(reviewItems.status, 'open'),
-    ));
+    return withTenantContext(user.tenantId, async (tx) => {
+      await assertRunIsMutable(runId, user.tenantId, tx);
+      const openItems = await tx.select().from(reviewItems)
+        .where(and(
+          eq(reviewItems.provisionRunId, runId),
+          eq(reviewItems.tenantId, user.tenantId),
+          eq(reviewItems.status, 'open'),
+        ));
 
-  const newStatus = resolution === 'approved' ? 'resolved' : 'rejected';
-  for (const item of openItems) {
-    await db.update(reviewItems).set({
-      status: newStatus,
-      resolvedByUserId: user.userId,
-      resolutionNote: resolutionNote ?? null,
-      resolvedAt: new Date(),
-      updatedAt: new Date(),
-    }).where(eq(reviewItems.id, item.id));
-  }
+      const newStatus = resolution === 'approved' ? 'resolved' : 'rejected';
+      for (const item of openItems) {
+        await tx.update(reviewItems).set({
+          status: newStatus,
+          resolvedByUserId: user.userId,
+          resolutionNote: resolutionNote ?? null,
+          resolvedAt: new Date(),
+          updatedAt: new Date(),
+        }).where(eq(reviewItems.id, item.id));
+      }
 
-  await db.update(provisionRuns).set({
-    approvalStatus: resolution === 'approved' ? 'approved' : 'rejected',
-    updatedAt: new Date(),
-  }).where(eq(provisionRuns.id, runId));
+      await tx.update(provisionRuns).set({
+        approvalStatus: resolution === 'approved' ? 'approved' : 'rejected',
+        updatedAt: new Date(),
+      }).where(eq(provisionRuns.id, runId));
 
-  return c.json({ resolved: openItems.length, status: newStatus });
+      await recordProvisionEvent({
+        tenantId: user.tenantId,
+        provisionRunId: runId,
+        eventType: resolution === 'approved' ? EVENT_TYPES.REVIEW_ITEM_RESOLVED : EVENT_TYPES.REVIEW_ITEM_REJECTED,
+        actorType: 'user',
+        actorUserId: user.userId,
+        reason: `Bulk ${resolution} of ${openItems.length} items` + (resolutionNote ? `: ${resolutionNote}` : ''),
+        metadata: { bulk: true, count: openItems.length, resolution },
+      }, tx);
+
+      return c.json({ resolved: openItems.length, status: newStatus });
+    });
 });
 
-// Finalize a provision run (mark as delivered)
-provisionRoutes.post('/runs/:runId/finalize', async (c) => {
-  const user = c.get('user');
-  const { runId } = c.req.param();
+provisionRoutes.post('/runs/:runId/finalize',
+  requireRole('preparer', 'reviewer', 'partner', 'admin'),
+  async (c) => {
+    const user = getUser(c);
+    const { runId } = c.req.param();
 
-  const [run] = await db.select().from(provisionRuns)
-    .where(and(eq(provisionRuns.id, runId), eq(provisionRuns.tenantId, user.tenantId))).limit(1);
-  if (!run) throw new BadRequestError('Provision run not found');
+    return withSpan(
+      'provision.finalize',
+      async () => {
+        return withTenantContext(user.tenantId, async (tx) => {
+          await assertRunIsMutable(runId, user.tenantId, tx);
 
-  const openItems = await db.select().from(reviewItems)
-    .where(and(eq(reviewItems.provisionRunId, runId), eq(reviewItems.status, 'open')));
-  if (openItems.length > 0) throw new BadRequestError(`Cannot finalize: ${openItems.length} review item(s) still open`);
+          const [run] = await tx.select().from(provisionRuns)
+            .where(and(eq(provisionRuns.id, runId), eq(provisionRuns.tenantId, user.tenantId))).limit(1);
+          if (!run) throw new BadRequestError('Provision run not found');
 
-  await db.update(provisionRuns).set({
-    status: 'finalized',
-    finalizedAt: new Date(),
-    updatedAt: new Date(),
-  }).where(eq(provisionRuns.id, runId));
+          const openItems = await tx.select().from(reviewItems)
+            .where(and(eq(reviewItems.provisionRunId, runId), eq(reviewItems.status, 'open')));
+          if (openItems.length > 0) throw new BadRequestError(`Cannot finalize: ${openItems.length} review item(s) still open`);
 
-  return c.json({ runId, status: 'finalized' });
+          const now = new Date();
+          await tx.update(provisionRuns).set({
+            status: 'finalized',
+            finalizedAt: now,
+            updatedAt: now,
+          }).where(eq(provisionRuns.id, runId));
+
+          await recordProvisionEvent({
+            tenantId: user.tenantId,
+            provisionRunId: runId,
+            eventType: 'run.finalized',
+            actorType: 'user',
+            actorUserId: user.userId,
+            reason: 'Run finalized',
+          }, tx);
+
+          return c.json({ runId, status: 'finalized' });
+        });
+      },
+      {
+        tracer,
+        attributes: {
+          'taxpro.tenant_id': user.tenantId,
+          'taxpro.provision_run_id': runId,
+        },
+      },
+    );
 });
 
 // Phase 2 Governance Endpoints
 
-// Submit for partner approval
-provisionRoutes.post('/runs/:runId/submit-for-approval', async (c) => {
-  const user = c.get('user');
-  const { runId } = c.req.param();
+provisionRoutes.post('/runs/:runId/submit-for-approval',
+  requireRole('reviewer', 'partner', 'admin'),
+  async (c) => {
+    const user = getUser(c);
+    const { runId } = c.req.param();
 
-  const [run] = await db.select().from(provisionRuns)
-    .where(and(eq(provisionRuns.id, runId), eq(provisionRuns.tenantId, user.tenantId))).limit(1);
-  if (!run) throw new BadRequestError('Provision run not found');
+    return withTenantContext(user.tenantId, async (tx) => {
+      await assertRunIsMutable(runId, user.tenantId, tx);
+      const [run] = await tx.select().from(provisionRuns)
+        .where(and(eq(provisionRuns.id, runId), eq(provisionRuns.tenantId, user.tenantId))).limit(1);
+      if (!run) throw new BadRequestError('Provision run not found');
 
-  await db.update(provisionRuns).set({
-    approvalStatus: 'pending_partner_review',
-    updatedAt: new Date(),
-  }).where(eq(provisionRuns.id, runId));
+      const now = new Date();
+      await tx.update(provisionRuns).set({
+        approvalStatus: 'pending_partner_review',
+        submittedAt: now,
+        submittedByUserId: user.userId,
+        updatedAt: now,
+      }).where(eq(provisionRuns.id, runId));
 
-  return c.json({ runId, approvalStatus: 'pending_partner_review' });
+      await recordProvisionEvent({
+        tenantId: user.tenantId,
+        provisionRunId: runId,
+        eventType: EVENT_TYPES.SUBMITTED_FOR_APPROVAL,
+        actorType: 'user',
+        actorUserId: user.userId,
+        reason: 'Submitted for partner approval',
+        beforeState: { approvalStatus: run.approvalStatus },
+        afterState: { approvalStatus: 'pending_partner_review' },
+      }, tx);
+
+      return c.json({ runId, approvalStatus: 'pending_partner_review' });
+    });
 });
 
-// Partner approval
-provisionRoutes.post('/runs/:runId/partner-approve', async (c) => {
-  const user = c.get('user');
-  const { runId } = c.req.param();
+provisionRoutes.post('/runs/:runId/partner-approve',
+  requireRole('partner', 'admin'),
+  async (c) => {
+    const user = getUser(c);
+    const { runId } = c.req.param();
 
-  const [run] = await db.select().from(provisionRuns)
-    .where(and(eq(provisionRuns.id, runId), eq(provisionRuns.tenantId, user.tenantId))).limit(1);
-  if (!run) throw new BadRequestError('Provision run not found');
+    return withTenantContext(user.tenantId, async (tx) => {
+      await assertRunIsMutable(runId, user.tenantId, tx);
+      const [run] = await tx.select().from(provisionRuns)
+        .where(and(eq(provisionRuns.id, runId), eq(provisionRuns.tenantId, user.tenantId))).limit(1);
+      if (!run) throw new BadRequestError('Provision run not found');
 
-  await db.update(provisionRuns).set({
-    approvalStatus: 'approved',
-    updatedAt: new Date(),
-  }).where(eq(provisionRuns.id, runId));
+      if (run.submittedByUserId === user.userId) {
+        throw new ForbiddenError('A partner cannot approve a run they submitted');
+      }
+      if (run.requestedByUserId === user.userId) {
+        throw new ForbiddenError('A partner cannot approve a run they requested');
+      }
 
-  return c.json({ runId, approvalStatus: 'approved' });
+      const now = new Date();
+      await tx.update(provisionRuns).set({
+        approvalStatus: 'approved',
+        approvedByUserId: user.userId,
+        approvedAt: now,
+        updatedAt: now,
+      }).where(eq(provisionRuns.id, runId));
+
+      await recordProvisionEvent({
+        tenantId: user.tenantId,
+        provisionRunId: runId,
+        eventType: EVENT_TYPES.PARTNER_APPROVED,
+        actorType: 'user',
+        actorUserId: user.userId,
+        reason: 'Partner approved the provision run',
+        beforeState: { approvalStatus: run.approvalStatus },
+        afterState: { approvalStatus: 'approved' },
+      }, tx);
+
+      return c.json({ runId, approvalStatus: 'approved', approvedByUserId: user.userId });
+    });
 });
 
-// Lock run
-provisionRoutes.post('/runs/:runId/lock', async (c) => {
-  const user = c.get('user');
-  const { runId } = c.req.param();
+provisionRoutes.post('/runs/:runId/lock',
+  requireRole('partner', 'admin'),
+  async (c) => {
+    const user = getUser(c);
+    const { runId } = c.req.param();
 
-  const [run] = await db.select().from(provisionRuns)
-    .where(and(eq(provisionRuns.id, runId), eq(provisionRuns.tenantId, user.tenantId))).limit(1);
-  if (!run) throw new BadRequestError('Provision run not found');
+    return withTenantContext(user.tenantId, async (tx) => {
+      const [run] = await tx.select().from(provisionRuns)
+        .where(and(eq(provisionRuns.id, runId), eq(provisionRuns.tenantId, user.tenantId))).limit(1);
+      if (!run) throw new BadRequestError('Provision run not found');
 
-  if (run.approvalStatus !== 'approved') {
-    throw new BadRequestError('Run must be approved by a partner before locking');
-  }
+      if (run.approvalStatus !== 'approved') {
+        throw new BadRequestError('Run must be approved by a partner before locking');
+      }
 
-  await db.update(provisionRuns).set({
-    status: 'locked',
-    finalizedAt: new Date(),
-    updatedAt: new Date(),
-  }).where(eq(provisionRuns.id, runId));
+      const now = new Date();
+      await tx.update(provisionRuns).set({
+        status: 'locked',
+        lockedAt: now,
+        lockedByUserId: user.userId,
+        finalizedAt: now,
+        updatedAt: now,
+      }).where(eq(provisionRuns.id, runId));
 
-  return c.json({ runId, status: 'locked' });
+      await recordProvisionEvent({
+        tenantId: user.tenantId,
+        provisionRunId: runId,
+        eventType: EVENT_TYPES.LOCKED,
+        actorType: 'user',
+        actorUserId: user.userId,
+        reason: 'Provision run locked',
+        beforeState: { status: run.status, approvalStatus: run.approvalStatus },
+        afterState: { status: 'locked' },
+      }, tx);
+
+      return c.json({ runId, status: 'locked' });
+    });
 });
 
-// Get trial balance detail for a run
 provisionRoutes.get('/runs/:runId/trial-balance-detail', async (c) => {
   const user = c.get('user');
   const { runId } = c.req.param();
   
-  const [run] = await db.select().from(provisionRuns)
-    .where(and(eq(provisionRuns.id, runId), eq(provisionRuns.tenantId, user.tenantId))).limit(1);
-  if (!run) throw new BadRequestError('Provision run not found');
+  return withTenantContext(user.tenantId, async (tx) => {
+    const [run] = await tx.select().from(provisionRuns)
+      .where(and(eq(provisionRuns.id, runId), eq(provisionRuns.tenantId, user.tenantId))).limit(1);
+    if (!run) throw new BadRequestError('Provision run not found');
 
-  const tbData = await db.select({
-    accountId: trialBalance.accountId,
-    accountName: accounts.name,
-    accountNumber: accounts.accountNumber,
-    type: accounts.type,
-    balance: trialBalance.balance,
-    taxAccountType: taxMappings.taxAccountType,
-    bookTreatment: taxMappings.bookTreatment,
-    confidenceScore: taxMappings.confidenceScore,
-    suggestedByAi: taxMappings.suggestedByAi,
-    mappingVersion: taxMappings.version,
-  }).from(trialBalance)
-    .innerJoin(accounts, eq(trialBalance.accountId, accounts.id))
-    .leftJoin(taxMappings, and(
-      eq(taxMappings.accountId, accounts.id),
-      eq(taxMappings.isActive, true)
-    ))
-    .where(and(
-      eq(trialBalance.tenantId, user.tenantId),
-      gte(trialBalance.period, run.period),
-      lte(trialBalance.period, run.endPeriod ?? run.period),
-      run.entityId ? eq(trialBalance.entityId, run.entityId) : undefined
-    ));
+    const tbData = await tx.select({
+      accountId: trialBalance.accountId,
+      accountName: accounts.name,
+      accountNumber: accounts.accountNumber,
+      type: accounts.type,
+      balance: trialBalance.balance,
+      taxAccountType: taxMappings.taxAccountType,
+      bookTreatment: taxMappings.bookTreatment,
+      confidenceScore: taxMappings.confidenceScore,
+      suggestedByAi: taxMappings.suggestedByAi,
+      mappingVersion: taxMappings.version,
+    }).from(trialBalance)
+      .innerJoin(accounts, eq(trialBalance.accountId, accounts.id))
+      .leftJoin(taxMappings, and(
+        eq(taxMappings.accountId, accounts.id),
+        eq(taxMappings.isActive, true)
+      ))
+      .where(and(
+        eq(trialBalance.tenantId, user.tenantId),
+        gte(trialBalance.period, run.period),
+        lte(trialBalance.period, run.endPeriod ?? run.period),
+        run.entityId ? eq(trialBalance.entityId, run.entityId) : undefined
+      ));
 
-  // Group by account to sum balances across entities/periods
-  const grouped = new Map<string, any>();
-  for (const row of tbData) {
-    if (!grouped.has(row.accountId)) {
-      grouped.set(row.accountId, {
-        accountId: row.accountId,
-        accountName: row.accountName,
-        accountNumber: row.accountNumber,
-        type: row.type,
-        balance: 0,
-        taxAccountType: row.taxAccountType,
-        bookTreatment: row.bookTreatment,
-        confidenceScore: row.confidenceScore ? Number(row.confidenceScore) : null,
-        suggestedByAi: row.suggestedByAi,
-      });
+    const grouped = new Map<string, any>();
+    for (const row of tbData) {
+      if (!grouped.has(row.accountId)) {
+        grouped.set(row.accountId, {
+          accountId: row.accountId,
+          accountName: row.accountName,
+          accountNumber: row.accountNumber,
+          type: row.type,
+          balance: 0,
+          taxAccountType: row.taxAccountType,
+          bookTreatment: row.bookTreatment,
+          confidenceScore: row.confidenceScore ? Number(row.confidenceScore) : null,
+          suggestedByAi: row.suggestedByAi,
+        });
+      }
+      grouped.get(row.accountId)!.balance += Number(row.balance);
     }
-    grouped.get(row.accountId)!.balance += Number(row.balance);
-  }
 
-  // Also include the review items for this run so the UI can flag them
-  const items = await db.select().from(reviewItems)
-    .where(eq(reviewItems.provisionRunId, runId));
-  
-  const results = Array.from(grouped.values()).map(row => {
-    const reviewItem = items.find(i => i.accountId === row.accountId);
-    return {
-      ...row,
-      reviewItemId: reviewItem?.id,
-      reviewItemStatus: reviewItem?.status,
-      reviewItemSeverity: reviewItem?.severity,
-    };
+    const items = await tx.select().from(reviewItems)
+      .where(eq(reviewItems.provisionRunId, runId));
+    
+    const results = Array.from(grouped.values()).map(row => {
+      const reviewItem = items.find(i => i.accountId === row.accountId);
+      return {
+        ...row,
+        reviewItemId: reviewItem?.id,
+        reviewItemStatus: reviewItem?.status,
+        reviewItemSeverity: reviewItem?.severity,
+      };
+    });
+
+    return c.json(results);
   });
-
-  return c.json(results);
 });
 
-// Review queue summary — all runs needing review across tenant
+provisionRoutes.get('/runs/:runId/compare', async (c) => {
+  const user = c.get('user');
+  const { runId } = c.req.param();
+
+  return withTenantContext(user.tenantId, async (tx) => {
+    const [run] = await tx.select().from(provisionRuns)
+      .where(and(eq(provisionRuns.id, runId), eq(provisionRuns.tenantId, user.tenantId))).limit(1);
+    if (!run) throw new BadRequestError('Provision run not found');
+
+    const currentResult = run.resultId
+      ? (await tx.select().from(provisionResults).where(eq(provisionResults.id, run.resultId)).limit(1))[0]
+      : null;
+
+    const [previousRun] = await tx.select().from(provisionRuns)
+      .where(and(
+        eq(provisionRuns.tenantId, user.tenantId),
+        eq(provisionRuns.period, run.period),
+        run.entityId ? eq(provisionRuns.entityId, run.entityId) : undefined,
+        not(eq(provisionRuns.id, run.id)),
+      ))
+      .orderBy(desc(provisionRuns.createdAt))
+      .limit(1);
+
+    const previousResult = previousRun?.resultId
+      ? (await tx.select().from(provisionResults).where(eq(provisionResults.id, previousRun.resultId)).limit(1))[0]
+      : null;
+
+    return c.json({
+      currentPeriod: run.period,
+      previousPeriod: previousRun?.period ?? null,
+      current: currentResult ?? null,
+      previous: previousResult ?? null,
+      delta: currentResult && previousResult ? {
+        bookIncome: Number(currentResult.bookIncome) - Number(previousResult.bookIncome),
+        totalTaxExpense: Number(currentResult.totalTaxExpense) - Number(previousResult.totalTaxExpense),
+        effectiveTaxRate: Number(currentResult.effectiveTaxRate) - Number(previousResult.effectiveTaxRate),
+        taxPayable: Number(currentResult.taxPayable) - Number(previousResult.taxPayable),
+      } : null,
+    });
+  });
+});
+
+provisionRoutes.get('/runs/:runId/events', async (c) => {
+  const user = getUser(c);
+  const { runId } = c.req.param();
+
+  return withTenantContext(user.tenantId, async (tx) => {
+    await requireRunAccess(runId, user.tenantId, tx);
+    const events = await getEventsForRun(runId, user.tenantId, tx);
+    return c.json(events);
+  });
+});
+
 provisionRoutes.get('/review/queue', async (c) => {
   const user = c.get('user');
+  return withTenantContext(user.tenantId, async (tx) => {
+    const severityRank = { high: 0, medium: 1, low: 2 };
 
-  const needsReviewRuns = await db.select().from(provisionRuns)
-    .where(and(
-      eq(provisionRuns.tenantId, user.tenantId),
-      eq(provisionRuns.status, 'needs_review'),
-    ))
-    .orderBy(desc(provisionRuns.createdAt));
-
-  const summary = await Promise.all(needsReviewRuns.map(async (run) => {
-    const openItems = await db.select().from(reviewItems)
+    const needsReviewRuns = await tx.select().from(provisionRuns)
       .where(and(
-        eq(reviewItems.provisionRunId, run.id),
-        eq(reviewItems.status, 'open'),
+        eq(provisionRuns.tenantId, user.tenantId),
+        eq(provisionRuns.status, 'needs_review'),
       ))
-      .orderBy(reviewItems.createdAt);
-    return { run, openItems };
-  }));
+      .orderBy(desc(provisionRuns.createdAt));
 
-  return c.json(summary);
+    const summary = await Promise.all(needsReviewRuns.map(async (run) => {
+      const openItems = await tx.select().from(reviewItems)
+        .where(and(
+          eq(reviewItems.provisionRunId, run.id),
+          eq(reviewItems.status, 'open'),
+        ))
+        .orderBy(reviewItems.createdAt);
+      const maxSeverity = openItems.reduce((max, item) => {
+        const rank = severityRank[item.severity as keyof typeof severityRank] ?? 2;
+        return Math.min(max, rank);
+      }, 2);
+      return { run, openItems, maxSeverity };
+    }));
+
+    summary.sort((a, b) => {
+      if (a.maxSeverity !== b.maxSeverity) return a.maxSeverity - b.maxSeverity;
+      if (b.openItems.length !== a.openItems.length) return b.openItems.length - a.openItems.length;
+      return new Date(b.run.createdAt ?? 0).getTime() - new Date(a.run.createdAt ?? 0).getTime();
+    });
+
+    return c.json(summary);
+  });
 });

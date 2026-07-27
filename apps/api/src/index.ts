@@ -1,8 +1,9 @@
+import './telemetry.js';
 import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { env } from './config/env.js';
-import { testConnection, closeDb } from './config/db.js';
+import { testConnection, closeDb, validateRuntimeRoleSecurity, logSecurityValidation } from './config/db.js';
 import { errorHandler } from './lib/middleware/error-handler.js';
 import { rateLimiter } from './lib/middleware/rate-limiter.js';
 import { authRoutes } from './modules/auth/auth.routes.js';
@@ -11,7 +12,9 @@ import { mappingRoutes } from './modules/mapping/mapping.routes.js';
 import { provisionRoutes } from './modules/provision/provision.routes.js';
 import { importRoutes } from './modules/import/import.routes.js';
 import { startMappingWorker } from './modules/mapping/ai/worker.js';
+import { startAutoMappingWorker } from './modules/import/auto-mapping/auto-mapping.worker.js';
 import { logger } from './lib/logger.js';
+import { shutdownTelemetry } from './telemetry.js';
 
 const app = new Hono();
 
@@ -65,6 +68,17 @@ app.route('/api/import', importRoutes);
 // ── Start ──
 async function main() {
   await testConnection();
+
+  // Validate runtime role security in non-development or when explicitly requested
+  if (env.NODE_ENV !== 'development') {
+    const securityResult = await validateRuntimeRoleSecurity();
+    logSecurityValidation(securityResult);
+    if (!securityResult.valid) {
+      logger.error('[Security] Runtime role validation FAILED — refusing to start');
+      process.exit(1);
+    }
+  }
+
   logger.info({ port: env.PORT, env: env.NODE_ENV }, `[API] Starting`);
 
   const server = serve({
@@ -72,9 +86,12 @@ async function main() {
     port: env.PORT,
   });
 
-  // Start background worker for async AI mapping
-  const worker = startMappingWorker();
+  // Start background workers
+  const mappingWorker = startMappingWorker();
   logger.info('[API] Mapping worker started');
+
+  const autoMappingWorker = startAutoMappingWorker();
+  logger.info('[API] Auto-mapping worker started');
 
   // Graceful shutdown
   const shutdown = async (signal: string) => {
@@ -83,6 +100,7 @@ async function main() {
       logger.info('[API] Server closed');
       await closeDb();
       logger.info('[API] Database pool closed');
+      await shutdownTelemetry();
       process.exit(0);
     });
 

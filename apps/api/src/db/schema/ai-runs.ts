@@ -19,11 +19,15 @@ export const aiRuns = pgTable('ai_runs', {
   errorMessage: text('error_message'),
   startedAt: timestamp('started_at').defaultNow(),
   completedAt: timestamp('completed_at'),
+  policyOutcome: varchar('policy_outcome', { length: 20 }).default('allowed'),
+  toolName: varchar('tool_name', { length: 100 }),
+  agentName: varchar('agent_name', { length: 100 }),
 });
 
 export const aiSteps = pgTable('ai_steps', {
   id: uuid('id').defaultRandom().primaryKey(),
   aiRunId: uuid('ai_run_id').notNull().references(() => aiRuns.id, { onDelete: 'cascade' }),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
   stepName: varchar('step_name', { length: 100 }).notNull(),
   status: varchar('status', { length: 30 }).notNull().default('started'),
   sequence: integer('sequence').notNull().default(0),

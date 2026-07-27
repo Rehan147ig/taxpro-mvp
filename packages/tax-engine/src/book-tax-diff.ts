@@ -83,7 +83,11 @@ function getTimingFactor(type: string, assetAgeYears: number): DecimalInstance {
   const life = MACRS_LIFE_MAP[type];
   if (life && MACRS_TABLES[life]) {
     const rates = MACRS_TABLES[life];
-    return rates[assetAgeYears] ?? rates[Object.keys(rates).length - 1] ?? new Decimal('0.10');
+    const maxYear = Math.max(...Object.keys(rates).map(Number));
+    if (assetAgeYears > maxYear) {
+      return new Decimal('0');
+    }
+    return rates[assetAgeYears] ?? new Decimal('0');
   }
 
   return DEFAULT_TIMING_FACTORS[type] ?? new Decimal('0.10');

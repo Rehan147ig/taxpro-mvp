@@ -1,12 +1,32 @@
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { z } from 'zod';
 import { logger } from '../lib/logger.js';
 import { callJsonModel } from '../eve/model-client.js';
 import { findSimilarPatterns } from '../eve/pattern-store.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const INSTRUCTIONS = readFileSync(join(__dirname, 'instructions.md'), 'utf-8');
+
+const provisionAnalysisSchema = z.object({
+  reasoning: z.string(),
+  totalRevenue: z.number(),
+  totalExpenses: z.number(),
+  bookIncome: z.number(),
+  permanentDifferences: z.array(z.object({
+    accountId: z.string(),
+    label: z.string().optional(),
+    amount: z.number(),
+  })),
+  temporaryDifferences: z.array(z.object({
+    accountId: z.string(),
+    bookBalance: z.number(),
+    taxBalance: z.number(),
+    difference: z.number(),
+    timingCategory: z.string().optional(),
+  })),
+});
 
 export interface AgentInput {
   tenantId: string;
@@ -109,7 +129,8 @@ Rules:
 Return ONLY valid JSON. No markdown, no code fences, no explanation outside the JSON. The JSON must have: reasoning (string), totalRevenue (number), totalExpenses (number), bookIncome (number), permanentDifferences (array of {accountId, label, amount}), temporaryDifferences (array of {accountId, bookBalance, taxBalance, difference, timingCategory}).`;
 
   try {
-    const response = await callJsonModel<any>({
+    const response = await callJsonModel({
+      schema: provisionAnalysisSchema,
       system: INSTRUCTIONS,
       user: prompt,
       promptVersion: 'eve-provision-analysis-v1',
@@ -123,12 +144,12 @@ Return ONLY valid JSON. No markdown, no code fences, no explanation outside the 
       totalRevenue: Number(parsed.totalRevenue ?? 0),
       totalExpenses: Number(parsed.totalExpenses ?? 0),
       bookIncome: Number(parsed.bookIncome ?? 0),
-      permanentDifferences: (parsed.permanentDifferences ?? []).map((pd: any) => ({
+      permanentDifferences: (parsed.permanentDifferences ?? []).map((pd) => ({
         accountId: pd.accountId,
-        label: pd.label ?? pd.taxAccountType ?? 'Perm Diff',
+        label: pd.label ?? 'Perm Diff',
         amount: Number(pd.amount ?? 0),
       })),
-      temporaryDifferences: (parsed.temporaryDifferences ?? []).map((td: any) => ({
+      temporaryDifferences: (parsed.temporaryDifferences ?? []).map((td) => ({
         accountId: td.accountId,
         entityId: input.entityId ?? 'consolidated',
         period: input.period,

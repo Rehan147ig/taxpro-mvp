@@ -1,21 +1,33 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { provision as provApi } from '../api/client';
+import { webProvisionRunCounter } from '../observability';
 
 export default function ProvisionPage() {
   const [period, setPeriod] = useState('2024-01-01');
+  const [endPeriod, setEndPeriod] = useState('');
+  const [entityId, setEntityId] = useState('');
+  const [entities, setEntities] = useState<{ id: string; name: string; type: string }[]>([]);
   const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState<'workpaper' | 'package' | null>(null);
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState('');
+  const [entitiesError, setEntitiesError] = useState<string | null>(null);
+
+  useEffect(() => {
+    provApi.entities().then(setEntities).catch((err: any) => setEntitiesError(err.message || 'Failed to load entities'));
+  }, []);
 
   const handleRun = async () => {
     setLoading(true);
     setError('');
     setResult(null);
     try {
-      const data = await provApi.run({ period });
+      const data = await provApi.run({ period, endPeriod: endPeriod || undefined, entityId: entityId || undefined });
       setResult(data);
+      webProvisionRunCounter.add(1, { outcome: 'success' });
     } catch (err: any) {
       setError(err.message);
+      webProvisionRunCounter.add(1, { outcome: 'error' });
     } finally {
       setLoading(false);
     }
@@ -24,27 +36,55 @@ export default function ProvisionPage() {
   const fmt = (n: number) =>
     new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(n);
 
-  const handleExport = async () => {
+  const handleExport = async (type: 'workpaper' | 'package') => {
     if (!result?.id) return;
-    const blob = await provApi.exportResult(result.id);
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `taxpro-provision-${period}.xlsx`;
-    link.click();
-    URL.revokeObjectURL(url);
+    setExporting(type);
+    try {
+      const blob = type === 'package' ? await provApi.exportPackage(result.id) : await provApi.exportResult(result.id);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = type === 'package'
+        ? `taxpro-package-${period}.zip`
+        : `taxpro-provision-${period}.xlsx`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      setError(err.message || 'Export failed');
+    } finally {
+      setExporting(null);
+    }
   };
 
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold">Tax Provision</h2>
-        <div className="flex gap-2 items-center">
+        <div className="flex gap-2 items-center flex-wrap">
+          <select
+            value={entityId}
+            onChange={(e) => setEntityId(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+          >
+            <option value="">All Entities</option>
+            {entities.map(e => (
+              <option key={e.id} value={e.id}>{e.name}</option>
+            ))}
+          </select>
+          {entitiesError && <span className="text-red-500 text-xs">{entitiesError}</span>}
           <input
             type="month"
-            value={period}
+            value={period.slice(0, 7)}
             onChange={(e) => setPeriod(e.target.value + '-01')}
             className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+          />
+          <span className="text-gray-400 text-sm">to</span>
+          <input
+            type="month"
+            value={endPeriod ? endPeriod.slice(0, 7) : ''}
+            onChange={(e) => setEndPeriod(e.target.value ? e.target.value + '-01' : '')}
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+            placeholder="End period"
           />
           <button
             onClick={handleRun}
@@ -64,12 +104,20 @@ export default function ProvisionPage() {
 
       {result && (
         <div className="space-y-6">
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2">
             <button
-              onClick={handleExport}
-              className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50"
+              onClick={() => handleExport('workpaper')}
+              disabled={exporting !== null}
+              className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-50"
             >
-              Export Workpaper (.xlsx)
+              {exporting === 'workpaper' ? 'Exporting...' : 'Export Workpaper (.xlsx)'}
+            </button>
+            <button
+              onClick={() => handleExport('package')}
+              disabled={exporting !== null}
+              className="bg-brand-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
+            >
+              {exporting === 'package' ? 'Exporting...' : 'Export Package (.zip)'}
             </button>
           </div>
 

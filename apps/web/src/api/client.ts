@@ -27,8 +27,15 @@ export async function apiClient<T>(
   const res = await fetch(`${BASE_URL}${path}`, { ...options, headers });
 
   if (!res.ok) {
-    const error = await res.json().catch(() => ({ error: 'Request failed' }));
-    throw new Error(error.error || `HTTP ${res.status}`);
+    const errorBody = await res.json().catch(() => ({ error: 'Request failed' }));
+    // Genericize access-denied errors to avoid leaking internal details
+    if (res.status === 403 || res.status === 401) {
+      throw new Error('You do not have access to this provision or its records.');
+    }
+    if (res.status === 409) {
+      throw new Error(errorBody.error || 'This action cannot be completed because the provision is locked.');
+    }
+    throw new Error(errorBody.error || `HTTP ${res.status}`);
   }
 
   return res.json();
@@ -85,11 +92,13 @@ export const imports = {
 
 // Mappings
 export const mappings = {
-  list: () => apiClient<any[]>('/mapping/mappings'),
+  list: (status?: string) => apiClient<any[]>(`/mapping/mappings${status ? `?status=${status}` : ''}`),
   runAi: () => apiClient<{ jobId: string; message: string }>('/mapping/mappings/run-ai', { method: 'POST' }),
   status: (jobId: string) => apiClient<{ jobId: string; state: string; progress: any; result: any }>(`/mapping/mappings/status/${jobId}`),
   override: (accountId: string, payload: any) =>
     apiClient<any>(`/mapping/mappings/${accountId}/override`, { method: 'POST', body: JSON.stringify(payload) }),
+  reject: (accountId: string, reason?: string) =>
+    apiClient<any>(`/mapping/mappings/${accountId}/reject`, { method: 'PATCH', body: JSON.stringify({ reason }) }),
 };
 
 export interface AiAgentRun {
@@ -106,6 +115,7 @@ export interface AiAgentRun {
 
 // Provision
 export const provision = {
+  entities: () => apiClient<{ id: string; name: string; type: string }[]>('/provision/entities'),
   run: (payload: { period: string; endPeriod?: string; entityId?: string }) =>
     apiClient<any>('/provision/run', { method: 'POST', body: JSON.stringify(payload) }),
   results: () => apiClient<any[]>('/provision/results'),
@@ -129,7 +139,11 @@ export const provision = {
     apiClient<any>(`/provision/runs/${runId}/lock`, { method: 'POST' }),
   runTrialBalanceDetail: (runId: string) =>
     apiClient<any[]>(`/provision/runs/${runId}/trial-balance-detail`),
+  compare: (runId: string) =>
+    apiClient<{ currentPeriod: string; previousPeriod: string | null; current: any; previous: any; delta: any }>(`/provision/runs/${runId}/compare`),
   reviewQueue: () => apiClient<any[]>('/provision/review/queue'),
   eveAsk: (prompt: string) =>
     apiClient<{ answer: string; suggestedAction?: string }>('/provision/eve/ask', { method: 'POST', body: JSON.stringify({ prompt }) }),
+  events: (runId: string) =>
+    apiClient<any[]>(`/provision/runs/${runId}/events`),
 };

@@ -19,9 +19,31 @@
  * both decisions simultaneously, improving accuracy.
  */
 
+import { z } from 'zod';
 import { callJsonModel } from '../../eve/model-client.js';
 import { findSimilarPatterns } from '../../eve/pattern-store.js';
 import { logger } from '../../lib/logger.js';
+
+const stage1Schema = z.object({
+  classifications: z.array(z.object({
+    accountId: z.string(),
+    functionalCategory: z.string(),
+    confidence: z.number(),
+    reasoning: z.string(),
+  })),
+});
+
+const stage2Schema = z.object({
+  mappings: z.array(z.object({
+    accountId: z.string(),
+    taxAccountType: z.string(),
+    bookTreatment: z.string(),
+    timingCategory: z.string().optional(),
+    confidenceScore: z.number(),
+    ircSection: z.string(),
+    explanation: z.string(),
+  })),
+});
 
 // ── Types ──
 
@@ -130,9 +152,8 @@ export async function runMappingAgent(input: MappingAgentInput): Promise<Mapping
       balance: a.netBalance,
     }));
 
-    const typeResponse = await callJsonModel<{ classifications: Array<{
-      accountId: string; functionalCategory: string; confidence: number; reasoning: string;
-    }> }>({
+    const typeResponse = await callJsonModel({
+      schema: stage1Schema,
       system: TYPE_CLASSIFICATION_PROMPT,
       user: `Classify these accounts by functional category:\n${JSON.stringify(stage1Accounts, null, 2)}`,
       promptVersion: 'mapping-agent-stage1-v1',
@@ -166,10 +187,8 @@ export async function runMappingAgent(input: MappingAgentInput): Promise<Mapping
       functionalCategory: typeClassifications.find(c => c.accountId === a.id)?.functionalCategory ?? 'unknown',
     }));
 
-    const mappingResponse = await callJsonModel<{ mappings: Array<{
-      accountId: string; taxAccountType: string; bookTreatment: string;
-      timingCategory?: string; confidenceScore: number; ircSection: string; explanation: string;
-    }> }>({
+    const mappingResponse = await callJsonModel({
+      schema: stage2Schema,
       system: IRC_MAPPING_SYSTEM_PROMPT,
       user: `Map these accounts to IRC tax categories. Include the specific IRC section for each.${historical}\n\nAccounts:\n${JSON.stringify(stage2Accounts, null, 2)}`,
       promptVersion: 'mapping-agent-stage2-v2',

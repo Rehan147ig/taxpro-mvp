@@ -15,6 +15,7 @@ export const taxMappings = pgTable('tax_mappings', {
   overrideReason: text('override_reason'),
   aiExplanation: text('ai_explanation'),
   isActive: boolean('is_active').default(true),
+  status: varchar('status', { length: 20 }).default('active'),
   version: integer('version').default(1),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
