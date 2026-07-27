@@ -19,71 +19,76 @@ function superlogHeaders(token: string): Record<string, string> {
   return { 'x-api-key': token };
 }
 
-const isLocal =
-  typeof window !== 'undefined' && window.location.hostname === 'localhost';
+let pageViewCounterInstance: { add: (val: number, attrs?: any) => void } = { add: () => {} };
+let webProvisionRunCounterInstance: { add: (val: number, attrs?: any) => void } = { add: () => {} };
 
-const resource = resourceFromAttributes({
-  'service.name': 'taxpro-web',
-  'service.version': '0.1.0',
-  'deployment.environment.name': isLocal ? 'local' : 'production',
-});
+try {
+  const isLocal =
+    typeof window !== 'undefined' && window.location.hostname === 'localhost';
 
-const headers = superlogHeaders(SUPERLOG_PUBLIC_TOKEN);
+  const resource = resourceFromAttributes({
+    'service.name': 'taxpro-web',
+    'service.version': '0.1.0',
+    'deployment.environment.name': isLocal ? 'local' : 'production',
+  });
 
-// ── Traces ──
-const traceProvider = new WebTracerProvider({ resource });
-// The Web SDK types omit addSpanProcessor in some versions; use any cast
-(traceProvider as any).addSpanProcessor(
-  new BatchSpanProcessor(
-    new OTLPTraceExporter({
-      url: `${SUPERLOG_ENDPOINT}/v1/traces`,
-      headers,
+  const headers = superlogHeaders(SUPERLOG_PUBLIC_TOKEN);
+
+  // ── Traces ──
+  const traceProvider = new WebTracerProvider({ resource });
+  (traceProvider as any).addSpanProcessor(
+    new BatchSpanProcessor(
+      new OTLPTraceExporter({
+        url: `${SUPERLOG_ENDPOINT}/v1/traces`,
+        headers,
+      }),
+    ),
+  );
+  traceProvider.register({ contextManager: new ZoneContextManager() });
+
+  // ── Metrics ──
+  const meterProvider = new MeterProvider({ resource });
+  (meterProvider as any).addMetricReader(
+    new PeriodicExportingMetricReader({
+      exporter: new OTLPMetricExporter({
+        url: `${SUPERLOG_ENDPOINT}/v1/metrics`,
+        headers,
+      }),
+      exportIntervalMillis: 30_000,
     }),
-  ),
-);
-traceProvider.register({ contextManager: new ZoneContextManager() });
+  );
+  metrics.setGlobalMeterProvider(meterProvider);
 
-// ── Metrics ──
-const meterProvider = new MeterProvider({ resource });
-// The SDK types omit addMetricReader in some versions; use any cast
-(meterProvider as any).addMetricReader(
-  new PeriodicExportingMetricReader({
-    exporter: new OTLPMetricExporter({
-      url: `${SUPERLOG_ENDPOINT}/v1/metrics`,
-      headers,
-    }),
-    exportIntervalMillis: 30_000,
-  }),
-);
-metrics.setGlobalMeterProvider(meterProvider);
+  // ── Logs ──
+  const logExporter = new OTLPLogExporter({
+    url: `${SUPERLOG_ENDPOINT}/v1/logs`,
+    headers,
+  });
+  const loggerProvider = new LoggerProvider({ resource });
+  (loggerProvider as any).addLogRecordProcessor(
+    new (BatchLogRecordProcessor as any)(logExporter),
+  );
 
-// ── Logs ──
-const logExporter = new OTLPLogExporter({
-  url: `${SUPERLOG_ENDPOINT}/v1/logs`,
-  headers,
-});
-const loggerProvider = new LoggerProvider({ resource });
-// The SDK types omit addLogRecordProcessor in some versions; use any cast
-(loggerProvider as any).addLogRecordProcessor(
-  new (BatchLogRecordProcessor as any)(logExporter),
-);
+  // ── Auto-instrumentation ──
+  registerInstrumentations({
+    instrumentations: [
+      new FetchInstrumentation(),
+      new DocumentLoadInstrumentation(),
+    ],
+  });
 
-// ── Auto-instrumentation ──
-registerInstrumentations({
-  instrumentations: [
-    new FetchInstrumentation(),
-    new DocumentLoadInstrumentation(),
-  ],
-});
+  const meter = metrics.getMeter('taxpro-web');
+  pageViewCounterInstance = meter.createCounter('page.views', {
+    description: 'Page views by route',
+  });
+  webProvisionRunCounterInstance = meter.createCounter('provision.runs', {
+    description: 'Provision runs initiated from the web UI',
+  });
+} catch (err) {
+  console.warn('[Telemetry] Web telemetry initialization skipped:', err);
+}
 
-// ── Module-scope tracer, meter, and counters ──
 export const webTracer = trace.getTracer('taxpro-web');
-const meter = metrics.getMeter('taxpro-web');
+export const pageViewCounter = pageViewCounterInstance;
+export const webProvisionRunCounter = webProvisionRunCounterInstance;
 
-export const pageViewCounter = meter.createCounter('page.views', {
-  description: 'Page views by route',
-});
-
-export const webProvisionRunCounter = meter.createCounter('provision.runs', {
-  description: 'Provision runs initiated from the web UI',
-});
