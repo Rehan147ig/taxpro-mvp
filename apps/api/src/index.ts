@@ -13,7 +13,7 @@ import { provisionRoutes } from './modules/provision/provision.routes.js';
 import { importRoutes } from './modules/import/import.routes.js';
 import { startMappingWorker } from './modules/mapping/ai/worker.js';
 import { startAutoMappingWorker } from './modules/import/auto-mapping/auto-mapping.worker.js';
-import { startAgentPipelineWorker } from '../../agent/orchestrator/state-machine.js';
+import { startAgentPipelineWorker } from '../../../agent/orchestrator/state-machine.js';
 import { agentRoutes } from './modules/agent/agent.routes.js';
 import { logger } from './lib/logger.js';
 import { shutdownTelemetry } from './telemetry.js';

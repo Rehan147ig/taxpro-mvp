@@ -1,4 +1,4 @@
-import type { Jurisdiction } from '../../packages/tax-engine/src/types.js';
+import type { Jurisdiction } from '@taxpro/tax-engine';
 
 export type PipelineStage = 'parse' | 'map' | 'calculate' | 'explain' | 'audit' | 'review' | 'locked';
 
