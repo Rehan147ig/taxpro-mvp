@@ -1,6 +1,6 @@
 # TaxPro Enterprise — Multi-Jurisdiction ASC 740 & FRS 102 Corporate Tax Provision Platform
 
-TypeScript | Hono.js | React 18 | PostgreSQL RLS | Vercel AI SDK | Superlog OpenTelemetry
+TypeScript | Hono.js | React 18 | Turborepo | PostgreSQL RLS | Vercel AI SDK | Superlog OpenTelemetry
 
 **US ASC 740 EDGAR Benchmark** | **UK FRS 102 Benchmark**
 
@@ -132,6 +132,7 @@ TaxPro Enterprise enforces defense-in-depth tenant boundary isolation and audita
 
 ```text
 taxpro/
+├── turbo.json                 # Turborepo task orchestration + caching
 ├── apps/
 │   ├── api/                     # Hono.js REST API Server & Background Workers
 │   │   ├── src/
@@ -222,6 +223,19 @@ OFFLINE=1 npm run eval
 # Run UK FRS 102 Companies House Benchmark Harness
 npm run eval:uk
 ```
+
+---
+
+## ⚙️ Turborepo
+
+The monorepo uses [Turborepo](https://turbo.build) for task orchestration and content-based caching:
+
+- **`turbo run build`** — Builds all workspaces in dependency order (tax-engine → api, web in parallel).
+- **`turbo run test`** — Re-runs tests only when source changes (cached otherwise).
+- **`turbo run dev`** — Starts api + web dev servers in parallel.
+- **`turbo run lint`** — Typechecks all workspaces.
+
+First run is cold; subsequent runs skip unchanged tasks via local cache.
 
 ---
 
