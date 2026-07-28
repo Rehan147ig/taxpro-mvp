@@ -1,0 +1,49 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "ui": "stream",
+  "globalDependencies": ["tsconfig.base.json"],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "inputs": ["src/**", "tsconfig.json"],
+      "outputs": ["dist/**"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true,
+      "dependsOn": ["^build"]
+    },
+    "lint": {
+      "dependsOn": ["^build"]
+    },
+    "test": {
+      "dependsOn": ["build"]
+    },
+    "test:watch": {
+      "cache": false,
+      "persistent": true
+    },
+    "db:generate": {},
+    "db:migrate": {
+      "dependsOn": ["build"]
+    },
+    "db:seed": {
+      "dependsOn": ["build"]
+    },
+    "db:synthetic": {
+      "dependsOn": ["build"]
+    },
+    "eval": {
+      "dependsOn": ["build"]
+    },
+    "eval:uk": {
+      "dependsOn": ["build"]
+    },
+    "start": {
+      "dependsOn": ["build"]
+    },
+    "preview": {
+      "dependsOn": ["build"]
+    }
+  }
+}

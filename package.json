@@ -1,25 +1,28 @@
 {
-  "name": "taxpro-mvp",
+  "name": "taxpro-enterprise",
   "private": true,
+  "packageManager": "npm@10.9.0",
   "workspaces": [
     "apps/*",
     "packages/*"
   ],
   "scripts": {
-    "dev": "concurrently \"npm run dev -w apps/api\" \"npm run dev -w apps/web\"",
-    "build": "npm run build -w packages/tax-engine && npm run build -w apps/api && npm run build -w apps/web",
-    "lint": "npm run lint -w apps/api && npm run lint -w apps/web",
-    "test": "npm run test -w packages/tax-engine",
-    "db:generate": "npm run db:generate -w apps/api",
-    "db:migrate": "npm run db:migrate -w apps/api",
-    "db:seed": "npm run db:seed -w apps/api",
-    "eval": "npm run eval -w apps/api"
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "db:generate": "turbo run db:generate",
+    "db:migrate": "turbo run db:migrate",
+    "db:seed": "turbo run db:seed",
+    "eval": "turbo run eval",
+    "eval:uk": "turbo run eval:uk"
   },
   "devDependencies": {
     "@types/archiver": "^8.0.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/jsonwebtoken": "^9.0.10",
     "concurrently": "^9.2.4",
+    "turbo": "^2.10.7",
     "typescript": "^5.9.3"
   },
   "dependencies": {
