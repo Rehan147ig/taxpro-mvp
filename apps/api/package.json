@@ -14,6 +14,7 @@
     "db:synthetic": "tsx scripts/synthetic-seed.ts",
     "db:synthetic-q1": "tsx scripts/synthetic-seed.ts q1-only",
     "eval": "tsx scripts/eval/run-eval.ts",
+    "eval:uk": "tsx scripts/eval/run-uk-eval.ts",
     "test:integration": "tsx scripts/test-provision-flow.ts"
   },
   "dependencies": {

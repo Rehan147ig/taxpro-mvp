@@ -22,7 +22,6 @@
     "test:watch": "vitest"
   },
   "devDependencies": {
-    "@types/decimal.js": "^0.0.32",
     "vitest": "^4.1.0"
   },
   "dependencies": {
