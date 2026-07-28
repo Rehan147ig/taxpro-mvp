@@ -4,36 +4,25 @@ import type {
 } from './types.js';
 import { Jurisdiction } from './types.js';
 import { validateRate, validatePositive } from './types.js';
+import { ukDeferredTaxLine, calculateUkDeferredTax } from './uk-frs102-s29/deferred-tax.js';
+import { US_RATES_BY_FISCAL_YEAR, getRateForFiscalYear } from './uk-frs102-s29/rules.js';
 
 export function calculateDeferredTaxLine(input: DeferredTaxInput): DeferredTaxLine {
+  if (input.jurisdiction === Jurisdiction.UK_FRS102_S29) {
+    return ukDeferredTaxLine(input);
+  }
+
   validateRate('taxRate', input.taxRate);
   validatePositive('openingDTA', input.openingDTA);
   validatePositive('openingDTL', input.openingDTL);
-
-  if (input.jurisdiction === Jurisdiction.UK_FRS102_S29 && input.dtType === 'DTA' && input.probableRecovery === false) {
-    return {
-      timingCategory: input.timingCategory.replace(/temporary/gi, 'timing'),
-      openingBalance: new Decimal(0),
-      currentYearChange: new Decimal(0),
-      taxRate: input.taxRate,
-      deferredTaxAmount: new Decimal(0),
-      reversals: new Decimal(0),
-      closingBalance: new Decimal(0),
-      dtType: input.dtType,
-    };
-  }
 
   const deferredTaxAmount: USD = input.currentYearTemporaryChange.abs().mul(input.taxRate);
 
   const openingBalance: USD = input.dtType === 'DTA' ? input.openingDTA : input.openingDTL;
   const closingBalance: USD = openingBalance.plus(deferredTaxAmount);
 
-  const label = input.jurisdiction === Jurisdiction.UK_FRS102_S29
-    ? input.timingCategory.replace(/temporary/gi, 'timing')
-    : input.timingCategory;
-
   return {
-    timingCategory: label,
+    timingCategory: input.timingCategory,
     openingBalance,
     currentYearChange: input.currentYearTemporaryChange,
     taxRate: input.taxRate,
@@ -51,12 +40,23 @@ export function calculateDeferredTax(
   taxRates: Record<string, TaxRate>,
   jurisdiction: Jurisdiction = Jurisdiction.US_ASC740,
   probableRecoveryMap?: Record<string, boolean>,
+  asOfDate?: string,
 ): DeferredTaxResult {
+  if (jurisdiction === Jurisdiction.UK_FRS102_S29) {
+    return calculateUkDeferredTax(
+      temporaryDifferences,
+      priorYearDTAByCategory,
+      priorYearDTLByCategory,
+      taxRates,
+      probableRecoveryMap,
+      asOfDate,
+    );
+  }
+
   const lines: DeferredTaxLine[] = [];
 
-  const defaultRate = jurisdiction === Jurisdiction.UK_FRS102_S29
-    ? new Decimal('0.25')
-    : new Decimal('0.21');
+  const fiscalYear = asOfDate ? asOfDate.slice(0, 4) : new Date().getFullYear().toString();
+  const defaultRate = getRateForFiscalYear('US_ASC740', fiscalYear, taxRates, US_RATES_BY_FISCAL_YEAR);
 
   for (const diff of temporaryDifferences) {
     if (diff.diffType !== 'temporary') continue;
@@ -72,29 +72,11 @@ export function calculateDeferredTax(
       ? (priorYearDTAByCategory[cat] ?? new Decimal(0))
       : (priorYearDTLByCategory[cat] ?? new Decimal(0));
 
-    if (jurisdiction === Jurisdiction.UK_FRS102_S29 && isDeductible && probableRecoveryMap?.[cat] === false) {
-      lines.push({
-        timingCategory: cat.replace(/temporary/gi, 'timing'),
-        openingBalance: opening,
-        currentYearChange: new Decimal(0),
-        taxRate,
-        deferredTaxAmount: new Decimal(0),
-        reversals: new Decimal(0),
-        closingBalance: opening,
-        dtType,
-      });
-      continue;
-    }
-
     const deferredTaxAmount: USD = diff.difference.abs().mul(taxRate);
     const closingBalance: USD = opening.plus(deferredTaxAmount);
 
-    const label = jurisdiction === Jurisdiction.UK_FRS102_S29
-      ? cat.replace(/temporary/gi, 'timing')
-      : cat;
-
     lines.push({
-      timingCategory: label,
+      timingCategory: cat,
       openingBalance: opening,
       currentYearChange: diff.difference,
       taxRate,
@@ -134,7 +116,7 @@ export function calculateDeferredTax(
   };
 }
 
-function aggregateByCategory(lines: DeferredTaxLine[]): DeferredTaxLine[] {
+export function aggregateByCategory(lines: DeferredTaxLine[]): DeferredTaxLine[] {
   const map = new Map<string, DeferredTaxLine>();
 
   for (const line of lines) {

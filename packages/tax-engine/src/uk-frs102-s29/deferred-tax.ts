@@ -1,8 +1,9 @@
 import Decimal from 'decimal.js';
 import type { DeferredTaxInput, DeferredTaxLine, DeferredTaxResult, BookTaxDifference, USD, TaxRate } from '../types.js';
 import { Jurisdiction } from '../types.js';
-import { checkProbableRecovery, shouldDiscount, applyTimingDifferenceLabel } from './rules.js';
+import { checkProbableRecovery, shouldDiscount, applyTimingDifferenceLabel, getRateForFiscalYear, UK_RATES_BY_FISCAL_YEAR } from './rules.js';
 import { validateRate, validatePositive } from '../types.js';
+import { aggregateByCategory } from '../deferred-tax.js';
 
 export function ukDeferredTaxLine(input: DeferredTaxInput): DeferredTaxLine {
   validateRate('taxRate', input.taxRate);
@@ -23,7 +24,9 @@ export function ukDeferredTaxLine(input: DeferredTaxInput): DeferredTaxLine {
     };
   }
 
-  const discountFactor = shouldDiscount(Jurisdiction.UK_FRS102_S29) ? new Decimal(1) : new Decimal(1);
+  const discountFactor = shouldDiscount(input.jurisdiction)
+    ? new Decimal(1).div(new Decimal(1.05).pow(1))
+    : new Decimal(1);
   const grossDeferred: USD = input.currentYearTemporaryChange.abs().mul(input.taxRate);
   const deferredTaxAmount: USD = grossDeferred.mul(discountFactor);
 
@@ -50,8 +53,12 @@ export function calculateUkDeferredTax(
   priorYearDTLByCategory: Record<string, USD>,
   taxRates: Record<string, TaxRate>,
   probableRecoveryMap?: Record<string, boolean>,
+  asOfDate?: string,
 ): DeferredTaxResult {
   const lines: DeferredTaxLine[] = [];
+
+  const fiscalYear = asOfDate ? asOfDate.slice(0, 4) : new Date().getFullYear().toString();
+  const defaultRate = getRateForFiscalYear('UK_FRS102_S29', fiscalYear, taxRates, UK_RATES_BY_FISCAL_YEAR);
 
   for (const diff of temporaryDifferences) {
     if (diff.diffType !== 'temporary') continue;
@@ -61,7 +68,7 @@ export function calculateUkDeferredTax(
     const isDeductible = cat === 'deductible_temporary' || ukCat === 'deductible_timing';
     const dtType: 'DTA' | 'DTL' = isDeductible ? 'DTA' : 'DTL';
 
-    const taxRate: TaxRate = taxRates[cat] ?? new Decimal('0.25');
+    const taxRate: TaxRate = getRateForFiscalYear('UK_FRS102_S29', fiscalYear, taxRates, UK_RATES_BY_FISCAL_YEAR, cat);
     validateRate(`taxRates.${cat}`, taxRate);
 
     const opening: USD = isDeductible
@@ -69,7 +76,6 @@ export function calculateUkDeferredTax(
       : (priorYearDTLByCategory[cat] ?? new Decimal(0));
 
     const probableRecovery = probableRecoveryMap?.[cat] ?? true;
-
     const recovery = checkProbableRecovery(Jurisdiction.UK_FRS102_S29, probableRecovery, dtType);
     if (!recovery.allowed) {
       lines.push({
@@ -127,23 +133,4 @@ export function calculateUkDeferredTax(
     totalClosingDTL,
     netDeferredTaxExpense,
   };
-}
-
-function aggregateByCategory(lines: DeferredTaxLine[]): DeferredTaxLine[] {
-  const map = new Map<string, DeferredTaxLine>();
-
-  for (const line of lines) {
-    const key = `${line.timingCategory}::${line.dtType}`;
-    const existing = map.get(key);
-    if (existing) {
-      existing.openingBalance = existing.openingBalance.plus(line.openingBalance);
-      existing.currentYearChange = existing.currentYearChange.plus(line.currentYearChange);
-      existing.deferredTaxAmount = existing.deferredTaxAmount.plus(line.deferredTaxAmount);
-      existing.closingBalance = existing.closingBalance.plus(line.closingBalance);
-    } else {
-      map.set(key, { ...line });
-    }
-  }
-
-  return Array.from(map.values());
 }
