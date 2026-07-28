@@ -14,6 +14,7 @@ export interface EveModelRequest {
   temperature?: number;
   maxTokens?: number;
   promptVersion: string;
+  jurisdiction?: 'US_ASC740' | 'UK_FRS102_S29';
 }
 
 export interface EveModelResponse<T> {

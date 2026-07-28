@@ -1,18 +1,18 @@
 import Decimal from 'decimal.js';
-import type {
-  DeferredTaxInput, DeferredTaxResult, DeferredTaxLine, BookTaxDifference, USD, TaxRate,
-} from './types.js';
-import { Jurisdiction } from './types.js';
-import { validateRate, validatePositive } from './types.js';
+import type { DeferredTaxInput, DeferredTaxLine, DeferredTaxResult, BookTaxDifference, USD, TaxRate } from '../types.js';
+import { Jurisdiction } from '../types.js';
+import { checkProbableRecovery, shouldDiscount, applyTimingDifferenceLabel } from './rules.js';
+import { validateRate, validatePositive } from '../types.js';
 
-export function calculateDeferredTaxLine(input: DeferredTaxInput): DeferredTaxLine {
+export function ukDeferredTaxLine(input: DeferredTaxInput): DeferredTaxLine {
   validateRate('taxRate', input.taxRate);
   validatePositive('openingDTA', input.openingDTA);
   validatePositive('openingDTL', input.openingDTL);
 
-  if (input.jurisdiction === Jurisdiction.UK_FRS102_S29 && input.dtType === 'DTA' && input.probableRecovery === false) {
+  const recovery = checkProbableRecovery(Jurisdiction.UK_FRS102_S29, input.probableRecovery, input.dtType);
+  if (!recovery.allowed) {
     return {
-      timingCategory: input.timingCategory.replace(/temporary/gi, 'timing'),
+      timingCategory: applyTimingDifferenceLabel(input.timingCategory, Jurisdiction.UK_FRS102_S29),
       openingBalance: new Decimal(0),
       currentYearChange: new Decimal(0),
       taxRate: input.taxRate,
@@ -23,14 +23,14 @@ export function calculateDeferredTaxLine(input: DeferredTaxInput): DeferredTaxLi
     };
   }
 
-  const deferredTaxAmount: USD = input.currentYearTemporaryChange.abs().mul(input.taxRate);
+  const discountFactor = shouldDiscount(Jurisdiction.UK_FRS102_S29) ? new Decimal(1) : new Decimal(1);
+  const grossDeferred: USD = input.currentYearTemporaryChange.abs().mul(input.taxRate);
+  const deferredTaxAmount: USD = grossDeferred.mul(discountFactor);
 
   const openingBalance: USD = input.dtType === 'DTA' ? input.openingDTA : input.openingDTL;
   const closingBalance: USD = openingBalance.plus(deferredTaxAmount);
 
-  const label = input.jurisdiction === Jurisdiction.UK_FRS102_S29
-    ? input.timingCategory.replace(/temporary/gi, 'timing')
-    : input.timingCategory;
+  const label = applyTimingDifferenceLabel(input.timingCategory, Jurisdiction.UK_FRS102_S29);
 
   return {
     timingCategory: label,
@@ -44,37 +44,36 @@ export function calculateDeferredTaxLine(input: DeferredTaxInput): DeferredTaxLi
   };
 }
 
-export function calculateDeferredTax(
+export function calculateUkDeferredTax(
   temporaryDifferences: BookTaxDifference[],
   priorYearDTAByCategory: Record<string, USD>,
   priorYearDTLByCategory: Record<string, USD>,
   taxRates: Record<string, TaxRate>,
-  jurisdiction: Jurisdiction = Jurisdiction.US_ASC740,
   probableRecoveryMap?: Record<string, boolean>,
 ): DeferredTaxResult {
   const lines: DeferredTaxLine[] = [];
 
-  const defaultRate = jurisdiction === Jurisdiction.UK_FRS102_S29
-    ? new Decimal('0.25')
-    : new Decimal('0.21');
-
   for (const diff of temporaryDifferences) {
     if (diff.diffType !== 'temporary') continue;
 
-    const cat = diff.timingCategory ?? 'TEMP_OTHER';
-    const isDeductible = cat === 'deductible_temporary';
+    const cat = diff.timingCategory ?? 'TEMP_TIMING_DIFFERENCE';
+    const ukCat = cat.replace(/temporary/gi, 'timing');
+    const isDeductible = cat === 'deductible_temporary' || ukCat === 'deductible_timing';
     const dtType: 'DTA' | 'DTL' = isDeductible ? 'DTA' : 'DTL';
 
-    const taxRate: TaxRate = taxRates[cat] ?? defaultRate;
+    const taxRate: TaxRate = taxRates[cat] ?? new Decimal('0.25');
     validateRate(`taxRates.${cat}`, taxRate);
 
     const opening: USD = isDeductible
       ? (priorYearDTAByCategory[cat] ?? new Decimal(0))
       : (priorYearDTLByCategory[cat] ?? new Decimal(0));
 
-    if (jurisdiction === Jurisdiction.UK_FRS102_S29 && isDeductible && probableRecoveryMap?.[cat] === false) {
+    const probableRecovery = probableRecoveryMap?.[cat] ?? true;
+
+    const recovery = checkProbableRecovery(Jurisdiction.UK_FRS102_S29, probableRecovery, dtType);
+    if (!recovery.allowed) {
       lines.push({
-        timingCategory: cat.replace(/temporary/gi, 'timing'),
+        timingCategory: applyTimingDifferenceLabel(ukCat, Jurisdiction.UK_FRS102_S29),
         openingBalance: opening,
         currentYearChange: new Decimal(0),
         taxRate,
@@ -89,12 +88,8 @@ export function calculateDeferredTax(
     const deferredTaxAmount: USD = diff.difference.abs().mul(taxRate);
     const closingBalance: USD = opening.plus(deferredTaxAmount);
 
-    const label = jurisdiction === Jurisdiction.UK_FRS102_S29
-      ? cat.replace(/temporary/gi, 'timing')
-      : cat;
-
     lines.push({
-      timingCategory: label,
+      timingCategory: applyTimingDifferenceLabel(ukCat, Jurisdiction.UK_FRS102_S29),
       openingBalance: opening,
       currentYearChange: diff.difference,
       taxRate,

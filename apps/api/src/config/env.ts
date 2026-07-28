@@ -15,10 +15,14 @@ const envSchema = z.object({
   CORS_ORIGIN: z.string().default('http://localhost:5173'),
 
   // AI Provider — swap by changing these
-  AI_PROVIDER: z.enum(['openai', 'nvidia', 'custom']).default('openai'),
+  AI_PROVIDER: z.enum(['openai', 'nvidia', 'interfaze', 'custom']).default('openai'),
   AI_BASE_URL: z.string().optional(),
   AI_API_KEY: z.string().optional(),
   AI_MODEL: z.string().optional(),
+
+  // Interfaze.ai — multimodal parsing provider (OpenAI-compatible)
+  INTERFAZE_API_KEY: z.string().optional(),
+  INTERFAZE_ENDPOINT: z.string().default('https://api.interfaze.ai/v1'),
 
   // Legacy fallback
   OPENAI_API_KEY: z.string().optional(),

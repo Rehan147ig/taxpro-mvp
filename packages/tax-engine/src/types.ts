@@ -3,16 +3,20 @@
 
 import Decimal from 'decimal.js';
 
-export type USD = InstanceType<typeof Decimal>;
-export type TaxRate = InstanceType<typeof Decimal>;
-export type Ratio = InstanceType<typeof Decimal>;
+export type USD = Decimal;
+export type TaxRate = Decimal;
+export type Ratio = Decimal;
 export type Years = number;
+
+export interface TaxRateConfig {
+  rateTableSource: 'IRS' | 'HMRC';
+}
 
 export interface Entity {
   id: string;
   name: string;
   currency: string;
-  taxJurisdiction: string;
+  taxJurisdiction: Jurisdiction;
   parentEntityId?: string;
   taxRate: TaxRate;
   stateTaxRate?: TaxRate;
@@ -32,7 +36,12 @@ export interface TrialBalanceLine {
   balance: USD;
 }
 
-export type TaxAccountType =
+export enum Jurisdiction {
+  US_ASC740 = 'US_ASC740',
+  UK_FRS102_S29 = 'UK_FRS102_S29',
+}
+
+export type TaxAccountTypeUS =
   | 'PERM_MEALS_ENTERTAINMENT'
   | 'PERM_PENALTIES_FINES'
   | 'PERM_DIVIDENDS_RECEIVED_DEDUCTION'
@@ -63,6 +72,15 @@ export type TaxAccountType =
   | 'NODIFF_RENT'
   | 'NODIFF_UTILITIES'
   | 'NODIFF_OTHER';
+
+export type TaxAccountTypeUK =
+  | 'TEMP_TIMING_DIFFERENCE'
+  | 'TEMP_UNRELIEVED_LOSS'
+  | 'TEMP_FIXED_ASSET_ALLOWANCE'
+  | 'PERM_OTHER'
+  | 'NODIFF_OTHER';
+
+export type TaxAccountType = TaxAccountTypeUS | TaxAccountTypeUK;
 
 export interface TaxMapping {
   accountId: string;
@@ -124,6 +142,8 @@ export interface DeferredTaxInput {
   currentYearTemporaryChange: USD;
   taxRate: TaxRate;
   dtType: 'DTA' | 'DTL';
+  probableRecovery?: boolean;
+  jurisdiction: Jurisdiction;
 }
 
 export interface DeferredTaxLine {

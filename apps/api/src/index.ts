@@ -13,6 +13,8 @@ import { provisionRoutes } from './modules/provision/provision.routes.js';
 import { importRoutes } from './modules/import/import.routes.js';
 import { startMappingWorker } from './modules/mapping/ai/worker.js';
 import { startAutoMappingWorker } from './modules/import/auto-mapping/auto-mapping.worker.js';
+import { startAgentPipelineWorker } from '../../agent/orchestrator/state-machine.js';
+import { agentRoutes } from './modules/agent/agent.routes.js';
 import { logger } from './lib/logger.js';
 import { shutdownTelemetry } from './telemetry.js';
 
@@ -64,6 +66,7 @@ app.route('/api/netsuite', netsuiteRoutes);
 app.route('/api/mapping', mappingRoutes);
 app.route('/api/provision', provisionRoutes);
 app.route('/api/import', importRoutes);
+app.route('/api/agent', agentRoutes);
 
 // ── Start ──
 async function main() {
@@ -92,6 +95,9 @@ async function main() {
 
   const autoMappingWorker = startAutoMappingWorker();
   logger.info('[API] Auto-mapping worker started');
+
+  const agentPipelineWorker = startAgentPipelineWorker();
+  logger.info('[API] Agent pipeline worker started');
 
   // Graceful shutdown
   const shutdown = async (signal: string) => {

@@ -7,12 +7,15 @@ import { env } from './env.js';
  * AI provider configuration (Vercel AI SDK).
  *
  * Supports any OpenAI-compatible API by setting:
- *   AI_PROVIDER  = openai | nvidia | custom
+ *   AI_PROVIDER  = openai | nvidia | interfaze | custom
  *   AI_BASE_URL  = https://integrate.api.nvidia.com/v1  (for nvidia)
  *   AI_API_KEY   = nvapi-... or sk-...
  *   AI_MODEL     = gpt-4o-mini | z-ai/glm-5.2 | ...
  *
+ * Interfaze (multimodal parsing) reads from INTERFAZE_API_KEY and INTERFAZE_ENDPOINT.
  * Defaults to OpenAI if nothing is configured.
+ *
+ * SECURITY: API keys are read from process.env only. Never log or print keys.
  */
 
 const PROVIDER_DEFAULTS: Record<string, { baseUrl: string; model: string }> = {
@@ -23,6 +26,10 @@ const PROVIDER_DEFAULTS: Record<string, { baseUrl: string; model: string }> = {
   nvidia: {
     baseUrl: 'https://integrate.api.nvidia.com/v1',
     model: 'z-ai/glm-5.2',
+  },
+  interfaze: {
+    baseUrl: 'https://api.interfaze.ai/v1',
+    model: 'gpt-4o-mini',
   },
   custom: {
     baseUrl: '',
@@ -51,30 +58,41 @@ function resolveConfig(): AiConfig {
   const provider = env.AI_PROVIDER || 'openai';
   const defaults = PROVIDER_DEFAULTS[provider] || PROVIDER_DEFAULTS.openai;
 
-  const apiKey = env.AI_API_KEY || env.OPENAI_API_KEY;
+  let apiKey: string | undefined;
+  let baseUrl: string | undefined;
+  let modelName: string | undefined;
+
+  if (provider === 'interfaze') {
+    apiKey = env.INTERFAZE_API_KEY || env.AI_API_KEY;
+    baseUrl = env.INTERFAZE_ENDPOINT || env.AI_BASE_URL || defaults.baseUrl;
+    modelName = env.AI_MODEL || defaults.model;
+  } else {
+    apiKey = env.AI_API_KEY || env.OPENAI_API_KEY;
+    baseUrl = env.AI_BASE_URL || defaults.baseUrl;
+    modelName = env.AI_MODEL || defaults.model;
+  }
+
   if (!apiKey) {
     throw new Error(
-      'No AI API key configured. Set AI_API_KEY (or OPENAI_API_KEY) in .env',
+      'No AI API key configured. Set AI_API_KEY (or INTERFAZE_API_KEY) in .env',
     );
   }
 
-  const baseUrl = env.AI_BASE_URL || defaults.baseUrl;
   if (!baseUrl && provider === 'custom') {
     throw new Error('AI_BASE_URL is required when AI_PROVIDER=custom');
   }
 
-  const modelName = env.AI_MODEL || defaults.model;
   if (!modelName && provider === 'custom') {
     throw new Error('AI_MODEL is required when AI_PROVIDER=custom');
   }
 
   // Native OpenAI provider for api.openai.com; OpenAI-compatible provider
-  // (chat completions) for NVIDIA / custom gateways that lack the Responses API.
+  // (chat completions) for NVIDIA / Interfaze / custom gateways.
   const model: LanguageModel = provider === 'openai' && !env.AI_BASE_URL
-    ? createOpenAI({ apiKey })(modelName)
-    : createOpenAICompatible({ name: provider, apiKey, baseURL: baseUrl })(modelName);
+    ? createOpenAI({ apiKey })(modelName!)
+    : createOpenAICompatible({ name: provider, apiKey, baseURL: baseUrl! })(modelName!);
 
-  cachedConfig = { model, modelName, provider };
+  cachedConfig = { model, modelName: modelName!, provider };
   return cachedConfig;
 }
 

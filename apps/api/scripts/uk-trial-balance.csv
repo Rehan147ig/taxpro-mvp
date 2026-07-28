@@ -1,0 +1,47 @@
+accountNumber,accountName,accountType,debit,credit,balance,period,entityId
+1000,Land and buildings (cost),Asset,2500000,0,2500000,2026-06-30,UK-LTD
+1010,Accumulated depreciation - buildings,Asset,0,320000,-320000,2026-06-30,UK-LTD
+1020,Plant and machinery (cost),Asset,850000,0,850000,2026-06-30,UK-LTD
+1030,Accumulated depreciation - plant,Asset,0,210000,-210000,2026-06-30,UK-LTD
+1040,Fixtures and fittings (cost),Asset,180000,0,180000,2026-06-30,UK-LTD
+1050,Accumulated depreciation - fixtures,Asset,0,65000,-65000,2026-06-30,UK-LTD
+1060,Intangible assets - goodwill,Asset,420000,0,420000,2026-06-30,UK-LTD
+1070,Intangible assets - software,Asset,310000,0,310000,2026-06-30,UK-LTD
+1080,Investments in subsidiaries,Asset,500000,0,500000,2026-06-30,UK-LTD
+1100,Stock and work in progress,Asset,680000,0,680000,2026-06-30,UK-LTD
+1110,Trade debtors,Asset,920000,0,920000,2026-06-30,UK-LTD
+1120,Prepayments and accrued income,Asset,85000,0,85000,2026-06-30,UK-LTD
+1130,Cash at bank and in hand,Asset,450000,0,450000,2026-06-30,UK-LTD
+1140,Deferred tax asset,Asset,42000,0,42000,2026-06-30,UK-LTD
+2000,Trade creditors,Liability,0,580000,-580000,2026-06-30,UK-LTD
+2010,Accruals and deferred income,Liability,0,195000,-195000,2026-06-30,UK-LTD
+2020,Corporation tax payable,Liability,0,142000,-142000,2026-06-30,UK-LTD
+2030,Deferred tax liability,Liability,0,58000,-58000,2026-06-30,UK-LTD
+2040,Bank loans and overdrafts,Liability,0,750000,-750000,2026-06-30,UK-LTD
+2050,Hire purchase creditors,Liability,0,120000,-120000,2026-06-30,UK-LTD
+3000,Called up share capital,Equity,0,100000,-100000,2026-06-30,UK-LTD
+3010,Share premium account,Equity,0,250000,-250000,2026-06-30,UK-LTD
+3020,Profit and loss reserves,Equity,0,1850000,-1850000,2026-06-30,UK-LTD
+3030,Revaluation reserve,Equity,0,180000,-180000,2026-06-30,UK-LTD
+4000,Turnover - UK sales,Income,0,3200000,-3200000,2026-06-30,UK-LTD
+4010,Turnover - export sales,Income,0,850000,-850000,2026-06-30,UK-LTD
+4020,Interest receivable,Income,0,18000,-18000,2026-06-30,UK-LTD
+5000,Cost of sales - materials,Expense,980000,0,980000,2026-06-30,UK-LTD
+5010,Cost of sales - direct labour,Expense,720000,0,720000,2026-06-30,UK-LTD
+5020,Cost of sales - overhead,Expense,310000,0,310000,2026-06-30,UK-LTD
+6000,Administrative - salaries,Expense,520000,0,520000,2026-06-30,UK-LTD
+6010,Administrative - rent and rates,Expense,180000,0,180000,2026-06-30,UK-LTD
+6020,Administrative - insurance,Expense,45000,0,45000,2026-06-30,UK-LTD
+6030,Administrative - legal and professional,Expense,95000,0,95000,2026-06-30,UK-LTD
+6040,Administrative - IT and software,Expense,120000,0,120000,2026-06-30,UK-LTD
+6050,Administrative - travel and subsistence,Expense,42000,0,42000,2026-06-30,UK-LTD
+6060,Administrative - entertainment (disallowed),Expense,15000,0,15000,2026-06-30,UK-LTD
+6070,Administrative - depreciation,Expense,185000,0,185000,2026-06-30,UK-LTD
+6080,Administrative - amortisation,Expense,48000,0,48000,2026-06-30,UK-LTD
+6090,Administrative - bad debts,Expense,22000,0,22000,2026-06-30,UK-LTD
+6100,Administrative - goodwill impairment,Expense,50000,0,50000,2026-06-30,UK-LTD
+7000,Interest payable,Expense,42000,0,42000,2026-06-30,UK-LTD
+7010,Bank charges,Expense,8500,0,8500,2026-06-30,UK-LTD
+7020,Foreign exchange losses,Expense,12000,0,12000,2026-06-30,UK-LTD
+7030,Donations and charitable gifts,Expense,25000,0,25000,2026-06-30,UK-LTD
+7040,Fines and penalties,Expense,8000,0,8000,2026-06-30,UK-LTD

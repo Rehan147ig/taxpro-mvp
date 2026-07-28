@@ -13,6 +13,17 @@ const REQUEST_TIMEOUT_MS = 15000;
  * JSON schema and the SDK handles retries, so no hand-rolled parsing or
  * backoff lives here anymore.
  */
+function resolveTemperature(request: EveModelRequest): number {
+  if (request.temperature !== undefined) return request.temperature;
+  if (request.promptVersion.startsWith('mapping-') || request.promptVersion.startsWith('audit-') || request.promptVersion.startsWith('parser-')) {
+    return 0.0;
+  }
+  if (request.promptVersion.startsWith('explanation-')) {
+    return 0.1;
+  }
+  return 0.1;
+}
+
 export async function callJsonModel<S extends z.ZodType>(
   request: EveModelRequest & { schema: S },
 ): Promise<EveModelResponse<z.infer<S>>> {
@@ -23,7 +34,7 @@ export async function callJsonModel<S extends z.ZodType>(
     schema: request.schema,
     system: request.system,
     prompt: request.user,
-    temperature: request.temperature ?? 0.1,
+    temperature: resolveTemperature(request),
     maxOutputTokens: request.maxTokens ?? 4096,
     maxRetries: MAX_RETRIES,
     abortSignal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
