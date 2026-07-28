@@ -56,7 +56,7 @@ function evalFixture(footnote: UkTaxFootnote): CompanyResult {
     };
   }
 
-  const { etr, deferred } = runEngine(footnote);
+  const { etr, deferred, deferredSource } = runEngine(footnote);
 
   console.log(`\n${'─'.repeat(72)}`);
   console.log(`${footnote.companyName} (${footnote.companiesHouseNumber}) — period ended ${footnote.accountingPeriodEnd}`);
@@ -96,6 +96,9 @@ function evalFixture(footnote: UkTaxFootnote): CompanyResult {
 
   const deferredVerdict = deferredDeltaBp <= PASS_BP ? 'OK' : deferredDeltaBp <= WARN_BP ? 'MARGINAL' : 'MISMATCH';
   console.log(`  Deferred closing:    engine ${fmt$(engineDeferredClosing)} vs disclosed ${fmt$(disclosedDeferredLiabilities)}  (${deferredDeltaBp}bp)  →  ${deferredVerdict}`);
+  if (deferredSource === 'balance_sheet_fallback') {
+    console.log(`  Deferred source:     balance_sheet_fallback — derived directly from disclosed Note 14 balances (no synthetic differences)`);
+  }
   if (footnote.probableRecoveryNoted) {
     console.log(`  Probable recovery:   noted in filing — DTA gate exercised`);
   }

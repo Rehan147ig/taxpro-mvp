@@ -30,6 +30,10 @@ export interface UkTaxFootnote {
   deferredTaxLiabilityClosing: number;
   probableRecoveryNoted: boolean;
   sourceDocumentUrl: string;
+  /** How deferred tax was sourced: 'recon_timing' from ETR reconciliation timing
+   *  items, or 'balance_sheet_fallback' from disclosed Note 14 balance-sheet
+   *  balances when no ETR timing items exist. */
+  deferredTaxBalanceSource?: 'recon_timing' | 'balance_sheet_fallback';
 }
 
 const PLACEHOLDER_MARKERS = ['TODO', null, 0, ''];

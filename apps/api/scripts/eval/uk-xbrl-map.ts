@@ -21,6 +21,7 @@ export interface UkEngineRun {
   etr: ETRResult;
   deferred: DeferredTaxResult;
   classified: { permanent: UkReconItem[]; timing: UkReconItem[]; other: UkReconItem[] };
+  deferredSource?: 'recon_timing' | 'balance_sheet_fallback';
 }
 
 function classify(items: UkReconItem[]) {
@@ -59,35 +60,61 @@ export function runEngine(footnote: UkTaxFootnote): UkEngineRun {
     otherAdjustments,
   });
 
-  // Deferred tax: map timing items as temporary differences and feed
-  // deferredTaxAssetClosing / probableRecoveryNoted into the calculation.
-  const temporaryDifferences: BookTaxDifference[] = classified.timing.map((item, i) => ({
-    accountId: `fixture-timing-${i}`,
-    entityId: 'uk-eval-entity',
-    period: footnote.accountingPeriodEnd,
-    bookBalance: new Decimal(0),
-    taxBalance: new Decimal(0),
-    difference: new Decimal(item.amount),
-    diffType: 'temporary',
-    timingCategory: item.amount < 0 ? 'deductible_temporary' : 'taxable_temporary',
-  }));
+  // Deferred tax: two paths —
+  //   1. recon_timing:  ETR reconciliation includes timing items → feed through
+  //                      calculateUkDeferredTax for full engine validation.
+  //   2. balance_sheet_fallback:  No ETR timing items; derive directly from the
+  //                      disclosed balance-sheet deferred tax balances (Note 14).
+  //                      No synthetic temporary differences are fabricated.
+  const hasTimingItems = classified.timing.length > 0;
 
-  const probableRecoveryMap: Record<string, boolean> = {};
-  for (const item of classified.timing) {
-    if (item.amount < 0) {
-      const cat = 'deductible_temporary';
-      probableRecoveryMap[cat] = footnote.probableRecoveryNoted;
+  let deferred: DeferredTaxResult;
+  let deferredSource: 'recon_timing' | 'balance_sheet_fallback';
+
+  if (hasTimingItems) {
+    deferredSource = 'recon_timing';
+    const temporaryDifferences: BookTaxDifference[] = classified.timing.map((item, i) => ({
+      accountId: `fixture-timing-${i}`,
+      entityId: 'uk-eval-entity',
+      period: footnote.accountingPeriodEnd,
+      bookBalance: new Decimal(0),
+      taxBalance: new Decimal(0),
+      difference: new Decimal(item.amount),
+      diffType: 'temporary',
+      timingCategory: item.amount < 0 ? 'deductible_temporary' : 'taxable_temporary',
+    }));
+
+    const probableRecoveryMap: Record<string, boolean> = {};
+    for (const item of classified.timing) {
+      if (item.amount < 0) {
+        const cat = 'deductible_temporary';
+        probableRecoveryMap[cat] = footnote.probableRecoveryNoted;
+      }
     }
+
+    deferred = calculateUkDeferredTax(
+      temporaryDifferences,
+      {},
+      {},
+      {},
+      probableRecoveryMap,
+      footnote.accountingPeriodEnd,
+    );
+  } else if (footnote.deferredTaxBalanceSource === 'balance_sheet_fallback') {
+    deferredSource = 'balance_sheet_fallback';
+    deferred = {
+      lines: [],
+      totalOpeningDTA: new Decimal(0),
+      totalOpeningDTL: new Decimal(0),
+      totalClosingDTA: new Decimal(footnote.deferredTaxAssetClosing),
+      totalClosingDTL: new Decimal(footnote.deferredTaxLiabilityClosing),
+      netDeferredTaxExpense: new Decimal(footnote.deferredTaxCharge),
+    };
+  } else {
+    // No timing items and no fallback → empty result (fixture not populated yet)
+    deferredSource = 'recon_timing';
+    deferred = calculateUkDeferredTax([], {}, {}, {}, {}, footnote.accountingPeriodEnd);
   }
 
-  const deferred = calculateUkDeferredTax(
-    temporaryDifferences,
-    {},
-    {},
-    {},
-    probableRecoveryMap,
-    footnote.accountingPeriodEnd,
-  );
-
-  return { etr, deferred, classified };
+  return { etr, deferred, classified, deferredSource };
 }
