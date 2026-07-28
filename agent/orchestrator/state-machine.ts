@@ -67,7 +67,11 @@ async function processState(initial: TaxProvisionState): Promise<TaxProvisionSta
       taxCredits: currentTax.taxCredits,
       otherAdjustments: [],
     });
-    state.engineOutput = { currentTax, deferredTax, etr };
+    state.engineOutput = {
+      currentTax: currentTax as unknown as Record<string, unknown>,
+      deferredTax: deferredTax as unknown as Record<string, unknown>,
+      etr: etr as unknown as Record<string, unknown>,
+    };
 
     state = transitionStage(state, 'explain', ['calculate']);
     const explanations = await generateExplanation({
