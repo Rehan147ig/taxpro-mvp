@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { callJsonModel } from '../../apps/api/src/eve/model-client.js';
+import { callJsonModel } from '../../eve/model-client.js';
 
 const EXPLANATION_SCHEMA = z.object({
   explanations: z.array(z.object({

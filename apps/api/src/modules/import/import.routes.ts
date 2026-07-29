@@ -11,6 +11,7 @@ import { reviewItems } from '../../db/schema/review-items.js';
 import { authMiddleware } from '../../lib/middleware/auth.js';
 import { BadRequestError } from '../../lib/errors.js';
 import { addAutoMappingJob, autoMappingQueue } from './auto-mapping/auto-mapping.queue.js';
+import { queueCompaniesHouseImport } from './companies-house/service.js';
 
 export const importRoutes = new Hono();
 importRoutes.use('*', authMiddleware);
@@ -120,6 +121,25 @@ importRoutes.post('/trial-balance', zValidator('json', importSchema), async (c) 
       message: 'Trial balance imported. Auto-mapping job enqueued.',
     }, 201);
   });
+});
+
+const chImportSchema = z.object({
+  companyNumber: z.string().min(1).max(20),
+  runId: z.string().uuid().optional(),
+});
+
+importRoutes.post('/companies-house', zValidator('json', chImportSchema), async (c) => {
+  const user = c.get('user');
+  const { companyNumber, runId } = c.req.valid('json');
+
+  const result = await queueCompaniesHouseImport({
+    companyNumber,
+    tenantId: user.tenantId,
+    userId: user.userId,
+    runId,
+  });
+
+  return c.json(result, 202);
 });
 
 function normalizeRow(row: ImportRow, lineNumber: number) {

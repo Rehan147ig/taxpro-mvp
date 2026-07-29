@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { callJsonModel } from '../../apps/api/src/eve/model-client.js';
-import { Jurisdiction } from '../../packages/tax-engine/src/types.js';
+import { callJsonModel } from '../../eve/model-client.js';
+import { Jurisdiction } from '@taxpro/tax-engine';
 
 const AUDIT_FLAG_SCHEMA = z.object({
   flags: z.array(z.object({

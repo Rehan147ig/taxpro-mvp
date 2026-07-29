@@ -1,9 +1,10 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "outDir": "./dist"
+    "outDir": "./dist",
+    "rootDir": "./src"
   },
-  "include": ["src", "../../agent"],
+  "include": ["src"],
   "references": [
     { "path": "../../packages/tax-engine" }
   ]

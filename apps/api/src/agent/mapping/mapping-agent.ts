@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import crypto from 'crypto';
-import { callJsonModel } from '../../apps/api/src/eve/model-client.js';
-import { Jurisdiction } from '../../packages/tax-engine/src/types.js';
+import { callJsonModel } from '../../eve/model-client.js';
+import { Jurisdiction } from '@taxpro/tax-engine';
 
 const MAPPED_ITEM_SCHEMA = z.object({
   items: z.array(z.object({

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { callJsonModel } from '../../apps/api/src/eve/model-client.js';
+import { callJsonModel } from '../../eve/model-client.js';
 
 const PARSED_ITEM_SCHEMA = z.object({
   items: z.array(z.object({

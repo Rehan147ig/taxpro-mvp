@@ -1,12 +1,8 @@
 import Decimal from 'decimal.js';
 import { logger } from '../../lib/logger.js';
-import {
-  calculateCurrentTax,
-  calculateDeferredTax,
-  generateRollforward,
-  calculateETR,
-  generateJournalEntries,
-} from '@taxpro/tax-engine';
+import { createEngine, Jurisdiction } from '@taxpro/tax-engine';
+
+const engine = createEngine(Jurisdiction.US_ASC740);
 
 const parameters = {
   type: 'object',
@@ -37,7 +33,7 @@ export const runTaxMath = {
   execute: async (args: Record<string, any>) => {
     logger.info({ bookIncome: args.bookIncome }, '[Eve] Running tax math');
 
-    const currentTax = calculateCurrentTax({
+    const currentTax = engine.calculateCurrentTax({
       bookIncome: new Decimal(args.bookIncome),
       permanentDifferences: (args.permanentDifferences ?? []).map((pd: any) => ({ amount: new Decimal(pd.amount), label: pd.label })),
       taxRate: new Decimal(args.federalRate),
@@ -48,7 +44,7 @@ export const runTaxMath = {
       asOfDate: args.period,
     });
 
-    const deferredTax = calculateDeferredTax(
+    const deferredTax = engine.calculateDeferredTax(
       (args.temporaryDifferences ?? []).map((d: any) => ({
         accountId: d.accountId, entityId: d.entityId, period: d.period,
         bookBalance: new Decimal(d.bookBalance), taxBalance: new Decimal(d.taxBalance),
@@ -59,9 +55,9 @@ export const runTaxMath = {
       { deductible_temporary: new Decimal(args.federalRate), taxable_temporary: new Decimal(args.federalRate), TEMP_OTHER: new Decimal(args.federalRate) },
     );
 
-    const journalEntries = generateJournalEntries(currentTax, deferredTax, new Decimal(0), args.entityId, args.period);
+    const journalEntries = engine.generateJournalEntries(currentTax, deferredTax, new Decimal(0), args.entityId, args.period);
 
-    const etr = calculateETR({
+    const etr = engine.calculateETR({
       bookIncome: currentTax.bookIncome, federalTaxRate: currentTax.federalTaxRate,
       federalTax: currentTax.federalTax, stateTax: currentTax.stateTax,
       permanentDifferences: (args.permanentDifferences ?? []).map((pd: any) => ({ amount: new Decimal(pd.amount), label: pd.label })),

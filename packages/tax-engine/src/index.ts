@@ -11,16 +11,5 @@ export { calculateETR } from './etr-reconciliation.js';
 export { generateJournalEntries } from './journal-entries.js';
 export { calculateUkDeferredTax, ukDeferredTaxLine } from './uk-frs102-s29/deferred-tax.js';
 export { Jurisdiction } from './types.js';
-
-export function calculateJurisdiction(config: {
-  jurisdiction: 'US_ASC740' | 'UK_FRS102_S29';
-  engine: 'current' | 'deferred' | 'etr';
-}) {
-  if (config.jurisdiction === 'UK_FRS102_S29') {
-    switch (config.engine) {
-      case 'deferred': return 'uk-deferred';
-      default: return 'us-std';
-    }
-  }
-  return 'us-std';
-}
+export { createEngine } from './engine-factory.js';
+export type { TaxEngine } from './engine-factory.js';

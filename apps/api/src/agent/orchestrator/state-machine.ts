@@ -4,13 +4,10 @@ import { parseTrialBalance } from '../parser/parser-agent.js';
 import { classifyAccounts } from '../mapping/mapping-agent.js';
 import { generateExplanation } from '../explanation/explanation-agent.js';
 import { auditProvision } from '../audit/audit-agent.js';
-import { calculateDeferredTax } from '../../packages/tax-engine/src/deferred-tax.js';
-import { calculateCurrentTax } from '../../packages/tax-engine/src/current-tax.js';
-import { calculateETR } from '../../packages/tax-engine/src/etr-reconciliation.js';
-import type { Jurisdiction } from '../../packages/tax-engine/src/types.js';
-import type { TaxProvisionState, PipelineStage } from '../../apps/api/src/state/tax-provision-state.js';
-import { assertNotLocked, transitionStage } from '../../apps/api/src/state/tax-provision-state.js';
-import { logger } from '../../apps/api/src/lib/logger.js';
+import { createEngine, Jurisdiction } from '@taxpro/tax-engine';
+import type { TaxProvisionState, PipelineStage } from '../../state/tax-provision-state.js';
+import { assertNotLocked, transitionStage } from '../../state/tax-provision-state.js';
+import { logger } from '../../lib/logger.js';
 
 const QUEUE_NAME = 'taxpro-agent-pipeline';
 const connection = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', { maxRetriesPerRequest: null });
@@ -43,22 +40,20 @@ async function processState(initial: TaxProvisionState): Promise<TaxProvisionSta
     state.mappedItems = mappedItems;
 
     state = transitionStage(state, 'calculate', ['map']);
+    const engine = createEngine(state.jurisdiction as Jurisdiction);
     const taxRate = state.jurisdiction === 'UK_FRS102_S29' ? 0.25 : 0.21;
-    const currentTax = calculateCurrentTax({
-      bookIncome: new (await import('decimal.js')).default(state.parsedItems.reduce((s, i) => s + parseFloat(i.balance), 0)),
+    const dec = await import('decimal.js').then(m => m.default);
+    const currentTax = engine.calculateCurrentTax({
+      bookIncome: state.parsedItems.reduce((s, i) => s.plus(new dec(i.balance)), new dec(0)),
       permanentDifferences: [],
-      taxRate: new (await import('decimal.js')).default(taxRate),
-      taxCredits: new (await import('decimal.js')).default(0),
-      estimatedPayments: new (await import('decimal.js')).default(0),
-      nolUtilization: new (await import('decimal.js')).default(0),
+      taxRate: new dec(taxRate),
+      taxCredits: new dec(0),
+      estimatedPayments: new dec(0),
+      nolUtilization: new dec(0),
       asOfDate: new Date().toISOString(),
     });
-    const deferredTax = calculateDeferredTax(
-      [],
-      {}, {}, {},
-      state.jurisdiction as Jurisdiction,
-    );
-    const etr = calculateETR({
+    const deferredTax = engine.calculateDeferredTax([], {}, {}, {});
+    const etr = engine.calculateETR({
       bookIncome: currentTax.bookIncome,
       federalTaxRate: currentTax.federalTaxRate,
       federalTax: currentTax.federalTax,
