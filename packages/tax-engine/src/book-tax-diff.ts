@@ -9,6 +9,10 @@ type DecimalInstance = InstanceType<typeof Decimal>;
  *
  * Uses MACRS tables for depreciation categories to compute accurate
  * timing factors based on asset age, rather than hardcoded percentages.
+ *
+ * Limitation: assetAgeYears defaults to 1 (first-year MACRS) for all assets.
+ * This may overstate DTL for older assets. Future: parse placed-in-service
+ * date from trial balance to compute real age.
  */
 export function computeBookTaxDifferences(
   trialBalance: TrialBalanceLine[],
@@ -17,6 +21,7 @@ export function computeBookTaxDifferences(
   period: string,
   assetAgeYears: number = 1,
 ): BookTaxDifference[] {
+  let warnedAge = false;
   const results: BookTaxDifference[] = [];
 
   for (const tb of trialBalance) {
@@ -48,6 +53,13 @@ export function computeBookTaxDifferences(
     }
 
     // Temporary difference — use MACRS for depreciation, else fallback
+    if (!warnedAge) {
+      warnedAge = true;
+      console.warn(
+        `computeBookTaxDifferences: assetAgeYears=${assetAgeYears} for ${tb.accountId} — first-year MACRS assumed, `
+        + `may overstate DTL for older assets. TODO: parse placed-in-service date from trial balance.`,
+      );
+    }
     const isDeductible = mapping.timingCategory === 'deductible_temporary';
     const timingFactor = getTimingFactor(mapping.taxAccountType, assetAgeYears);
     const difference: USD = tb.balance.mul(timingFactor).abs();

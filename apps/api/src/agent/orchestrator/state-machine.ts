@@ -68,10 +68,20 @@ function buildPermanentDifferences(
     });
 }
 
+/** Returns Profit Before Tax = ΣIncome - ΣExpense (positive = profit).
+ *  Uses abs() on each balance so the result is deterministic regardless
+ *  of whether the LLM parser stored expenses as positive or negative strings. */
 function computeBookIncome(state: TaxProvisionState): Decimal {
-  return state.parsedItems
-    .filter(p => p.accountType === 'Income' || p.accountType === 'Expense')
-    .reduce((s, i) => s.plus(new Decimal(i.balance)), new Decimal(0));
+  let income = new Decimal(0);
+  let expense = new Decimal(0);
+  for (const p of state.parsedItems) {
+    if (p.accountType === 'Income') {
+      income = income.plus(new Decimal(p.balance).abs());
+    } else if (p.accountType === 'Expense') {
+      expense = expense.plus(new Decimal(p.balance).abs());
+    }
+  }
+  return income.minus(expense);
 }
 
 function resolvePeriod(state: TaxProvisionState): string {

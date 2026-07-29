@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { Decimal } from '@taxpro/tax-engine';
 import { callJsonModel } from '../../eve/model-client.js';
 
 const PARSED_ITEM_SCHEMA = z.object({
@@ -31,20 +32,36 @@ export async function parseTrialBalance(
   const system = `You are a trial balance parser. Parse the provided ${source.toUpperCase()} content into structured items.
 Extract: account number, account name, type (Income/Expense/Asset/Liability/Equity), debit amount, credit amount, balance, period, and entity ID.
 Return all monetary values as strings preserving exact decimals.
-For CSV, the first row is a header — skip it. For PDF, extract each row verbatim.`;
+For CSV, the first row is a header — skip it. For PDF, extract each row verbatim.
+
+CRITICAL SIGN CONVENTION:
+- Income accounts: balance must be POSITIVE string, e.g. '100000'
+- Expense accounts: balance must be NEGATIVE string, e.g. '-50000'
+- If source text shows expense as '5000 Dr' or '5000' expense, you MUST output '-5000'
+- Never output expense as positive`;
 
   const result = await callJsonModel({
     system,
     user: `Parse this trial balance ${source}:\n\n${rawContent}`,
     temperature: 0.0,
     maxTokens: 8192,
-    promptVersion: 'parser-v1',
+    promptVersion: 'parser-v2',
     schema: PARSED_ITEM_SCHEMA,
   });
 
   const parsed = result.parsed;
+  const items = parsed.items.map(item => {
+    const dec = new Decimal(item.balance);
+    if (item.accountType === 'Expense' && dec.isPositive()) {
+      return { ...item, balance: dec.negated().toString() };
+    }
+    if (item.accountType === 'Income' && dec.isNegative()) {
+      return { ...item, balance: dec.negated().toString() };
+    }
+    return item;
+  });
   return {
-    items: parsed.items,
+    items,
     totalRows: parsed.totalRows,
     source: parsed.source,
   };
