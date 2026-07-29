@@ -22,16 +22,27 @@ export const migrationPool = new Pool({
 });
 export const migrationDb = drizzle(migrationPool, { schema });
 
-// Test runtime connection
-export async function testConnection() {
-  try {
-    const client = await pool.connect();
-    await client.query('SELECT 1');
-    client.release();
-    logger.info('[DB] Runtime connected successfully');
-  } catch (err) {
-    logger.error({ err }, '[DB] Runtime connection failed');
-    process.exit(1);
+// Test runtime connection with retry
+export async function testConnection(retries = 3): Promise<void> {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const client = await pool.connect();
+      await client.query('SELECT 1');
+      const roleRes = await client.query('SELECT current_user AS role, (SELECT rolbypassrls FROM pg_roles WHERE rolname = current_user) AS bypassrls');
+      const row = roleRes.rows[0];
+      client.release();
+      logger.info({ role: row?.role, bypassrls: row?.bypassrls, poolSize: pool.totalCount }, `[DB] Runtime connected successfully`);
+      return;
+    } catch (err) {
+      if (attempt < retries) {
+        const delay = Math.min(1000 * Math.pow(2, attempt - 1), 8000);
+        logger.warn({ err, attempt, retries }, `[DB] Connection attempt ${attempt}/${retries} failed, retrying in ${delay}ms`);
+        await new Promise(r => setTimeout(r, delay));
+      } else {
+        logger.error({ err }, '[DB] Runtime connection failed after all retries');
+        process.exit(1);
+      }
+    }
   }
 }
 

@@ -33,6 +33,7 @@ import { tracer, agentRunCounter, provisionRunCounter, reviewResolutionCounter, 
 import { runProvisionMath } from './provision-calculator.js';
 import { computeBookTaxDifferences, Decimal } from '@taxpro/tax-engine';
 import { recordProvisionEvent, getEventsForRun, EVENT_TYPES } from './provision-events.js';
+import { auditSensitiveOp } from './audit.js';
 
 const INCOME_TYPES = new Set(['Income', 'Revenue', 'OtherIncome', 'Sales', 'ServiceRevenue']);
 const EXPENSE_TYPES = new Set(['Expense', 'COGS', 'OtherExpense', 'OperatingExpense', 'SG&A', 'CostOfSales']);
@@ -1009,14 +1010,15 @@ provisionRoutes.post('/runs/:runId/finalize',
             updatedAt: now,
           }).where(eq(provisionRuns.id, runId));
 
-          await recordProvisionEvent({
+          await auditSensitiveOp(tx, {
             tenantId: user.tenantId,
-            provisionRunId: runId,
-            eventType: 'run.finalized',
-            actorType: 'user',
+            runId,
+            action: 'run.finalized',
             actorUserId: user.userId,
-            reason: 'Run finalized',
-          }, tx);
+            actorRole: user.role,
+            details: { period: run.period, etrVariance: null, finalizedAt: now.toISOString() },
+            requestId: c.get('requestId'),
+          });
 
           return c.json({ runId, status: 'finalized' });
         });
@@ -1118,7 +1120,7 @@ provisionRoutes.post('/runs/:runId/lock',
 
     return withTenantContext(user.tenantId, async (tx) => {
       const [run] = await tx.select().from(provisionRuns)
-        .where(and(eq(provisionRuns.id, runId), eq(provisionRuns.tenantId, user.tenantId))).limit(1);
+        .where(and(eq(provisionRuns.id, runId), eq(provisionRuns.tenantId, user.tenantId))).limit(1).for('update');
       if (!run) throw new BadRequestError('Provision run not found');
 
       if (run.approvalStatus !== 'approved') {
@@ -1134,18 +1136,54 @@ provisionRoutes.post('/runs/:runId/lock',
         updatedAt: now,
       }).where(eq(provisionRuns.id, runId));
 
-      await recordProvisionEvent({
+      await auditSensitiveOp(tx, {
         tenantId: user.tenantId,
-        provisionRunId: runId,
-        eventType: EVENT_TYPES.LOCKED,
-        actorType: 'user',
+        runId,
+        action: 'run.locked',
         actorUserId: user.userId,
-        reason: 'Provision run locked',
-        beforeState: { status: run.status, approvalStatus: run.approvalStatus },
-        afterState: { status: 'locked' },
-      }, tx);
+        actorRole: user.role,
+        details: { previousStatus: run.status, previousApprovalStatus: run.approvalStatus },
+        requestId: c.get('requestId'),
+      });
 
       return c.json({ runId, status: 'locked' });
+    });
+});
+
+provisionRoutes.post('/runs/:runId/unlock',
+  requireRole('partner', 'admin'),
+  async (c) => {
+    const user = getUser(c);
+    const { runId } = c.req.param();
+
+    return withTenantContext(user.tenantId, async (tx) => {
+      const [run] = await tx.select().from(provisionRuns)
+        .where(and(eq(provisionRuns.id, runId), eq(provisionRuns.tenantId, user.tenantId))).limit(1).for('update');
+      if (!run) throw new BadRequestError('Provision run not found');
+
+      if (run.status !== 'locked') {
+        throw new BadRequestError('Run is not locked');
+      }
+
+      const now = new Date();
+      await tx.update(provisionRuns).set({
+        status: 'draft',
+        lockedAt: null,
+        lockedByUserId: null,
+        updatedAt: now,
+      }).where(eq(provisionRuns.id, runId));
+
+      await auditSensitiveOp(tx, {
+        tenantId: user.tenantId,
+        runId,
+        action: 'run.unlocked',
+        actorUserId: user.userId,
+        actorRole: user.role,
+        details: { previousStatus: 'locked' },
+        requestId: c.get('requestId'),
+      });
+
+      return c.json({ runId, status: 'unlocked' });
     });
 });
 

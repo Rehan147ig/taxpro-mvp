@@ -24,6 +24,9 @@ const envSchema = z.object({
   INTERFAZE_API_KEY: z.string().optional(),
   INTERFAZE_ENDPOINT: z.string().default('https://api.interfaze.ai/v1'),
 
+  // Companies House API — optional in dev, required in prod if feature used
+  COMPANIES_HOUSE_API_KEY: z.string().optional(),
+
   // Legacy fallback
   OPENAI_API_KEY: z.string().optional(),
 

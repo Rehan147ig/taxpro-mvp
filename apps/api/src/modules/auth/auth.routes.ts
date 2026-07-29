@@ -8,6 +8,7 @@ import { tenants } from '../../db/schema/tenants.js';
 import { signToken } from '../../lib/middleware/auth.js';
 import { BadRequestError, UnauthorizedError } from '../../lib/errors.js';
 import { eq } from 'drizzle-orm';
+import { rateLimitMiddleware } from '../../lib/rate-limiter.js';
 
 export const authRoutes = new Hono();
 
@@ -51,7 +52,7 @@ authRoutes.post('/register', zValidator('json', registerSchema), async (c) => {
   return c.json({ token, tenant: { id: tenant.id, name: tenant.name, slug: tenant.slug } }, 201);
 });
 
-authRoutes.post('/login', zValidator('json', loginSchema), async (c) => {
+authRoutes.post('/login', rateLimitMiddleware, zValidator('json', loginSchema), async (c) => {
   const { email, password } = c.req.valid('json');
 
   const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);

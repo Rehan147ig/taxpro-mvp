@@ -9,7 +9,9 @@
 --
 -- After running, set these environment variables:
 --   DATABASE_URL_MIGRATIONS=postgres://taxpro_migrations:<password>@localhost:5432/taxpro
---   DATABASE_URL_APP=postgres://taxpro_app:<password>@localhost:5432/taxpro
+--   DATABASE_URL=postgres://taxpro_app:<password>@localhost:5432/taxpro
+-- The runtime pool (db.ts) uses DATABASE_URL (taxpro_app, NOBYPASSRLS).
+-- The migration pool uses DATABASE_URL_MIGRATIONS (schema_owner).
 -- ================================================================
 
 -- ================================================================

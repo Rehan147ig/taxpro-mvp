@@ -1,11 +1,7 @@
 import Decimal from 'decimal.js';
-import {
-  calculateCurrentTax,
-  calculateDeferredTax,
-  calculateETR,
-  generateJournalEntries,
-  generateRollforward,
-} from '@taxpro/tax-engine';
+import { createEngine, Jurisdiction } from '@taxpro/tax-engine';
+
+const engine = createEngine(Jurisdiction.US_ASC740);
 
 export interface ProvisionMathInput {
   bookIncome: number;
@@ -50,7 +46,7 @@ export function runProvisionMath(input: ProvisionMathInput) {
     timingCategory: d.timingCategory ?? 'TEMP_OTHER',
   }));
 
-  const currentTax = calculateCurrentTax({
+  const currentTax = engine.calculateCurrentTax({
     bookIncome,
     permanentDifferences,
     taxRate: federalRate,
@@ -61,7 +57,7 @@ export function runProvisionMath(input: ProvisionMathInput) {
     asOfDate: input.period,
   });
 
-  const deferredTax = calculateDeferredTax(
+  const deferredTax = engine.calculateDeferredTax(
     temporaryDifferences,
     {},
     {},
@@ -72,7 +68,7 @@ export function runProvisionMath(input: ProvisionMathInput) {
     },
   );
 
-  const rollforward = generateRollforward({
+  const rollforward = engine.generateRollforward({
     priorYear: {
       deferredTaxLines: [],
       valuationAllowance: money(0),
@@ -90,7 +86,7 @@ export function runProvisionMath(input: ProvisionMathInput) {
     },
   });
 
-  const etr = calculateETR({
+  const etr = engine.calculateETR({
     bookIncome: currentTax.bookIncome,
     federalTaxRate: federalRate,
     federalTax: currentTax.federalTax,
@@ -100,7 +96,7 @@ export function runProvisionMath(input: ProvisionMathInput) {
     otherAdjustments: [],
   });
 
-  const journalEntries = generateJournalEntries(
+  const journalEntries = engine.generateJournalEntries(
     currentTax,
     deferredTax,
     money(0),

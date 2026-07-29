@@ -44,20 +44,24 @@ export function requireMinimumRole(minRole: Role) {
   };
 }
 
-export async function requireRunAccess(runId: string, tenantId: string, tx?: any): Promise<{ status: string; approvalStatus: string }> {
+export async function requireRunAccess(runId: string, tenantId: string, tx?: any, forUpdate = false): Promise<{ status: string; approvalStatus: string }> {
   const d = tx ?? db;
-  const [run] = await d.select({
+  let query = d.select({
     status: provisionRuns.status,
     approvalStatus: provisionRuns.approvalStatus,
     tenantId: provisionRuns.tenantId,
   }).from(provisionRuns).where(eq(provisionRuns.id, runId)).limit(1);
+  if (forUpdate && tx) {
+    query = query.for('update');
+  }
+  const [run] = await query;
   if (!run) throw new NotFoundError('Provision run', runId);
   if (run.tenantId !== tenantId) throw new ForbiddenError('Cross-tenant access denied');
   return run;
 }
 
 export async function assertRunIsMutable(runId: string, tenantId: string, tx?: any): Promise<void> {
-  const run = await requireRunAccess(runId, tenantId, tx);
+  const run = await requireRunAccess(runId, tenantId, tx, true);
   if (run.status === 'locked') {
     throw new ConflictError('Provision run is locked and cannot be modified');
   }
