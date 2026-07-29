@@ -12,6 +12,7 @@ import { calculateETR } from './etr-reconciliation.js';
 import { generateRollforward } from './rollforward.js';
 import { generateJournalEntries } from './journal-entries.js';
 import { computeBookTaxDifferences } from './book-tax-diff.js';
+import { getRateForFiscalYear, US_RATES_BY_FISCAL_YEAR, UK_RATES_BY_FISCAL_YEAR } from './uk-frs102-s29/rules.js';
 
 Decimal.set = ((_config: Decimal.Config): typeof Decimal => {
   throw new Error(
@@ -26,6 +27,7 @@ Object.freeze(Decimal.config);
 export interface TaxEngine {
   readonly jurisdiction: Jurisdiction;
   readonly Decimal: typeof Decimal;
+  getRateForFiscalYear(fiscalYear: string, categoryRates?: Record<string, TaxRate>): TaxRate;
   calculateCurrentTax(input: CurrentTaxInput): CurrentTaxResult;
   calculateDeferredTax(
     temporaryDifferences: BookTaxDifference[],
@@ -55,9 +57,15 @@ export interface TaxEngine {
 }
 
 export function createEngine(jurisdiction: Jurisdiction): TaxEngine {
+  const yearTable = jurisdiction === Jurisdiction.UK_FRS102_S29 ? UK_RATES_BY_FISCAL_YEAR : US_RATES_BY_FISCAL_YEAR;
+
   return {
     jurisdiction,
     Decimal,
+
+    getRateForFiscalYear(fiscalYear, categoryRates = {}) {
+      return getRateForFiscalYear(jurisdiction, fiscalYear, categoryRates, yearTable);
+    },
 
     calculateCurrentTax(input) {
       return calculateCurrentTax(input);
