@@ -6,4 +6,5 @@ dist/
 coverage/
 .turbo/
 apps/api/scripts/eval/cache/
-tsconfig.tsbuildinfo  
+tsconfig.tsbuildinfo
+.obsidian/

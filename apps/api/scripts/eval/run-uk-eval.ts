@@ -118,7 +118,13 @@ function main() {
   console.log(`\nFixtures loaded: ${fixtures.length}`);
 
   const results: CompanyResult[] = [];
+  let skippedWrongStandard = 0;
   for (const footnote of fixtures) {
+    if (footnote.standard && footnote.standard !== 'FRS 102') {
+      console.log(`SKIP ${footnote.companyName} - not FRS 102 (${footnote.standard}) - excluded from benchmark`);
+      skippedWrongStandard++;
+      continue;
+    }
     results.push(evalFixture(footnote));
   }
 
@@ -134,7 +140,8 @@ function main() {
   const counts = { PASS: 0, WARN: 0, FAIL: 0, SKIP: 0 };
   results.forEach(r => counts[r.verdict]++);
   const skipCount = results.filter(r => r.verdict === 'SKIP').length;
-  console.log(`\n  ${counts.PASS} passed, ${counts.WARN} warnings, ${counts.FAIL} failed, ${counts.SKIP} skipped`);
+  const wrongStandardInfo = skippedWrongStandard > 0 ? `, ${skippedWrongStandard} wrong-standard` : '';
+  console.log(`\n  ${counts.PASS} passed, ${counts.WARN} warnings, ${counts.FAIL} failed, ${counts.SKIP} skipped${wrongStandardInfo}`);
 
   const evaluated = results.filter(r => r.etrDeltaBp !== null);
   if (evaluated.length > 0) {

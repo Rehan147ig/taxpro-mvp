@@ -35,34 +35,7 @@ const fixtures: UkTaxFootnote[] = [
     deferredTaxLiabilityClosing: 76.7,
     probableRecoveryNoted: true,
     sourceDocumentUrl: 'https://find-and-update.company-information.service.gov.uk/company/00502851/filing-history',
-    deferredTaxBalanceSource: 'balance_sheet_fallback',
-  },
-
-  // British Telecommunications plc — year ended 31 March 2024
-  // Source: BT plc Annual Report and Financial Statements 2024 (filed 2024-06-25)
-  // Note 10 (Taxation) pp 57–59, Deferred taxation pp 59–60
-  // Group accounts (FRS 101/IFRS), principal trading subsidiary of BT Group plc
-  {
-    companyName: 'British Telecommunications plc',
-    companiesHouseNumber: '01800000',
-    accountingPeriodEnd: '2024-03-31',
-    pretaxProfit: 1897,
-    totalTaxCharge: 331,
-    currentTaxCharge: 97,
-    deferredTaxCharge: 234,
-    disclosedEffectiveRate: 0.174,
-    statutoryRate: 0.25,
-    reconciliationItems: [
-      { label: 'Higher/lower taxes on non-UK profits', amount: -25, type: 'other' },
-      { label: 'Net permanent differences between tax and accounting', amount: -63, type: 'permanent' },
-      { label: 'Adjustments in respect of earlier years', amount: -40, type: 'other' },
-      { label: 'Prior year non-UK losses used', amount: -10, type: 'other' },
-      { label: 'Non-UK losses not recognised', amount: -5, type: 'other' },
-    ],
-    deferredTaxAssetClosing: 1048,
-    deferredTaxLiabilityClosing: 1533,
-    probableRecoveryNoted: true,
-    sourceDocumentUrl: 'https://find-and-update.company-information.service.gov.uk/company/01800000/filing-history',
+    standard: 'FRS 102',
     deferredTaxBalanceSource: 'balance_sheet_fallback',
   },
 

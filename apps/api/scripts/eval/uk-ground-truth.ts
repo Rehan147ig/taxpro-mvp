@@ -30,6 +30,8 @@ export interface UkTaxFootnote {
   deferredTaxLiabilityClosing: number;
   probableRecoveryNoted: boolean;
   sourceDocumentUrl: string;
+  /** Accounting standard: 'FRS 102', 'FRS 101', 'IFRS', etc. */
+  standard: 'FRS 102' | 'FRS 101' | 'IFRS';
   /** How deferred tax was sourced: 'recon_timing' from ETR reconciliation timing
    *  items, or 'balance_sheet_fallback' from disclosed Note 14 balance-sheet
    *  balances when no ETR timing items exist. */

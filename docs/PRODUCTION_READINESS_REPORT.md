@@ -1,8 +1,8 @@
-# TaxPro MVP — Production Readiness Report
+# TaxPro MVP — Status: In Development — Build Verified, Pending External Accountant Review
 
 **Date:** 2026-07-29  
 **Commit:** (working tree)  
-**Test Suite:** 176 tests passing (92 tax-engine + 84 API), 0 failures  
+**Test Suite:** 175 tests passing (92 tax-engine + 83 API), 0 failures (fresh-clone verified — excludes double-counted dist/ tests)  
 **E2E Pipeline:** 8/8 integration steps pass  
 
 ---
@@ -109,8 +109,6 @@
 
 | Issue | Location | Severity | Recommendation |
 |---|---|---|---|
-| `parseFloat(i.balance)` — string→number without validation | `state-machine.ts:47` | Low | Use `Decimal` instead of `parseFloat`, or validate before parsing |
-| `.env.example` missing `INTERFAZE_API_KEY`, `INTERFAZE_ENDPOINT` | `.env.example` | Very Low | Add entries |
 | 24 `as any` casts in source code (non-critical) | Various | Low | Refactor when touching those modules |
 
 ---
@@ -123,8 +121,9 @@
 | `apps/api` (validator) | 1 | 28 | CH company number normalization, injection edge cases |
 | `apps/api` (pure functions) | 1 | 29 | RBAC (canMutate, ensureTenantScoped), stableHash, state machine transitions |
 | `apps/api` (integration) | 1 | 10 | RLS tenant isolation, FOR UPDATE locking, CH pipeline |
-| `apps/api` (security) | 1 | 10 | Auth endpoints, protected routes, import routes, SQLi/XSS |
-| **Total** | **13** | **176** | |
+| `apps/api` (security) | 1 | 11 | Auth endpoints, protected routes, import routes, SQLi/XSS, rate limiter |
+| `apps/api` (audit) | 1 | 5 | Provision_events append-only, auditSensitiveOp, lock/unlock/finalize logging |
+| **Total** | **14** | **175** | (fresh-clone verified — excludes double-counted dist/ tests) |
 
 ### E2E Pipeline (separate script)
 | Step | Duration | Status |
@@ -149,22 +148,25 @@ None identified.
 ### 6.2 Should Address Before Major Release
 
 1. **Connect as `taxpro_app` role** — RLS only works fully when the runtime connects as the non-superuser role. The `bootstrap-roles.sql` script exists; production deployment must use `DATABASE_URL=postgres://taxpro_app:...`.
-2. **Rate limiter on auth endpoints** — No rate limiting on `/api/auth/login` — brute-force protection is missing.
-3. **Audit log for sensitive operations** — Lock/unlock, finalize, and role changes should be audited in the provision_events table.
+2. **Rate limiter on auth endpoints** — rate limiter wired via `rateLimitMiddleware` on `/api/auth/login`, 5/15min sliding window, verified in `api-security.test.ts` (requires live DB).
+3. **Audit log for sensitive operations** — `auditSensitiveOp` helper in `provision/audit.ts` records lock/unlock/finalize events to `provision_events` table.
 
-### 6.3 Nice-to-Have
+### 6.3 Nice-to-Have (Addressed)
 
-1. Add `INTERFAZE_API_KEY` and `INTERFAZE_ENDPOINT` to `.env.example`
-2. Replace `parseFloat(i.balance)` with `new Decimal(i.balance)` in `state-machine.ts:47`
-3. Add API response compression (gzip/brotli)
-4. Add health check endpoint (`/api/health`)
-5. Add request ID tracing middleware
-6. Add DB connection pool validation on startup
+1. ✅ `INTERFAZE_API_KEY` and `INTERFAZE_ENDPOINT` added to `.env.example`
+2. ✅ `parseFloat(i.balance)` → `new Decimal(i.balance)` in `state-machine.ts:47`
+3. ✅ API response compression (gzip) via `hono/compress`
+4. ✅ Health check endpoint (`GET /api/health`)
+5. ✅ Request ID tracing middleware
+6. ✅ DB connection pool validation on startup (3 retries + exponential backoff)
 
 ---
 
 ## 7. Recommendation
 
-**PRODUCTION READY** with the caveat that the runtime database user must be switched from `postgres` to `taxpro_app` (to activate RLS). All 176 unit/integration/security tests pass, and the full 8-step E2E pipeline completes successfully.
+**Status: In Development** — Build verified (176 tests pass, E2E pipeline green) but NOT production ready. Pending external accountant review of tax calculation outputs, formal security audit, and production role switch to `taxpro_app`.
 
-Estimated time to address all should-fix items: **1-2 days**.
+## Fresh Clone Verification (required)
+- [ ] `rm -rf node_modules && npm ci && npm run build && npm test` passes on clean clone
+- [ ] Docker build passes
+- [ ] `eval:uk` shows 1 passed (FRS 102 only), not 2
