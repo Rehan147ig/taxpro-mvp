@@ -1,0 +1,109 @@
+# TaxPro — Production Roadmap
+
+Launch checklist. Items are ordered; each must be verified by the gates in Phase 11 before go-live.
+
+## Status Legend
+
+- [ ] Not started
+- [~] In progress
+- [x] Done
+
+---
+
+## Phase 1 — Repo Hygiene & Documentation
+
+- [x] Fix README encoding (mojibake) and refresh content (React 19, TanStack Router, Turborepo, direct AI client)
+- [x] `.env.example` cleaned and complete
+- [x] `docs/PRODUCTION_READINESS_REPORT.md` updated with current numbers
+- [x] `docs/AI_EVAL.md` documents dry-run / mocked / real modes
+- [x] `docs/ROADMAP_PRODUCTION.md` (this file)
+- [ ] Commit changes in logical groups (docs / SDK swap / engine / exports / security / frontend / tests)
+
+## Phase 2 — AI SDK Strategy
+
+- [x] Replace Vercel AI SDK with direct OpenAI-compatible client (`eve/model-client.ts`, `config/ai.ts`)
+- [x] Remove `ai`, `@ai-sdk/openai`, `@ai-sdk/openai-compatible`, `openai` dependencies
+- [x] Preserve Eve operating layer and `callJsonModel` surface
+- [x] zod validation on structured output; `InvalidOutputError` on malformed output
+- [x] Retry/backoff on 429/5xx/network/timeout; per-attempt timeout
+- [x] Tests: provider config, missing keys, timeout, malformed output, retry behavior (16 tests)
+
+## Phase 3 — AI Outcome Quality
+
+- [~] Subagent lifecycle states: started / completed / failed / timeout / fallback_used
+- [ ] Integration test waits for subagent completion or timeout (not just trace creation)
+- [ ] Tests prove: mapping agent returns validated JSON; audit defense memo persisted; credit miner output persisted; failed AI does not corrupt deterministic results; deterministic fallback works
+- [ ] AI eval command with dry-run / mocked / real modes (harness exists; wire modes)
+- [ ] Enforce ≥ 80% mapping threshold only in real/provider mode
+
+## Phase 4 — Tax Engine Accuracy
+
+- [ ] Add placed-in-service date / asset age to trial balance & account data
+- [ ] Replace default first-year MACRS assumption with explicit asset metadata
+- [ ] Missing metadata → review item + low confidence (no silent first-year assumption)
+- [ ] Tests: current-year asset, prior-year asset, missing date, MACRS class variation, UK no-MACRS
+- [ ] Verify US/UK engine isolation preserved
+
+## Phase 5 — Public Data Validation
+
+- [~] Expand EDGAR mapping: state tax, foreign rate differential, credits, valuation allowance, share-based comp, contingencies, prior-year adjustments
+- [ ] Result categories: evaluated/pass, evaluated/warn, evaluated/fail, skipped/data unavailable, skipped/footnote does not tie
+- [ ] Never market skipped companies as validated
+- [ ] Add more UK Companies House fixtures with provenance metadata (company, year, source doc, note ref, manual adjustments)
+- [ ] `docs/PUBLIC_DATA_VALIDATION.md` summarizing evidence honestly
+
+## Phase 6 — Compliance Exports
+
+- [ ] CT600: validate box logic vs current HMRC guidance; fixture tests for small profits rate, marginal relief, main rate, credits, R&D
+- [ ] iXBRL: well-formed XML tests, taxonomy/version metadata, label output "validation-ready" not "filing-ready"
+- [ ] MTD: separate readiness checks from submission; mock HMRC API tests
+- [ ] Export package: calculation summary, assumptions, review items, AI traces, audit events, source hashes, approval trail
+- [ ] Test: locked package reproducible from immutable run data
+
+## Phase 7 — Security & Governance
+
+- [ ] Runtime role guard: fail startup when NODE_ENV=production and DATABASE_URL uses a superuser role
+- [ ] Verify NOBYPASSRLS role usage in production
+- [ ] Tests: tenant isolation, missing tenant context, cross-tenant access, locked-run mutation rejection, partner cannot approve own run, audit append-only
+- [ ] `.env` untracked (verified), `.env.example` complete (done)
+- [ ] Rate limiting on auth + critical provision endpoints
+- [ ] Generic auth failure messages (no information leakage)
+- [ ] Fix pg deprecation warning in API tests
+
+## Phase 8 — Frontend Product Completion
+
+- [ ] Finish TanStack Router migration; remove or archive old `App.tsx`
+- [ ] Pages align with backend: Dashboard, Connections, Mapping, Provision, Review Queue, Run Detail, AI Findings, Audit Events, Export Package
+- [ ] UI states: loading, empty, error, locked, needs review, awaiting partner approval, finalized
+- [ ] Route-level code splitting (fix > 500 kB bundle warning)
+- [ ] Operator workflows only — no marketing pages
+
+## Phase 9 — API Integration Tests
+
+- [ ] Extend `test-provision-flow.ts`: login → import TB → mapping → provision → wait AI traces → review items → resolve → submit → partner approval (different user) → lock → mutation 409 → export package → audit events → tenant isolation
+- [ ] Deterministic seed producing at least one review item
+- [ ] Runnable locally with Docker Postgres/Redis
+
+## Phase 10 — Production Deployment
+
+- [ ] Review Dockerfile / railway.json / docker-compose; fresh-clone build check (`npm ci && npm run build && npm test`)
+- [ ] Health checks: API, DB, Redis, worker status, AI provider (optional/graded)
+- [ ] Production env validation (fail fast)
+- [ ] Graceful worker shutdown
+- [ ] Logs/traces around every provision run
+
+## Phase 11 — Final Verification & Report
+
+Run and record: `npm run lint` · `npm test` · `npm run build` · `npm run test:integration -w @taxpro/api` · `OFFLINE=1 npm run eval` · `npm run eval:uk` · `npm run eval:ai-mapping -w @taxpro/api` (dry-run or mocked)
+
+Final report: files changed, tests run, pass/fail, remaining risks, go-to-market readiness rating, required accountant/legal/security review.
+
+---
+
+## Hard Constraints (do not violate)
+
+1. No "filing-ready" claim unless a real HMRC/Companies House validator is integrated and tested.
+2. No "100% accurate" claim without external CPA review and broad public-data validation.
+3. Deterministic engine remains the source of truth for official amounts.
+4. Human approval is mandatory before locked/final outputs.
+5. Do not remove existing user work unless verified unused and obsolete.

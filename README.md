@@ -1,246 +1,153 @@
-# TaxPro Enterprise — Multi-Jurisdiction ASC 740 & FRS 102 Corporate Tax Provision Platform
+# TaxPro — Multi-Jurisdiction Tax Provision Outcome-as-a-Service
 
-TypeScript | Hono.js | React 18 | Turborepo | PostgreSQL RLS | Vercel AI SDK | Superlog OpenTelemetry
+TypeScript | Hono.js | React 19 | TanStack Router | Turborepo | PostgreSQL RLS | BullMQ | Direct OpenAI-compatible AI client
 
-**US ASC 740 EDGAR Benchmark** | **UK FRS 102 Benchmark**
+TaxPro turns financial trial balance data into review-ready corporate tax provisions, audit support narratives, and locked governance packages across US (ASC 740) and UK (FRS 102 Section 29) tax regimes.
 
-TaxPro Enterprise turns financial trial balance data into review-ready corporate tax provisions, audit support narratives, and locked governance packages across US (ASC 740) and UK (FRS 102 Section 29) tax regimes.
+TaxPro is an **Outcome-as-a-Service (OaaS)**, not an AI SaaS dashboard:
 
-Instead of asking corporate tax teams to operate another complex enterprise software suite or rely on fragile Excel spreadsheets, TaxPro Enterprise uses an **Outcome-as-a-Service (OaaS)** model:
-
-**AI Subagents Draft & Explains → Deterministic Math Calculates → Human CPAs Approve & Lock**
+**AI drafts and explains, deterministic math calculates, human CPAs approve and lock.**
 
 ---
 
-## 🏛️ Executive Summary & YC Thesis
+## Core Invariant
 
-Corporate tax provision is a **$12B+ global market** currently split between two legacy options:
-
-- **Legacy Enterprise Software (ONESOURCE, Longview):** Expensive ($50k–$200k+/yr), rigid, and lacks modern AI automation.
-- **Excel Workpapers:** Highly error-prone, impossible to audit cleanly across multi-entity corporations, and fragile.
-
-### Core Principle
-
-- **AI prepares, recommends, explains, and drafts.**
-- **Deterministic tax code (`Decimal.js`) calculates official financial results.**
-- **Humans approve official decisions.**
-- **Locked runs cannot be mutated.**
-- **Every material action is fully attributable.**
-- **Tenant data remains isolated at the PostgreSQL database layer.**
+- **AI** prepares, classifies, explains, and flags risk (mapping, credit mining, audit defense, explanations).
+- **Deterministic tax engine** (`@taxpro/tax-engine`, Decimal.js) computes the official amounts. The engine is the single source of truth.
+- **Humans approve** official decisions — partner sign-off is required before any final/locked output.
+- **Locked runs are immutable** (409 on mutation).
+- **Every material action is auditable** (append-only `provision_events`).
+- **Tenant data is isolated** at the PostgreSQL layer (RLS, `NOBYPASSRLS` runtime role).
 
 ---
 
-## 📐 Architecture & Workflow
+## AI Provider Architecture
+
+TaxPro talks to any OpenAI-compatible chat-completions endpoint **directly** — there is no Vercel AI SDK and no Vercel hosting dependency.
+
+- `apps/api/src/eve/` — the Eve operating layer: model client, trace store, pattern store, run runtime.
+- `apps/api/src/config/ai.ts` — provider resolution (`openai | nvidia | interfaze | custom`).
+- Structured JSON output is validated with **zod**; malformed model output fails loudly (`InvalidOutputError`) and never silently corrupts a provision.
+- Retries with backoff on transient failures (429/5xx/network/timeout); per-attempt timeout.
 
 ```text
-flowchart TD
-    A[Trial Balance Ingestion CSV / NetSuite / Companies House API] --> B[BullMQ Auto-Mapping Queue]
-    B --> C{Precedent Engine}
-    C -->|1. Active Precedent| D[Exact Precedent Match]
-    C -->|2. Token Pattern| E[Classification Pattern Match]
-    C -->|3. Fallback Rules| F[Rule-based Fallback]
-    
-    D & E & F --> G[Draft Tax Mappings]
-    G --> H[CPA Review Dashboard & Staging Gate]
-    
-    H -->|One-Click Approve / Override| I[Active Precedent Memory]
-    H -->|Submit for Approval| J[Partner Review & Sign-Off]
-    
-    J --> K[Dual Tax Engine Router @taxpro/tax-engine]
-    K -->|US Jurisdiction| L[US ASC 740 Engine: Current/Deferred Tax, MACRS, ETR Walk]
-    K -->|UK Jurisdiction| M[UK FRS 102 S29 Engine: 25% Rate, No Discounting, Note 14]
-    
-    J -->|Partner Lock| N[Locked Immutable Provision Run]
-    N --> O[Excel Workpaper & Audit ZIP Package Export]
-```
-
-### Key Technical Invariants
-
-```text
-AI       = Account classification, explanation, review escalation, credit mining
-Engine   = ASC 740 & FRS 102 S29 tax math, MACRS depreciation, journal entries, workpaper export
-Human    = Segregation-of-duties review, partner sign-off, locking
-Database = PostgreSQL Row-Level Security (NOBYPASSRLS runtime role + append-only audit log)
+AI_PROVIDER=openai        # or nvidia | interfaze | custom
+AI_BASE_URL=https://api.openai.com/v1
+AI_API_KEY=sk-...
+AI_MODEL=gpt-4o-mini
 ```
 
 ---
 
-## 🎯 Empirical Benchmark Validation Results
+## Empirical Benchmark Results
 
-TaxPro Enterprise includes dual automated evaluation harnesses (`npm run eval` and `npm run eval:uk`) that benchmark the tax calculation engine against audited public company disclosures.
+Both harnesses are honest about what they validate. See `docs/PUBLIC_DATA_VALIDATION.md` for the full methodology and `docs/AI_EVAL.md` for the AI mapping eval modes.
 
-### US SEC EDGAR Benchmark (ASC 740)
+### UK FRS 102 (Companies House, manually curated fixtures)
 
-```text
-SEC EDGAR Accuracy Benchmark (12 Public 10-K Filings)
-========================================================================================================================
-Company                      Ticker   Disclosed ETR   Calculated ETR   Delta (bp)   Status   Notes
-------------------------------------------------------------------------------------------------------------------------
-Church & Dwight Co.          CHD      21.45%          21.23%           22 bp        PASS     Matched audited ETR
-Paycom Software Inc.         PAYC     18.60%          18.66%            6 bp        PASS     Exact match on R&D credits
-Rollins, Inc.                ROL      24.10%          24.43%           33 bp        WARN     State apportionment delta
-Pool Corporation             POOL     23.80%          22.94%           86 bp        WARN     Stock comp timing difference
-Tyler Technologies, Inc.     TYL      19.20%          20.20%          100 bp        WARN     Sec 174 amortization
-A.O. Smith Corporation       AOS      22.10%          22.42%           32 bp        WARN     Foreign tax credit delta
-------------------------------------------------------------------------------------------------------------------------
-Mean ETR Variance: 46.5 basis points (<0.50% total deviation across evaluable filings)
-Failures (>100bp): 0 companies
-Result: Exit Code 0 (Passed Benchmark)
-```
+`npm run eval:uk` — 9/9 PASS, mean ETR delta 1.3 bp, mean deferred closing delta 0.0 bp.
 
-### UK Companies House Benchmark (FRS 102 Section 29)
+| Company | CH Number | Period End | ETR delta | Deferred closing | Status |
+|---|---|---|---|---|---|
+| Greggs plc | 00502851 | 2024-12-28 | 5 bp | 0 bp | PASS |
+| Greggs plc | 00502851 | 2025-12-27 | 3 bp | 0 bp | PASS |
+| Finsbury Food Group Limited | 00204368 | 2025-06-28 | 1 bp | 0 bp | PASS |
+| Tesco PLC | 00445790 | 2026-02-28 | 1 bp | 0 bp | PASS |
+| Tesco PLC | 00445790 | 2025-02-22 | 1 bp | 0 bp | PASS |
+| Costa Limited | 01270695 | 2024-12-31 | 1 bp | 0 bp | PASS |
+| Vodafone Limited | 01471587 | 2025-03-31 | 0 bp | 0 bp | PASS |
+| Farmfoods Limited | SC030186 | 2024-12-28 | 0 bp | 0 bp | PASS |
+| Tiny Rebel Limited | 07582051 | 2023-12-31 | 0 bp | 0 bp | PASS |
 
-```text
-UK FRS 102 Benchmark Evaluation Harness (`npm run eval:uk`)
-========================================================================================================================
-Company                      CH Number   Disclosed ETR   Calculated ETR   ETR Delta   Deferred Closing   Status
-------------------------------------------------------------------------------------------------------------------------
-Greggs plc                   00502851    24.80%          24.75%           5 bp        0 bp (100% match)  PASS
-British Telecomm (BT plc)    01800000    17.40%          17.46%           6 bp        0 bp (100% match)  PASS
-------------------------------------------------------------------------------------------------------------------------
-Mean ETR Variance: 5.5 basis points (<0.06% total deviation across populated UK filings)
-Mean Deferred Closing Variance: 0.0 basis points (100% exact balance match)
-Result: Exit Code 0 (Passed Benchmark)
-```
+The Tiny Rebel fixture is a genuine marginal-relief case: its ETR reconciliation includes an explicit "Tax at marginal rate" line, verified against the filed accounts.
+
+### US ASC 740 (SEC EDGAR public 10-K filings)
+
+`npm run eval` — the harness evaluates filed XBRL footnote data. **Offline (cached) mode currently resolves 2 PASS, 4 WARN, 6 SKIPPED of 12 filings.** Skips are classified (`skipped/data unavailable` vs `skipped/footnote does not tie`) and are **not** counted as validated. Expanding EDGAR coverage is an active workstream (see `docs/ROADMAP_PRODUCTION.md`).
+
+**This is a development harness, not a market claim.** US coverage must grow before any "validated across public filings" statement is made.
 
 ---
 
-## 🔒 Security & Multi-Tenant Governance
+## Security & Multi-Tenant Governance
 
-TaxPro Enterprise enforces defense-in-depth tenant boundary isolation and auditability:
-
-1. **Dual-Role PostgreSQL Setup (`bootstrap-roles.sql`):**
-   - `taxpro_migrations`: Schema owner role for Drizzle migrations.
-   - `taxpro_app`: Runtime application login role with `NOBYPASSRLS` enforced.
-
-2. **Strict Row-Level Security (RLS):**
-   - All 12 tenant-owned tables use strict policies: `USING (tenant_id = app_current_tenant_id())`.
-   - Transaction-scoped `set_config('app.tenant_id', tenantId, true)` inside `withTenantContext`.
-   - Missing tenant context fails closed (0 rows returned, writes rejected).
-
-3. **Append-Only Audit Trail (`provision_events`):**
-   - Database trigger `reject_provision_event_mutation()` rejects any `UPDATE` or `DELETE` on event records.
-   - Table privileges for `UPDATE`, `DELETE`, `TRUNCATE` are explicitly revoked from `taxpro_app`.
-
-4. **Segregation of Duties:**
-   - Partner sign-off enforces `submittedByUserId !== user.userId` and `requestedByUserId !== user.userId`.
-   - Locked runs block modifications with `409 Conflict`.
+1. **Dual-role PostgreSQL setup** (`scripts/bootstrap-roles.sql`): `taxpro_migrations` (schema owner) vs `taxpro_app` (runtime, `NOBYPASSRLS`).
+2. **Row-Level Security** on all tenant-owned tables: `USING (tenant_id = app_current_tenant_id())`, transaction-scoped `set_config('app.tenant_id', ...)` inside `withTenantContext`. Missing tenant context fails closed.
+3. **Append-only audit trail** (`provision_events`): DB trigger rejects `UPDATE`/`DELETE`; table privileges revoked from `taxpro_app`.
+4. **Segregation of duties**: partner sign-off enforces `submittedByUserId !== user.userId` and `requestedByUserId !== user.userId`.
+5. **Locked runs** block modification with `409 Conflict`.
+6. **AI traces** (`ai_runs`, `ai_steps`) persist started/completed/failed/timeout/fallback states with input hashes and output JSON.
 
 ---
 
-## 📦 Monorepo Structure
+## Monorepo Structure
 
 ```text
 taxpro/
 ├── turbo.json                 # Turborepo task orchestration + caching
 ├── apps/
-│   ├── api/                     # Hono.js REST API Server & Background Workers
-│   │   ├── src/
-│   │   │   ├── agent/           # Unified Agent Architecture (parser, mapping, audit, explanation, orchestrator)
-│   │   │   ├── config/          # Dual DB pools, env schema, runtime security validation
-│   │   │   ├── db/              # Drizzle ORM schemas & versioned SQL migrations
-│   │   │   ├── eve/             # Vercel AI SDK model client, trace store, pattern store
-│   │   │   ├── lib/             # Crypto, JWT auth, RBAC middleware, Superlog OTel
-│   │   │   ├── modules/         # Auth, Import, Mapping, NetSuite, Provision, Export, Agent
-│   │   │   ├── state/           # TaxProvisionState & immutability guards
-│   │   │   └── index.ts         # Server entrypoint with graceful shutdown
-│   │   └── scripts/             # Governance tests, auto-mapping flow tests, US/UK eval harnesses
-│   │
-│   └── web/                     # React 18 SPA Frontend
-│       └── src/
-│           ├── api/             # Typed API client
-│           ├── components/      # Governance stepper, AI findings panel, provenance badges
-│           └── pages/           # Dashboard, Mapping, Provision, Review Dashboard, Connections
-│
+│   ├── api/                   # Hono.js REST API + background workers
+│   │   ├── src/agent/         # Subagents: mapping, audit defense, credit miner, parser, orchestrator
+│   │   ├── src/eve/           # Eve AI operating layer (model client, traces, patterns)
+│   │   ├── src/modules/       # Auth, Import, Mapping, NetSuite, QBO, Xero, Provision,
+│   │   │                      #   Export (iXBRL/CT600/CTO/R&D), MTD, Billing, Upload
+│   │   └── scripts/           # Governance tests, provision flow tests, US/UK/AI eval harnesses
+│   └── web/                   # React 19 + TanStack Router SPA
+│       └── src/routes/        # Dashboard, Connections, Mapping, Provision, Review, AI Findings
 └── packages/
-    └── tax-engine/              # Pure ASC 740 & FRS 102 S29 Tax Engine (Decimal.js exact math)
-        └── src/                 # Current tax, deferred tax, ETR walk, MACRS depreciation, UK rules
+    └── tax-engine/            # Pure ASC 740 & FRS 102 S29 engine (Decimal.js exact math)
 ```
 
 ---
 
-## ⚡ Quick Start & Local Demo Setup
+## Quick Start
 
-**Live Demo:** [https://taxpro.up.railway.app](https://taxpro.up.railway.app) _(deploy pending — see `railway.json` + root `Dockerfile`)_
-
-### Prerequisites
-
-- Node.js 22+
-- Docker Desktop (for PostgreSQL 16 & Redis containers)
-
-### 1. Start Services & Install Dependencies
+Prerequisites: Node.js 22+, Docker Desktop (PostgreSQL 16 & Redis).
 
 ```bash
 git clone https://github.com/Rehan147ig/taxpro-mvp.git
 cd taxpro-mvp
-cp .env.example .env
+cp .env.example .env          # then fill in JWT_SECRET, DATA_ENCRYPTION_KEY, AI_API_KEY
 docker compose up -d
 npm install
-```
-
-### 2. Run Migrations & Seed Demo Data
-
-```bash
 npm run db:migrate -w apps/api
 npm run db:synthetic -w apps/api
-```
-
-### 3. Launch Development Servers
-
-```bash
 npm run dev
 ```
 
-Open your browser to:
-
 - Frontend SPA: http://localhost:5173
-- API Health: http://localhost:3001/api/health
+- API health: http://localhost:3001/api/health
 
-### Demo Credentials
-
-| Role | Email | Password |
-|---|---|---|
-| **Admin / Partner** | `demo@taxpro.ai` | `TaxProDemo123!` |
+Demo credentials: `demo@taxpro.ai` / `TaxProDemo123!`
 
 ---
 
-## 🧪 Verification & Test Commands
+## Verification Commands
 
 ```bash
-# Typecheck all packages
-npx -w apps/api tsc --noEmit; npx -w apps/web tsc --noEmit
-
-# Run PostgreSQL RLS Governance Integration Tests
-npx -w apps/api tsx scripts/test-rls-governance.ts
-
-# Run Auto-Mapping Flow Integration Tests
-npx -w apps/api tsx scripts/test-auto-mapping-flow.ts
-
-# Run ASC 740 Tax Calculation Engine Suite
-npx -w apps/api tsx scripts/run-provision-tests.ts
-
-# Run US SEC EDGAR Public 10-K Benchmark Harness
-OFFLINE=1 npm run eval
-
-# Run UK FRS 102 Companies House Benchmark Harness
-npm run eval:uk
+npm run lint                                   # typecheck all workspaces
+npm test                                       # 276 unit tests (110 engine + 166 API)
+npm run build                                  # full turbo build
+npm run test:integration -w @taxpro/api        # provision lifecycle flow (needs Docker Postgres/Redis)
+OFFLINE=1 npm run eval                         # US EDGAR harness (offline cached mode)
+npm run eval:uk                                # UK FRS 102 harness — 9/9 PASS
+npm run eval:ai-mapping -w @taxpro/api         # AI mapping eval (dry-run/mocked/real modes)
 ```
 
 ---
 
-## ⚙️ Turborepo
+## Production Readiness Status
 
-The monorepo uses [Turborepo](https://turbo.build) for task orchestration and content-based caching:
+**In development — build verified, benchmark harnesses green, NOT filing-ready.**
 
-- **`turbo run build`** — Builds all workspaces in dependency order (tax-engine → api, web in parallel).
-- **`turbo run test`** — Re-runs tests only when source changes (cached otherwise).
-- **`turbo run dev`** — Starts api + web dev servers in parallel.
-- **`turbo run lint`** — Typechecks all workspaces.
-
-First run is cold; subsequent runs skip unchanged tasks via local cache.
+- UK FRS 102 engine validated against 9 curated real filings (0–5 bp ETR deltas).
+- US ASC 740 engine validated against a subset of public filings; coverage expansion in progress.
+- Compliance export modules (CT600, iXBRL, MTD, CTO XML, R&D claim) generate **validation-ready** structures — they are **not** yet HMRC/Companies House filing-ready. No claim of filing readiness is made until a real validator is integrated and tested.
+- External CPA review and a formal security audit are required before general availability.
+- See `docs/PRODUCTION_READINESS_REPORT.md` (current numbers) and `docs/ROADMAP_PRODUCTION.md` (launch checklist).
 
 ---
 
-## 📄 License
+## License
 
-MIT License. Built for enterprise ASC 740 & FRS 102 Section 29 corporate tax provision automation.
+MIT.

@@ -1,172 +1,128 @@
-# TaxPro MVP — Status: In Development — Build Verified, Pending External Accountant Review
+# TaxPro — Production Readiness Report
 
-**Date:** 2026-07-29  
-**Commit:** (working tree)  
-**Test Suite:** 175 tests passing (92 tax-engine + 83 API), 0 failures (fresh-clone verified — excludes double-counted dist/ tests)  
-**E2E Pipeline:** 8/8 integration steps pass  
-
----
-
-## 1. Security
-
-### 1.1 Tenant Isolation (RLS)
-
-| Check | Status | Details |
-|---|---|---|
-| RLS policies exist on all tenant tables | ✅ PASS | 13 tables with `FORCE ROW LEVEL SECURITY` |
-| `withTenantContext` sets `app.tenant_id` per transaction | ✅ PASS | Uses `set_config('app.tenant_id', ..., true)` |
-| `requireRunAccess` reject cross-tenant | ✅ PASS | Throws `ForbiddenError('Cross-tenant access denied')` |
-| RLS falls closed (no context = no rows) | ⚠️ MANUAL | Requires `taxpro_app` role (NOBYPASSRLS) — dev env uses superuser |
-| `ensureTenantScoped` guard | ✅ PASS | Tested `pure-functions.test.ts` |
-
-**Risk:** Low. Application-layer guards (`requireRunAccess`, `assertRunIsMutable`, `ensureTenantScoped`) plus RLS provide defense in depth. RLS only activates fully when connecting as `taxpro_app`.
-
-### 1.2 Secrets & Environment
-
-| Check | Status | Details |
-|---|---|---|
-| Hardcoded credentials in source | ✅ PASS | Zero found in `src/` |
-| `.env.example` documents all vars | ⚠️ MINOR | `INTERFAZE_API_KEY` and `INTERFAZE_ENDPOINT` missing from `.env.example` |
-| Zod schema validates env at startup | ✅ PASS | `env.ts` validates all required vars |
-| JWT secret configured | ✅ PASS | In `.env` |
-
-### 1.3 Injection
-
-| Check | Status | Details |
-|---|---|---|
-| SQL injection in company number | ✅ PASS | All variants rejected by validator |
-| XSS in company number | ✅ PASS | `<script>`, HTML entities, null bytes all rejected |
-| SQL injection in login email | ✅ PASS | Returns 400 (not 500) |
-| Path traversal in company number | ✅ PASS | Rejected |
-| Newline/control chars sanitized | ✅ PASS | Stripped safely (not passed to API) |
+**Status:** In development — build verified, benchmark harnesses green, NOT filing-ready.
+**Date:** 2026-08-01
+**Branch:** master
+**Test Suite:** 276 tests passing (110 tax-engine + 166 API), 0 failures
+**E2E Pipeline:** 7/8 integration steps pass, 1 skipped (requires live AI provider)
 
 ---
 
-## 2. Concurrency & Locking
+## 1. Current Verification State
 
-### 2.1 Database Locking
-
-| Check | Status | Details |
+| Gate | Command | Result |
 |---|---|---|
-| `requireRunAccess` supports `forUpdate` | ✅ PASS | `for('update')` applied when `forUpdate=true && tx` |
-| `assertRunIsMutable` passes `forUpdate=true` | ✅ PASS | Verified via integration test |
-| Lock endpoint uses FOR UPDATE | ✅ PASS | `provision.routes.ts:1120` |
-| Lock prevents modification | ✅ PASS | `assertRunIsMutable` throws `ConflictError('locked')` |
+| Lint / typecheck | `npm run lint` | PASS |
+| Unit tests | `npm test` | 276/276 PASS (110 engine + 166 API) |
+| Build | `npm run build` | PASS |
+| Provision integration flow | `npm run test:integration -w @taxpro/api` | 7/8, 1 skipped |
+| US EDGAR eval | `OFFLINE=1 npm run eval` | 2 PASS, 4 WARN, 6 SKIPPED (of 12) |
+| UK eval | `npm run eval:uk` | 9/9 PASS, mean ETR delta 1.3 bp |
 
-### 2.2 Race Condition Analysis
+### 1.1 UK FRS 102 Benchmark (Companies House fixtures)
 
-| Scenario | Risk | Mitigation |
-|---|---|---|
-| Two concurrent lock requests on same run | Low | FOR UPDATE serializes; second caller waits |
-| Lock → modify race (no tx) | Low | All modifications go through `assertRunIsMutable` |
-| Cross-tenant concurrent operations | None | RLS + app-layer check |
+9 manually-curated real filings, ETR deltas 0–5 bp, deferred closing 0 bp:
 
----
-
-## 3. Data Integrity
-
-### 3.1 Decimal.js Precision
-
-| Check | Status | Details |
-|---|---|---|
-| `Decimal.set()` frozen | ✅ PASS | Throws at runtime to prevent cross-jurisdiction config tampering |
-| `Decimal.config()` frozen | ✅ PASS | Throws at runtime |
-| `createEngine` factory binds jurisdiction | ✅ PASS | US/UK engines produce different correct outputs |
-| Large number precision ($10B × 21%) | ✅ PASS | Exact result, no floating-point error |
-| `0.1 + 0.2 = 0.3` | ✅ PASS | Decimal avoids IEEE 754 rounding |
-
-### 3.2 Determinism
-
-| Check | Status | Details |
-|---|---|---|
-| `calculateCurrentTax` x100 same result | ✅ PASS | Identical output every call |
-| `stableHash` deterministic | ✅ PASS | Same input → same output; key-order independent |
-
-### 3.3 Tax Calculation Accuracy
-
-| Check | Status | Details |
-|---|---|---|
-| US current tax: $1M × 21% = $210k | ✅ PASS | |
-| UK deferred tax: 25% rate, FRS 102 labels | ✅ PASS | |
-| UK probable recovery blocks DTA | ✅ PASS | |
-| MACRS year 1 temporary difference | ✅ PASS | |
-| ETR reconciliation sums correctly | ✅ PASS | |
-| Journal entries: debits = credits | ✅ PASS | |
-| Rollforward with §382 limitation | ✅ PASS | |
-| Negative values rejected | ✅ PASS | tax credits, NOL util, oldRate |
-
----
-
-## 4. Bugs Found & Fixed
-
-| Bug | File | Impact | Fix |
+| Company | CH Number | Period End | ETR delta |
 |---|---|---|---|
-| `stableHash(undefined)` crashes | `hash.ts:4` | Low — only affects edge-case callers | Added `?? ''` guard |
-| ~~Lock race condition~~ | `rbac.ts`, `provision.routes.ts` | ~~Critical — concurrent requests could modify locked runs~~ | ~~Added `.for('update')` to all lock paths~~ (fixed previously) |
-| ~~Decimal.js cross-contamination~~ | `engine-factory.ts` | ~~Hard — one jurisdiction's config leaks to another~~ | ~~Frozen `Decimal.set/config`, added `createEngine` factory~~ (fixed previously) |
+| Greggs plc | 00502851 | 2024-12-28 | 5 bp |
+| Greggs plc | 00502851 | 2025-12-27 | 3 bp |
+| Finsbury Food Group Limited | 00204368 | 2025-06-28 | 1 bp |
+| Tesco PLC | 00445790 | 2026-02-28 | 1 bp |
+| Tesco PLC | 00445790 | 2025-02-22 | 1 bp |
+| Costa Limited | 01270695 | 2024-12-31 | 1 bp |
+| Vodafone Limited | 01471587 | 2025-03-31 | 0 bp |
+| Farmfoods Limited | SC030186 | 2024-12-28 | 0 bp |
+| Tiny Rebel Limited | 07582051 | 2023-12-31 | 0 bp |
 
-### Unfixed Issues (Documented)
+The Tiny Rebel fixture exercises a genuine marginal-relief disclosure ("Tax at marginal rate" line in the ETR reconciliation) at the blended 23.52% transition rate.
 
-| Issue | Location | Severity | Recommendation |
-|---|---|---|---|
-| 24 `as any` casts in source code (non-critical) | Various | Low | Refactor when touching those modules |
+### 1.2 US ASC 740 Benchmark (SEC EDGAR)
+
+12 targeted 10-K filers. Harness semantics: PASS ≤ 25 bp, WARN ≤ 100 bp, SKIP = footnote data inadequate to test the engine (no itemized recon, or footnote does not tie internally). **SKIP is not validation.** Offline mode currently resolves 2 PASS / 4 WARN / 6 SKIPPED.
+
+Expansion of EDGAR coverage (state tax, valuation allowance, credits, contingencies mapping) is an active workstream — see `docs/ROADMAP_PRODUCTION.md` and `docs/PUBLIC_DATA_VALIDATION.md`.
 
 ---
 
-## 5. Test Coverage Summary
+## 2. Security
 
-| Package | Test Files | Tests | Coverage Area |
-|---|---|---|---|
-| `packages/tax-engine` | 9 | 92 | Current tax, deferred tax (US/UK), book-tax diff, rollforward, ETR, journal entries, factory isolation, Decimal guard, determinism |
-| `apps/api` (validator) | 1 | 28 | CH company number normalization, injection edge cases |
-| `apps/api` (pure functions) | 1 | 29 | RBAC (canMutate, ensureTenantScoped), stableHash, state machine transitions |
-| `apps/api` (integration) | 1 | 10 | RLS tenant isolation, FOR UPDATE locking, CH pipeline |
-| `apps/api` (security) | 1 | 11 | Auth endpoints, protected routes, import routes, SQLi/XSS, rate limiter |
-| `apps/api` (audit) | 1 | 5 | Provision_events append-only, auditSensitiveOp, lock/unlock/finalize logging |
-| **Total** | **14** | **175** | (fresh-clone verified — excludes double-counted dist/ tests) |
-
-### E2E Pipeline (separate script)
-| Step | Duration | Status |
+| Check | Status | Details |
 |---|---|---|
-| Auth (login) | 828ms | ✅ |
-| Provision Run | 453ms | ✅ |
-| AI Findings | 41ms | ✅ |
-| Review Items | 28ms | ✅ |
-| Single Resolution | 93ms | ✅ |
-| Bulk Resolve | 35ms | ✅ |
-| Finalize | 37ms | ✅ |
-| ZIP Export (9.5KB) | 179ms | ✅ |
+| RLS policies on all tenant tables | PASS | 13 tables with FORCE ROW LEVEL SECURITY |
+| `withTenantContext` sets `app.tenant_id` per transaction | PASS | `set_config('app.tenant_id', ..., true)` |
+| `requireRunAccess` rejects cross-tenant | PASS | `ForbiddenError('Cross-tenant access denied')` |
+| RLS fails closed (no context = no rows) | PARTIAL | Requires `taxpro_app` role (NOBYPASSRLS) — dev uses superuser |
+| `.env` not tracked | PASS | git-ignored |
+| `.env.example` documents all vars | PASS | Includes AI provider, Interfaze, NetSuite, CH API key |
+| Startup env validation (zod) | PASS | `env.ts` |
+| Production JWT secret guard | PASS | `env.ts` rejects default secret in production |
+| Secrets in source | PASS | Zero found in `src/` |
+
+### Runtime role guard (planned)
+
+Production must connect as `taxpro_app` (NOBYPASSRLS). A startup guard that fails fast when `NODE_ENV=production` and `DATABASE_URL` uses a superuser role is on the Phase 7 checklist.
 
 ---
 
-## 6. Remaining Production Gaps
+## 3. Concurrency & Locking
 
-### 6.1 Would Block Production Go-Live
+| Check | Status |
+|---|---|
+| `requireRunAccess` FOR UPDATE support | PASS |
+| `assertRunIsMutable` uses FOR UPDATE | PASS |
+| Lock endpoint uses FOR UPDATE | PASS |
+| Locked runs reject mutation with 409 | PASS |
+| Cross-tenant concurrent operations | PASS (RLS + app-layer) |
 
-None identified.
+---
 
-### 6.2 Should Address Before Major Release
+## 4. Data Integrity & Determinism
 
-1. **Connect as `taxpro_app` role** — RLS only works fully when the runtime connects as the non-superuser role. The `bootstrap-roles.sql` script exists; production deployment must use `DATABASE_URL=postgres://taxpro_app:...`.
-2. **Rate limiter on auth endpoints** — rate limiter wired via `rateLimitMiddleware` on `/api/auth/login`, 5/15min sliding window, verified in `api-security.test.ts` (requires live DB).
-3. **Audit log for sensitive operations** — `auditSensitiveOp` helper in `provision/audit.ts` records lock/unlock/finalize events to `provision_events` table.
+| Check | Status |
+|---|---|
+| Decimal.js config frozen | PASS |
+| `createEngine` jurisdiction factory isolation | PASS |
+| Large-number precision ($10B × 21%) | PASS |
+| `calculateCurrentTax` × 100 identical | PASS |
+| `stableHash` deterministic | PASS |
+| Engine current tax, deferred, ETR walk, rollforward, journal entries | PASS |
+| Marginal relief (UK S29) rules + tests | PASS |
 
-### 6.3 Nice-to-Have (Addressed)
+---
 
-1. ✅ `INTERFAZE_API_KEY` and `INTERFAZE_ENDPOINT` added to `.env.example`
-2. ✅ `parseFloat(i.balance)` → `new Decimal(i.balance)` in `state-machine.ts:47`
-3. ✅ API response compression (gzip) via `hono/compress`
-4. ✅ Health check endpoint (`GET /api/health`)
-5. ✅ Request ID tracing middleware
-6. ✅ DB connection pool validation on startup (3 retries + exponential backoff)
+## 5. AI Layer
+
+| Check | Status |
+|---|---|
+| Provider abstraction (openai/nvidia/interfaze/custom) | PASS — direct OpenAI-compatible client, no Vercel AI SDK |
+| zod validation of structured model output | PASS — `InvalidOutputError` on malformed output |
+| Retries + timeout | PASS — tested against mock server |
+| Trace lifecycle started/completed/failed | PASS |
+| Trace lifecycle timeout/fallback_used | Phase 3 — in progress |
+| AI mapping eval (dry-run/mocked/real modes) | Phase 3 — in progress |
+| Minimum accuracy threshold enforced in real mode only | Phase 3 — in progress |
+
+---
+
+## 6. Known Gaps
+
+### Would block production go-live
+- External CPA review of engine outputs (required, not yet performed).
+- Formal security audit (required, not yet performed).
+- Compliance exports (CT600/iXBRL/MTD) are structure generators — **validation-ready, not filing-ready**. No HMRC/Companies House validator is integrated.
+
+### Must fix before major release
+- US EDGAR eval coverage: 6/12 filings skipped; mapping expansion (state tax, valuation allowance, credits, contingencies) in progress.
+- MACRS assumes first-year treatment without placed-in-service date; must surface review item + low confidence instead of silent assumption.
+- Runtime DB role guard (superuser detection at startup in production).
+- pg deprecation warning in API tests (`client.query()` concurrency).
+- Frontend bundle > 500 kB warning; code-split routes.
+- Rate limiting hardening for auth + critical provision endpoints (current limiter exists for login; verify coverage).
+- AI subagent integration tests must wait for completion (not just trace creation).
 
 ---
 
 ## 7. Recommendation
 
-**Status: In Development** — Build verified (176 tests pass, E2E pipeline green) but NOT production ready. Pending external accountant review of tax calculation outputs, formal security audit, and production role switch to `taxpro_app`.
-
-## Fresh Clone Verification (required)
-- [ ] `rm -rf node_modules && npm ci && npm run build && npm test` passes on clean clone
-- [ ] Docker build passes
-- [ ] `eval:uk` shows 1 passed (FRS 102 only), not 2
+**Not yet production-ready.** Remaining order: complete Phase 3–10 checklist in `docs/ROADMAP_PRODUCTION.md`, then external CPA review + security audit before any go-live or "filing-ready" claim.
