@@ -1,12 +1,10 @@
-import { createOpenAI } from '@ai-sdk/openai';
-import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
-import type { LanguageModel } from 'ai';
 import { env } from './env.js';
 
 /**
- * AI provider configuration (Vercel AI SDK).
+ * AI provider configuration — direct OpenAI-compatible HTTP client.
  *
- * Supports any OpenAI-compatible API by setting:
+ * TaxPro talks to any OpenAI-compatible chat-completions endpoint directly
+ * (no Vercel AI SDK, no Vercel hosting dependency). Supported providers:
  *   AI_PROVIDER  = openai | nvidia | interfaze | custom
  *   AI_BASE_URL  = https://integrate.api.nvidia.com/v1  (for nvidia)
  *   AI_API_KEY   = nvapi-... or sk-...
@@ -18,7 +16,7 @@ import { env } from './env.js';
  * SECURITY: API keys are read from process.env only. Never log or print keys.
  */
 
-const PROVIDER_DEFAULTS: Record<string, { baseUrl: string; model: string }> = {
+export const PROVIDER_DEFAULTS: Record<string, { baseUrl: string; model: string }> = {
   openai: {
     baseUrl: 'https://api.openai.com/v1',
     model: 'gpt-4o-mini',
@@ -38,7 +36,9 @@ const PROVIDER_DEFAULTS: Record<string, { baseUrl: string; model: string }> = {
 };
 
 export interface AiConfig {
-  model: LanguageModel;
+  /** Base URL for chat-completions, e.g. https://api.openai.com/v1 */
+  baseUrl: string;
+  apiKey: string;
   modelName: string;
   provider: string;
 }
@@ -52,7 +52,7 @@ let cachedConfig: AiConfig | null = null;
  *   AI_PROVIDER + AI_BASE_URL + AI_API_KEY + AI_MODEL  → primary
  *   OPENAI_API_KEY                                      → legacy fallback
  */
-function resolveConfig(): AiConfig {
+export function resolveConfig(): AiConfig {
   if (cachedConfig) return cachedConfig;
 
   const provider = env.AI_PROVIDER || 'openai';
@@ -86,22 +86,29 @@ function resolveConfig(): AiConfig {
     throw new Error('AI_MODEL is required when AI_PROVIDER=custom');
   }
 
-  // Native OpenAI provider for api.openai.com; OpenAI-compatible provider
-  // (chat completions) for NVIDIA / Interfaze / custom gateways.
-  const model: LanguageModel = provider === 'openai' && !env.AI_BASE_URL
-    ? createOpenAI({ apiKey })(modelName!)
-    : createOpenAICompatible({ name: provider, apiKey, baseURL: baseUrl! })(modelName!);
-
-  cachedConfig = { model, modelName: modelName!, provider };
+  cachedConfig = { baseUrl: baseUrl!, apiKey, modelName: modelName!, provider };
   return cachedConfig;
 }
 
 /**
- * Get the configured AI SDK language model.
+ * Get the resolved AI provider config.
  * Throws if no API key is set.
  */
 export function getAiModel(): AiConfig {
   return resolveConfig();
+}
+
+/**
+ * True when an AI provider key is configured and calls may be made.
+ * Safe to call without throwing.
+ */
+export function isAiConfigured(): boolean {
+  if (cachedConfig) return true;
+  const provider = env.AI_PROVIDER || 'openai';
+  if (provider === 'interfaze') {
+    return Boolean(env.INTERFAZE_API_KEY || env.AI_API_KEY);
+  }
+  return Boolean(env.AI_API_KEY || env.OPENAI_API_KEY);
 }
 
 /**
