@@ -36,6 +36,10 @@ export interface UkTaxFootnote {
    *  items, or 'balance_sheet_fallback' from disclosed Note 14 balance-sheet
    *  balances when no ETR timing items exist. */
   deferredTaxBalanceSource?: 'recon_timing' | 'balance_sheet_fallback';
+  /** Note number/refs in the filed document, e.g. 'Note 8 (income tax), Note 14 (deferred tax)'. */
+  noteRef?: string;
+  /** Manual transcription adjustments made against the filed figures (none = as-filed). */
+  manualAdjustments?: string[];
 }
 
 const PLACEHOLDER_MARKERS = ['TODO', null, 0, ''];

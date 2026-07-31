@@ -35,13 +35,21 @@ const fmt$ = (n: number) => {
 const bp = (ratio: number) => Math.round(ratio * 10_000);
 
 type Verdict = 'PASS' | 'WARN' | 'FAIL' | 'SKIP';
+type Category = 'evaluated' | 'skipped';
+type SkipReason = 'data_unavailable' | 'footnote_does_not_tie' | 'no_recon_items' | 'fetch_error';
 
 interface CompanyResult {
   ticker: string;
   name: string;
   verdict: Verdict;
+  category: Category;
+  skipReason?: SkipReason;
   etrDeltaBp: number | null;
   notes: string[];
+}
+
+function skipResult(ticker: string, name: string, skipReason: SkipReason, notes: string[]): CompanyResult {
+  return { ticker, name, verdict: 'SKIP', category: 'skipped', skipReason, etrDeltaBp: null, notes };
 }
 
 async function evalCompany(ticker: string): Promise<CompanyResult> {
@@ -53,7 +61,7 @@ async function evalCompany(ticker: string): Promise<CompanyResult> {
   try {
     footnote = extractTaxFootnote(facts);
   } catch (err) {
-    return { ticker, name, verdict: 'SKIP', etrDeltaBp: null, notes: [(err as Error).message] };
+    return skipResult(ticker, name, 'data_unavailable', [(err as Error).message]);
   }
 
   const { etr, classified, creditSignFlipped, consistencyBp: footnoteTieBp } = runEngine(footnote);
@@ -86,7 +94,7 @@ async function evalCompany(ticker: string): Promise<CompanyResult> {
     notes.push('credit signs flipped to tie footnote (filer convention quirk)');
   }
 
-  console.log(`  Recon items:        ${classified.permanent.length} perm, ${classified.credits.length} credit, ${classified.state.length} state, ${classified.other.length} other${creditSignFlipped ? '  [credits sign-flipped]' : ''}`);
+  console.log(`  Recon items:        ${classified.permanent.length} perm, ${classified.credits.length} credit, ${classified.state.length} state, ${classified.foreignRateDifferential.length} foreign, ${classified.valuationAllowance.length} val.allowance, ${classified.shareBasedCompensation.length} SBC, ${classified.contingencies.length} contingencies, ${classified.priorYearAdjustments.length} prior-yr, ${classified.other.length} other${creditSignFlipped ? '  [credits sign-flipped]' : ''}`);
   for (const item of footnote.reconItems) {
     console.log(`    ${item.amount >= 0 ? '+' : ''}${fmt$(item.amount).replace('$-', '-$')}  ${item.label}`);
   }
@@ -99,21 +107,28 @@ async function evalCompany(ticker: string): Promise<CompanyResult> {
   // Verdict semantics:
   //   PASS/WARN/FAIL = engine test result (footnote ties, so delta reflects engine)
   //   SKIP = footnote data inadequate to test the engine (doesn't tie internally,
-  //          or no recon items tagged at all) — not an engine failure
+  //          or no recon items tagged at all) — NOT an engine failure and NOT
+  //          counted as validated
   let verdict: Verdict;
+  let category: Category = 'evaluated';
+  let skipReason: SkipReason | undefined;
   if (footnote.reconItems.length === 0) {
     verdict = 'SKIP';
+    category = 'skipped';
+    skipReason = 'no_recon_items';
     notes.push('no itemized recon data tagged (percentage-only or untagged filing)');
   } else if (footnoteTieBp > WARN_BP) {
     verdict = 'SKIP';
+    category = 'skipped';
+    skipReason = 'footnote_does_not_tie';
   } else {
     verdict = etrDeltaBp <= PASS_BP ? 'PASS' : etrDeltaBp <= WARN_BP ? 'WARN' : 'FAIL';
   }
 
   console.log(`  Engine tax:         ${fmt$(engineTotal)}  (ETR ${(engineETR * 100).toFixed(2)}%)`);
-  console.log(`  ETR delta:          ${etrDeltaBp}bp  →  ${verdict}`);
+  console.log(`  ETR delta:          ${etrDeltaBp}bp  →  ${verdict}${category === 'skipped' ? ` (${skipReason})` : ''}`);
 
-  return { ticker, name, verdict, etrDeltaBp: verdict === 'SKIP' ? null : etrDeltaBp, notes };
+  return { ticker, name, verdict, category, skipReason, etrDeltaBp: category === 'skipped' ? null : etrDeltaBp, notes };
 }
 
 async function main() {
@@ -126,7 +141,7 @@ async function main() {
     try {
       results.push(await evalCompany(ticker));
     } catch (err) {
-      results.push({ ticker, name: '?', verdict: 'SKIP', etrDeltaBp: null, notes: [(err as Error).message] });
+      results.push(skipResult(ticker, '?', 'fetch_error', [(err as Error).message]));
     }
   }
 
@@ -135,18 +150,21 @@ async function main() {
   console.log('═'.repeat(72));
   for (const r of results) {
     const delta = r.etrDeltaBp === null ? '  n/a' : `${String(r.etrDeltaBp).padStart(4)}bp`;
-    console.log(`  ${r.verdict.padEnd(4)}  ${r.ticker.padEnd(6)} ${delta}  ${r.notes.join('; ')}`);
+    const reason = r.category === 'skipped' && r.skipReason ? ` (${r.skipReason})` : '';
+    console.log(`  ${r.verdict.padEnd(4)}  ${r.ticker.padEnd(6)} ${delta}  ${r.notes.join('; ')}${reason}`);
   }
 
   const counts = { PASS: 0, WARN: 0, FAIL: 0, SKIP: 0 };
   results.forEach(r => counts[r.verdict]++);
   console.log(`\n  ${counts.PASS} passed, ${counts.WARN} warnings, ${counts.FAIL} failed, ${counts.SKIP} skipped`);
 
-  const evaluated = results.filter(r => r.etrDeltaBp !== null);
+  const evaluated = results.filter(r => r.category === 'evaluated');
   if (evaluated.length > 0) {
     const meanDelta = evaluated.reduce((s, r) => s + (r.etrDeltaBp ?? 0), 0) / evaluated.length;
     console.log(`  Mean ETR delta: ${meanDelta.toFixed(1)}bp across ${evaluated.length} companies`);
   }
+  console.log(`  VALIDATED: ${evaluated.length}/${results.length} companies (PASS/WARN only).`);
+  console.log(`  NOT validated: ${results.length - evaluated.length} skipped companies — never market skipped companies as validated.`);
 
   process.exit(counts.FAIL > 0 ? 1 : 0);
 }

@@ -46,11 +46,11 @@ Launch checklist. Items are ordered; each must be verified by the gates in Phase
 
 ## Phase 5 — Public Data Validation
 
-- [~] Expand EDGAR mapping: state tax, foreign rate differential, credits, valuation allowance, share-based comp, contingencies, prior-year adjustments
-- [ ] Result categories: evaluated/pass, evaluated/warn, evaluated/fail, skipped/data unavailable, skipped/footnote does not tie
-- [ ] Never market skipped companies as validated
-- [ ] Add more UK Companies House fixtures with provenance metadata (company, year, source doc, note ref, manual adjustments)
-- [ ] `docs/PUBLIC_DATA_VALIDATION.md` summarizing evidence honestly
+- [x] Expand EDGAR mapping: state tax, foreign rate differential, credits, valuation allowance, share-based comp, contingencies, prior-year adjustments (classified buckets in `xbrl-map.ts`; math flows unchanged)
+- [x] Result categories: evaluated/pass, evaluated/warn, evaluated/fail, skipped/data unavailable, skipped/footnote does not tie (`run-eval.ts` emits category + skipReason)
+- [x] Never market skipped companies as validated (summary prints VALIDATED = evaluated only + explicit "NOT validated" line)
+- [x] Add more UK Companies House fixtures with provenance metadata (company, year, source doc, note ref, manual adjustments — 9 fixtures; noteRef/manualAdjustments fields added)
+- [x] `docs/PUBLIC_DATA_VALIDATION.md` summarizing evidence honestly
 
 ## Phase 6 — Compliance Exports
 

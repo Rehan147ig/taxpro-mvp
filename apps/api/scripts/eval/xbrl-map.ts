@@ -55,9 +55,55 @@ const STATE_TAGS = new Set([
   'IncomeTaxReconciliationStateAndLocalIncomeTaxes',
 ]);
 
+const FOREIGN_TAGS = new Set([
+  'IncomeTaxReconciliationForeignIncomeTaxRateDifferential',
+  'IncomeTaxReconciliationForeignRateDifferential',
+  'IncomeTaxReconciliationForeignIncomeTaxRateDifferentialByJurisdiction',
+  'ForeignRateDifferential',
+]);
+
+const VALUATION_ALLOWANCE_TAGS = new Set([
+  'IncomeTaxReconciliationValuationAllowance',
+  'IncomeTaxReconciliationValuationAllowanceRelease',
+  'IncomeTaxReconciliationChangeInValuationAllowance',
+  'ChangeInValuationAllowance',
+  'IncomeTaxReconciliationValuationAllowanceBenefit',
+]);
+
+const SBC_TAGS = new Set([
+  'IncomeTaxReconciliationShareBasedCompensationExcessTaxBenefit',
+  'IncomeTaxReconciliationShareBasedCompensationShortfall',
+  'IncomeTaxReconciliationExcessTaxBenefitFromShareBasedCompensation',
+  'IncomeTaxReconciliationShareBasedCompensationTaxBenefit',
+]);
+
+const CONTINGENCY_TAGS = new Set([
+  'IncomeTaxReconciliationUncertainTaxPositions',
+  'IncomeTaxReconciliationContingencies',
+  'IncomeTaxReconciliationTaxContingencies',
+  'IncomeTaxReconciliationReserveForUncertainTaxPositions',
+]);
+
+const PRIOR_YEAR_TAGS = new Set([
+  'IncomeTaxReconciliationOtherReconcilingItemsPriorPeriod',
+  'IncomeTaxReconciliationPriorYearAdjustments',
+  'IncomeTaxReconciliationAdjustmentForPriorPeriod',
+  'IncomeTaxReconciliationPriorPeriodAdjustments',
+]);
+
 export interface EngineRun {
   etr: ETRResult;
-  classified: { permanent: ReconItem[]; credits: ReconItem[]; state: ReconItem[]; other: ReconItem[] };
+  classified: {
+    permanent: ReconItem[];
+    credits: ReconItem[];
+    state: ReconItem[];
+    foreignRateDifferential: ReconItem[];
+    valuationAllowance: ReconItem[];
+    shareBasedCompensation: ReconItem[];
+    contingencies: ReconItem[];
+    priorYearAdjustments: ReconItem[];
+    other: ReconItem[];
+  };
   creditSignFlipped: boolean;
   consistencyBp: number;
 }
@@ -72,17 +118,42 @@ function suffixOf(tag: string): string {
 const CREDIT_SUFFIXES = new Set([...CREDIT_TAGS].map(suffixOf));
 const PERMANENT_SUFFIXES = new Set([...PERMANENT_TAGS].map(suffixOf));
 const STATE_SUFFIXES = new Set([...STATE_TAGS].map(suffixOf));
+const FOREIGN_SUFFIXES = new Set([...FOREIGN_TAGS].map(suffixOf));
+const VALUATION_ALLOWANCE_SUFFIXES = new Set([...VALUATION_ALLOWANCE_TAGS].map(suffixOf));
+const SBC_SUFFIXES = new Set([...SBC_TAGS].map(suffixOf));
+const CONTINGENCY_SUFFIXES = new Set([...CONTINGENCY_TAGS].map(suffixOf));
+const PRIOR_YEAR_SUFFIXES = new Set([...PRIOR_YEAR_TAGS].map(suffixOf));
 
 function isCredit(tag: string) { return CREDIT_SUFFIXES.has(suffixOf(tag)); }
 function isPermanent(tag: string) { return PERMANENT_SUFFIXES.has(suffixOf(tag)); }
 function isState(tag: string) { return STATE_SUFFIXES.has(suffixOf(tag)); }
+function isForeign(tag: string) { return FOREIGN_SUFFIXES.has(suffixOf(tag)); }
+function isValuationAllowance(tag: string) { return VALUATION_ALLOWANCE_SUFFIXES.has(suffixOf(tag)); }
+function isSbc(tag: string) { return SBC_SUFFIXES.has(suffixOf(tag)); }
+function isContingency(tag: string) { return CONTINGENCY_SUFFIXES.has(suffixOf(tag)); }
+function isPriorYear(tag: string) { return PRIOR_YEAR_SUFFIXES.has(suffixOf(tag)); }
 
 function classify(items: ReconItem[]) {
-  const classified = { permanent: [] as ReconItem[], credits: [] as ReconItem[], state: [] as ReconItem[], other: [] as ReconItem[] };
+  const classified = {
+    permanent: [] as ReconItem[],
+    credits: [] as ReconItem[],
+    state: [] as ReconItem[],
+    foreignRateDifferential: [] as ReconItem[],
+    valuationAllowance: [] as ReconItem[],
+    shareBasedCompensation: [] as ReconItem[],
+    contingencies: [] as ReconItem[],
+    priorYearAdjustments: [] as ReconItem[],
+    other: [] as ReconItem[],
+  };
   for (const item of items) {
     if (isCredit(item.tag)) classified.credits.push(item);
     else if (isPermanent(item.tag)) classified.permanent.push(item);
     else if (isState(item.tag)) classified.state.push(item);
+    else if (isForeign(item.tag)) classified.foreignRateDifferential.push(item);
+    else if (isValuationAllowance(item.tag)) classified.valuationAllowance.push(item);
+    else if (isSbc(item.tag)) classified.shareBasedCompensation.push(item);
+    else if (isContingency(item.tag)) classified.contingencies.push(item);
+    else if (isPriorYear(item.tag)) classified.priorYearAdjustments.push(item);
     else classified.other.push(item);
   }
   return classified;
@@ -119,7 +190,15 @@ export function runEngine(footnote: TaxFootnote): EngineRun {
       return sum.plus(new Decimal(item.amount).abs());
     }, new Decimal(0));
 
-  const otherAdjustments = [...classified.state, ...classified.other].map(item => ({
+  const otherAdjustments = [
+    ...classified.state,
+    ...classified.foreignRateDifferential,
+    ...classified.valuationAllowance,
+    ...classified.shareBasedCompensation,
+    ...classified.contingencies,
+    ...classified.priorYearAdjustments,
+    ...classified.other,
+  ].map(item => ({
     label: STATE_TAGS.has(item.tag) ? `${item.label} (as disclosed, net of federal)` : item.label,
     amount: new Decimal(item.amount),
   }));

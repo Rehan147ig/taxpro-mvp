@@ -43,6 +43,8 @@ const fixtures: UkTaxFootnote[] = [
     sourceDocumentUrl: 'https://find-and-update.company-information.service.gov.uk/company/00502851/filing-history',
     standard: 'IFRS',
     deferredTaxBalanceSource: 'balance_sheet_fallback',
+    noteRef: 'Note 8 (income tax expense), Note 14 (deferred tax)',
+    manualAdjustments: [],
   },
 
   // Greggs plc — 52 weeks ended 27 December 2025
