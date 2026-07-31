@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { generateKeyPairSync } from 'crypto';
-import { buildMtdCtSubmission, buildMtdReadinessReport, MtdClient, MTD } from './mtd-client.js';
+import { assertMtdEligible, buildMtdCtSubmission, buildMtdReadinessReport, MtdClient, MTD } from './mtd-client.js';
 
 const PRIVATE_PEM = generateKeyPairSync('rsa', { modulusLength: 2048 }).privateKey.export({ type: 'pkcs8', format: 'pem' }) as string;
 
@@ -56,6 +56,41 @@ describe('MtdClient (sandbox adapter)', () => {
     (fetch as any).mockResolvedValue({ ok: false, status: 400, text: async () => 'invalid_client' });
     const client = new MtdClient({ clientId: 'cid', clientSecret: 'sec', privateKeyPem: KEY_PEM });
     await expect(client.submitReturn(buildMtdCtSubmission(CT600))).rejects.toThrow(/400 invalid_client/);
+  });
+
+  it('separates the readiness gate from submission: ineligible report blocks submission with no network call', async () => {
+    const report = buildMtdReadinessReport({
+      utr: '1234567890',
+      periodStart: '2025-01-01',
+      hasAgentAuthority: false,
+      signedUpToMtd: false,
+      softwareConnected: false,
+    });
+    expect(report.eligible).toBe(false);
+    expect(report.missing.length).toBeGreaterThan(0);
+    expect(() => assertMtdEligible(report)).toThrow(/MTD readiness gate not met/);
+
+    const client = new MtdClient({ clientId: 'cid', clientSecret: 'sec', privateKeyPem: KEY_PEM });
+    await expect(client.submitReturn(buildMtdCtSubmission(CT600), report)).rejects.toThrow(/readiness gate/);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('passes the gate and submits when all readiness requirements are met', async () => {
+    (fetch as any).mockResolvedValue({ ok: true, json: async () => ({ access_token: 'hmrc-token' }) });
+    const report = buildMtdReadinessReport({
+      utr: '1234567890',
+      companiesHouseNumber: '00502851',
+      periodStart: '2025-01-01',
+      hasAgentAuthority: true,
+      signedUpToMtd: true,
+      softwareConnected: true,
+    });
+    expect(report.eligible).toBe(true);
+    expect(() => assertMtdEligible(report)).not.toThrow();
+
+    const client = new MtdClient({ clientId: 'cid', clientSecret: 'sec', privateKeyPem: KEY_PEM });
+    await client.submitReturn(buildMtdCtSubmission(CT600), report);
+    expect(fetch).toHaveBeenCalledTimes(2);
   });
 });
 

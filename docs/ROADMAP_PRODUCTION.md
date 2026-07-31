@@ -54,11 +54,11 @@ Launch checklist. Items are ordered; each must be verified by the gates in Phase
 
 ## Phase 6 — Compliance Exports
 
-- [ ] CT600: validate box logic vs current HMRC guidance; fixture tests for small profits rate, marginal relief, main rate, credits, R&D
-- [ ] iXBRL: well-formed XML tests, taxonomy/version metadata, label output "validation-ready" not "filing-ready"
-- [ ] MTD: separate readiness checks from submission; mock HMRC API tests
-- [ ] Export package: calculation summary, assumptions, review items, AI traces, audit events, source hashes, approval trail
-- [ ] Test: locked package reproducible from immutable run data
+- [x] CT600: validate box logic vs current HMRC guidance; fixture tests for small profits rate, marginal relief, main rate, credits, R&D
+- [x] iXBRL: well-formed XML tests, taxonomy/version metadata, label output "validation-ready" not "filing-ready"
+- [x] MTD: separate readiness checks from submission; mock HMRC API tests
+- [x] Export package: calculation summary, assumptions, review items, AI traces, audit events, source hashes, approval trail
+- [x] Test: locked package reproducible from immutable run data
 
 ## Phase 7 — Security & Governance
 

@@ -43,6 +43,64 @@ describe('buildCt600Return', () => {
     expect(r.consistency.ok).toBe(true);
   });
 
+  it('small profits rate band: sub-£50k profits charge 19% with no marginal relief', () => {
+    const r = buildCt600Return(COMPANY, PERIOD, {
+      profitsChargeableToCT: 45000,
+      taxableTotalProfits: 45000,
+      taxAtMainRate: 0,
+      taxAtSmallProfitsRate: 8550, // 45,000 × 19%
+      marginalRelief: 0,
+      taxCredits: 0,
+      taxDeductedAtSource: 0,
+      paymentsOnAccount: 0,
+      rdSurrender: 0,
+      rdec: 0,
+    });
+    expect(r.computed.totalTaxCharge).toBe(8550);
+    expect(r.boxes.find(b => b.box === 13)?.value).toBe(8550);
+    expect(r.boxes.find(b => b.box === 12)?.value).toBe(0);
+    expect(r.boxes.find(b => b.box === 14)?.value).toBe(0);
+    expect(r.consistency.ok).toBe(true);
+  });
+
+  it('carries R&D expenditure credit (RDEC) and surrendered-loss boxes', () => {
+    const r = buildCt600Return(COMPANY, PERIOD, {
+      profitsChargeableToCT: 100000,
+      taxableTotalProfits: 100000,
+      taxAtMainRate: 25000,
+      taxAtSmallProfitsRate: 0,
+      marginalRelief: 0,
+      taxCredits: 0,
+      taxDeductedAtSource: 0,
+      paymentsOnAccount: 0,
+      rdSurrender: 15000,
+      rdec: 2000,
+    });
+    expect(r.computed.totalTaxCharge).toBe(25000);
+    expect(r.boxes.find(b => b.box === 27)?.value).toBe(2000);
+    expect(r.boxes.find(b => b.box === 28)?.value).toBe(15000);
+    expect(r.consistency.ok).toBe(true);
+  });
+
+  it('zeroes the charge on a loss year and flags it', () => {
+    const r = buildCt600Return(COMPANY, PERIOD, {
+      profitsChargeableToCT: 0,
+      taxableTotalProfits: 0,
+      taxAtMainRate: 0,
+      taxAtSmallProfitsRate: 0,
+      marginalRelief: 5000,
+      taxCredits: 0,
+      taxDeductedAtSource: 0,
+      paymentsOnAccount: 0,
+      rdSurrender: 0,
+      rdec: 0,
+    });
+    expect(r.computed.totalTaxCharge).toBe(0);
+    expect(r.computed.balanceDue).toBe(0);
+    expect(r.consistency.ok).toBe(false);
+    expect(r.consistency.issues.some(i => i.includes('Negative tax charge'))).toBe(true);
+  });
+
   it('deducts R&D credits and payments on account', () => {
     const r = buildCt600Return(COMPANY, PERIOD, {
       profitsChargeableToCT: 100000,

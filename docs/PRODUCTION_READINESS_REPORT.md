@@ -3,7 +3,7 @@
 **Status:** In development — build verified, benchmark harnesses green, NOT filing-ready.
 **Date:** 2026-08-01
 **Branch:** master
-**Test Suite:** 291 tests passing (118 tax-engine + 173 API), 0 failures
+**Test Suite:** 304 tests passing (118 tax-engine + 186 API), 0 failures
 **E2E Pipeline:** 8/8 integration steps pass (in-process Hono + live Postgres; subagent calls degrade to fallback when the AI provider is unreachable)
 
 ---
@@ -13,7 +13,7 @@
 | Gate | Command | Result |
 |---|---|---|
 | Lint / typecheck | `npm run lint` | PASS |
-| Unit tests | `npm test` | 291/291 PASS (118 engine + 173 API) |
+| Unit tests | `npm test` | 304/304 PASS (118 engine + 186 API) |
 | Build | `npm run build` | PASS |
 | Provision integration flow | `npm run test:integration -w @taxpro/api` | 8/8 PASS |
 | US EDGAR eval | `OFFLINE=1 npm run eval` | 2 PASS, 4 WARN, 6 SKIPPED (of 12) |
@@ -99,9 +99,23 @@ Production must connect as `taxpro_app` (NOBYPASSRLS). A startup guard that fail
 | zod validation of structured model output | PASS — `InvalidOutputError` on malformed output |
 | Retries + timeout | PASS — tested against mock server |
 | Trace lifecycle started/completed/failed | PASS |
-| Trace lifecycle timeout/fallback_used | Phase 3 — in progress |
-| AI mapping eval (dry-run/mocked/real modes) | Phase 3 — in progress |
-| Minimum accuracy threshold enforced in real mode only | Phase 3 — in progress |
+| Trace lifecycle timeout/fallback_used | PASS |
+| AI mapping eval (dry-run/mocked/real modes) | PASS |
+| Minimum accuracy threshold enforced in real mode only | PASS |
+
+---
+
+## 5.5 Compliance Exports (Phase 6)
+
+| Check | Status | Details |
+|---|---|---|
+| CT600 box layout (CT600 2016+) + consistency flags | PASS | main rate, small profits, marginal relief (HMRC example), credits, R&D, POA, loss-year zeroing |
+| CT600 fixtures vs HMRC guidance | PASS | small-profits 19% band, HMRC marginal relief example, RDEC/surrendered-loss boxes |
+| iXBRL instance + inline docs | PASS | well-formed XML, contexts/units/facts, escaping |
+| iXBRL taxonomy/version metadata | PASS | schemaRef `ukgaap-frs102-2023-01-01.xsd`, `readyStatus: 'validation_ready'` honesty contract |
+| MTD readiness vs submission separation | PASS | `buildMtdReadinessReport`/`assertMtdEligible` gate; sandbox `MtdClient` mock tests; live channel = CTO GovTalk XML (CT MTD API still private beta) |
+| Export package contents | PASS | xlsx + audit CSV + review-items CSV + AI-traces CSV + approval-trail JSON + assumptions JSON + manifest.json (SHA-256 per file) + summary |
+| Locked-run reproducibility | PASS | byte-deterministic ZIP (fixed entry dates), identical inputs → identical bytes |
 
 ---
 
@@ -110,10 +124,9 @@ Production must connect as `taxpro_app` (NOBYPASSRLS). A startup guard that fail
 ### Would block production go-live
 - External CPA review of engine outputs (required, not yet performed).
 - Formal security audit (required, not yet performed).
-- Compliance exports (CT600/iXBRL/MTD) are structure generators — **validation-ready, not filing-ready**. No HMRC/Companies House validator is integrated.
+- Compliance exports (CT600/iXBRL/MTD) are structure generators with deterministic, reproducible packages (Phase 6) — **still validation-ready, not filing-ready**. No HMRC/Companies House validator is integrated.
 
 ### Must fix before major release
-- US EDGAR eval coverage: 6/12 filings skipped; mapping expansion (state tax, valuation allowance, credits, contingencies) in progress.
 - US EDGAR eval coverage: 6/12 filings skipped; mapping expansion (state tax, valuation allowance, credits, contingencies) in progress.
 - Runtime DB role guard (superuser detection at startup in production).
 - pg deprecation warning in API tests (`client.query()` concurrency).
@@ -125,4 +138,4 @@ Production must connect as `taxpro_app` (NOBYPASSRLS). A startup guard that fail
 
 ## 7. Recommendation
 
-**Not yet production-ready.** Remaining order: complete Phase 3–10 checklist in `docs/ROADMAP_PRODUCTION.md`, then external CPA review + security audit before any go-live or "filing-ready" claim.
+**Not yet production-ready.** Remaining order: complete Phase 7–10 checklist in `docs/ROADMAP_PRODUCTION.md`, then external CPA review + security audit before any go-live or "filing-ready" claim.

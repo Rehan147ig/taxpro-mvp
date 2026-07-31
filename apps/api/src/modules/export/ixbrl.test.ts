@@ -55,6 +55,15 @@ describe('buildIxbrlInstance', () => {
     expect(doc.facts).toHaveLength(0);
   });
 
+  it('carries versioned taxonomy metadata and the validation-ready honesty contract', () => {
+    const doc = buildIxbrlInstance(INPUT);
+    expect(doc.readyStatus).toBe('validation_ready');
+    expect(doc.schemaRef).toContain('ukgaap-frs102-2023-01-01.xsd');
+    expect(doc.content).toContain(`schemaRef="${doc.schemaRef}"`);
+    expect(doc.periodStart).toBe('2025-01-01');
+    expect(doc.periodEnd).toBe('2025-12-31');
+  });
+
   it('escapes XML-sensitive identifiers', () => {
     const doc = buildIxbrlInstance({ ...INPUT, companiesHouseNumber: 'A&B<Co>' });
     expect(doc.content).not.toContain('<Co>');

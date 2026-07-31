@@ -1024,8 +1024,9 @@ provisionRoutes.get('/results/:id/package', async (c) => {
     const auditLog = createAuditLog();
     auditLog.add('provision_run', `Provision run for ${result.period}`, { mode: run?.mode ?? 'unknown' });
 
+    let reviewItemsData: Array<typeof reviewItems.$inferSelect> = [];
     if (run) {
-      const reviewItemsData = await tx.select().from(reviewItems)
+      reviewItemsData = await tx.select().from(reviewItems)
         .where(eq(reviewItems.provisionRunId, run.id));
       for (const item of reviewItemsData) {
         auditLog.add(`review_item:${item.itemType}`, item.title, item.metadata as Record<string, unknown> ?? {}, 'system');
@@ -1044,6 +1045,18 @@ provisionRoutes.get('/results/:id/package', async (c) => {
       }, tx);
     }
 
+    const aiTraceData = run
+      ? await tx.select({
+        workflowName: aiRuns.workflowName,
+        status: aiRuns.status,
+        provider: aiRuns.provider,
+        model: aiRuns.model,
+        promptVersion: aiRuns.promptVersion,
+        errorMessage: aiRuns.errorMessage,
+        completedAt: aiRuns.completedAt,
+      }).from(aiRuns).where(eq(aiRuns.provisionRunId, run.id))
+      : [];
+
     const buf = await generateWorkpaperPackage({
       period: result.period,
       bookIncome: Number(result.bookIncome ?? 0),
@@ -1056,6 +1069,28 @@ provisionRoutes.get('/results/:id/package', async (c) => {
       valuationAllowance: Number(result.valuationAllowance ?? 0),
       createdAt: result.createdAt?.toISOString?.() ?? String(result.createdAt ?? ''),
       auditEntries: auditLog.entries,
+      reviewItems: reviewItemsData?.map((i) => ({
+        itemType: i.itemType,
+        title: i.title,
+        severity: i.severity,
+        status: i.status,
+        confidenceScore: i.confidenceScore,
+      })) ?? [],
+      aiTraces: aiTraceData.map((t) => ({
+        workflowName: t.workflowName,
+        status: t.status,
+        provider: t.provider,
+        model: t.model,
+        promptVersion: t.promptVersion,
+        errorMessage: t.errorMessage,
+        completedAt: t.completedAt ? t.completedAt.toISOString() : null,
+      })),
+      approvalTrail: {
+        approvalStatus: run?.approvalStatus ?? 'unknown',
+        submittedAt: run?.submittedAt ? run.submittedAt.toISOString() : null,
+        finalizedAt: run?.finalizedAt ? run.finalizedAt.toISOString() : null,
+      },
+      sourceHash: run?.inputDataHash ?? null,
     });
 
     packageExportCounter.add(1, { outcome: 'success' });

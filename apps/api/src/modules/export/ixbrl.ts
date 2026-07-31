@@ -51,6 +51,10 @@ export interface IxbrlDocument {
   periodEnd: string;
   facts: Array<{ tag: string; value: number; context: string; unit: string }>;
   content: string;
+  /** Honesty contract: structure/figures are validation-ready, NOT filing-ready until a real validator + taxonomy version lock. */
+  readyStatus: 'validation_ready';
+  /** Versioned UK GAAP taxonomy schema the instance is built against. */
+  schemaRef: string;
 }
 
 const ISO_ESCAPE_RE = /[&<>"']/g;
@@ -79,7 +83,7 @@ export function buildIxbrlInstance(input: IxbrlInput): IxbrlDocument {
   }
   lines.push(`</xbrl>`);
 
-  return { format: 'instance', periodStart: input.periodStart, periodEnd: input.periodEnd, facts, content: lines.join('\n') };
+  return { format: 'instance', periodStart: input.periodStart, periodEnd: input.periodEnd, facts, content: lines.join('\n'), readyStatus: 'validation_ready', schemaRef: `${FRS102_NS}/ukgaap-frs102-2023-01-01.xsd` };
 }
 
 export function buildInlineIxbrl(input: IxbrlInput): IxbrlDocument {

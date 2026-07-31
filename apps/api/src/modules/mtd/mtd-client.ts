@@ -87,6 +87,12 @@ export function buildMtdCtSubmission(ct600: {
   };
 }
 
+export function assertMtdEligible(report: MtdReadinessReport): void {
+  if (!report.eligible) {
+    throw new Error(`MTD readiness gate not met: ${report.missing.join('; ')}`);
+  }
+}
+
 export class MtdClient {
   constructor(private config: MtdConfig) {}
 
@@ -110,8 +116,14 @@ export class MtdClient {
     return json.access_token;
   }
 
-  /** Submit a return in the sandbox (CT endpoint in private beta — readiness only). */
-  async submitReturn(submission: MtdCtSubmission): Promise<{ submissionId: string; status: string }> {
+  /**
+   * Submit a return in the sandbox (CT endpoint in private beta — readiness only).
+   * The readiness gate is separate: call buildMtdReadinessReport + assertMtdEligible
+   * first; an optional report is accepted here as defense-in-depth so a submission
+   * can never bypass the gate accidentally.
+   */
+  async submitReturn(submission: MtdCtSubmission, readiness?: MtdReadinessReport): Promise<{ submissionId: string; status: string }> {
+    if (readiness) assertMtdEligible(readiness);
     const token = await this.accessToken();
     const body = {
       period: submission.period,
