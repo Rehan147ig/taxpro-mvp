@@ -38,11 +38,11 @@ Launch checklist. Items are ordered; each must be verified by the gates in Phase
 
 ## Phase 4 — Tax Engine Accuracy
 
-- [ ] Add placed-in-service date / asset age to trial balance & account data
-- [ ] Replace default first-year MACRS assumption with explicit asset metadata
-- [ ] Missing metadata → review item + low confidence (no silent first-year assumption)
-- [ ] Tests: current-year asset, prior-year asset, missing date, MACRS class variation, UK no-MACRS
-- [ ] Verify US/UK engine isolation preserved
+- [x] Add placed-in-service date / asset age to trial balance & account data (`placed_in_service_date` on accounts + trial_balance, engine types, `depreciation_metadata.sql`)
+- [x] Replace default first-year MACRS assumption with explicit asset metadata (per-account resolution: tb date > tb age > account date > fallback)
+- [x] Missing metadata → review item + low confidence (no silent first-year assumption) — `missing_depreciation_metadata` review item, run marked needs_review
+- [x] Tests: current-year asset, prior-year asset, missing date, MACRS class variation, UK no-MACRS (8 new engine tests; E2E asserts the review item)
+- [x] Verify US/UK engine isolation preserved (UK/non-MACRS categories never flagged; engine freeze guards intact)
 
 ## Phase 5 — Public Data Validation
 

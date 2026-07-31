@@ -137,7 +137,11 @@ async function main() {
     assert(res.status === 200, `Expected status 200, got ${res.status}`);
     reviewItems = await res.json();
     assert(Array.isArray(reviewItems), 'Review items response must be an array');
-    return `Retrieved ${reviewItems.length} review item(s) for run`;
+
+    const depreciationItem = (reviewItems as any[]).find((i) => i.itemType === 'missing_depreciation_metadata');
+    assert(!!depreciationItem, 'Expected a missing_depreciation_metadata review item for the seeded depreciation account (no placed-in-service date)');
+    assert(depreciationItem.accountId !== undefined, 'Depreciation metadata item must reference the account');
+    return `Retrieved ${reviewItems.length} review item(s) for run (incl. depreciation metadata flag: ${depreciationItem.title})`;
   });
 
   // Step 5: Resolve Review Item (Single Resolution & Pattern Feedback)

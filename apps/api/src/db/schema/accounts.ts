@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, boolean, timestamp } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, boolean, date, timestamp } from 'drizzle-orm/pg-core';
 import { tenants } from './tenants.js';
 
 export const accounts = pgTable('accounts', {
@@ -9,6 +9,7 @@ export const accounts = pgTable('accounts', {
   name: varchar('name', { length: 255 }).notNull(),
   type: varchar('type', { length: 50 }).notNull(),
   detailType: varchar('detail_type', { length: 100 }),
+  placedInServiceDate: date('placed_in_service_date'),
   isSummary: boolean('is_summary').default(false),
   parentId: uuid('parent_id'),
   isInactive: boolean('is_inactive').default(false),

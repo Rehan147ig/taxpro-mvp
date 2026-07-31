@@ -12,6 +12,7 @@ export const trialBalance = pgTable('trial_balance', {
   periodEnd: date('period_end').notNull(),
   fiscalYear: integer('fiscal_year').notNull(),
   fiscalPeriod: integer('fiscal_period').notNull(),
+  placedInServiceDate: date('placed_in_service_date'),
   debit: decimal('debit', { precision: 18, scale: 2 }).default('0'),
   credit: decimal('credit', { precision: 18, scale: 2 }).default('0'),
   balance: decimal('balance', { precision: 18, scale: 2 }).default('0'),

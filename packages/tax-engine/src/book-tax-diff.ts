@@ -4,24 +4,34 @@ import { MACRS_TABLES, MACRS_LIFE_MAP, DEFAULT_TIMING_FACTORS, REVERSAL_PERIOD_M
 
 type DecimalInstance = InstanceType<typeof Decimal>;
 
+export type DepreciationAgeSource = 'placed_in_service' | 'explicit_age' | 'assumed_first_year' | 'no_metadata';
+
 /**
  * Compute book-tax differences from trial balance data + tax mappings.
  *
  * Uses MACRS tables for depreciation categories to compute accurate
  * timing factors based on asset age, rather than hardcoded percentages.
  *
- * Limitation: assetAgeYears defaults to 1 (first-year MACRS) for all assets.
- * This may overstate DTL for older assets. Future: parse placed-in-service
- * date from trial balance to compute real age.
+ * Asset age resolution precedence (per account):
+ *   1. `placedInServiceDate` on the trial balance line
+ *   2. `assetAgeYears` on the trial balance line
+ *   3. `placedInServiceDate` on the account
+ *   4. `assumedAssetAgeYears` fallback (default 1 = first-year MACRS)
+ *
+ * When no metadata is available for a MACRS depreciation category, the
+ * difference is still computed with the fallback age so deterministic math
+ * never blocks, but the result carries `depreciationAgeSource: 'no_metadata'`
+ * so callers can raise a review item + low confidence instead of silently
+ * assuming first-year treatment.
  */
 export function computeBookTaxDifferences(
   trialBalance: TrialBalanceLine[],
   accounts: Account[],
   mappings: Map<string, TaxMapping>,
   period: string,
-  assetAgeYears: number = 1,
+  assumedAssetAgeYears: number = 1,
 ): BookTaxDifference[] {
-  let warnedAge = false;
+  const accountById = new Map(accounts.map((a) => [a.id, a]));
   const results: BookTaxDifference[] = [];
 
   for (const tb of trialBalance) {
@@ -52,16 +62,9 @@ export function computeBookTaxDifferences(
       continue;
     }
 
-    // Temporary difference — use MACRS for depreciation, else fallback
-    if (!warnedAge) {
-      warnedAge = true;
-      console.warn(
-        `computeBookTaxDifferences: assetAgeYears=${assetAgeYears} for ${tb.accountId} — first-year MACRS assumed, `
-        + `may overstate DTL for older assets. TODO: parse placed-in-service date from trial balance.`,
-      );
-    }
     const isDeductible = mapping.timingCategory === 'deductible_temporary';
-    const timingFactor = getTimingFactor(mapping.taxAccountType, assetAgeYears);
+    const { ageYears, ageSource } = resolveAssetAge(tb, accountById.get(tb.accountId), period, assumedAssetAgeYears, mapping.taxAccountType);
+    const timingFactor = getTimingFactor(mapping.taxAccountType, ageYears);
     const difference: USD = tb.balance.mul(timingFactor).abs();
     const taxBalance: USD = isDeductible
       ? tb.balance.minus(difference)
@@ -77,10 +80,57 @@ export function computeBookTaxDifferences(
       diffType: 'temporary',
       timingCategory: mapping.timingCategory,
       reversalPeriod: estimateReversalPeriod(mapping.taxAccountType, period),
+      depreciationAgeSource: ageSource,
+      assetAgeYears: ageYears,
     });
   }
 
   return results;
+}
+
+/**
+ * Resolve the MACRS asset age for a single trial balance line.
+ *
+ * Only MACRS depreciation categories (present in MACRS_LIFE_MAP) require
+ * metadata; everything else resolves to the assumed age with source
+ * 'assumed_first_year' and never triggers a review item.
+ */
+function resolveAssetAge(
+  tb: TrialBalanceLine,
+  account: Account | undefined,
+  period: string,
+  assumedAssetAgeYears: number,
+  taxAccountType: string,
+): { ageYears: number; ageSource: DepreciationAgeSource } {
+  const isMacrs = Boolean(MACRS_LIFE_MAP[taxAccountType]);
+
+  if (isMacrs && tb.placedInServiceDate) {
+    const age = yearsSince(tb.placedInServiceDate, period);
+    return { ageYears: Math.max(1, age), ageSource: 'placed_in_service' };
+  }
+
+  if (isMacrs && typeof tb.assetAgeYears === 'number') {
+    return { ageYears: Math.max(1, tb.assetAgeYears), ageSource: 'explicit_age' };
+  }
+
+  if (isMacrs && account?.placedInServiceDate) {
+    const age = yearsSince(account.placedInServiceDate, period);
+    return { ageYears: Math.max(1, age), ageSource: 'placed_in_service' };
+  }
+
+  if (isMacrs) {
+    return { ageYears: Math.max(1, assumedAssetAgeYears), ageSource: 'no_metadata' };
+  }
+
+  return { ageYears: Math.max(1, assumedAssetAgeYears), ageSource: 'assumed_first_year' };
+}
+
+/** Calendar-year age in service (e.g. placed 2022-07, period 2026-01 -> 4). */
+function yearsSince(placedInServiceDate: string, period: string): number {
+  const placedYear = new Date(placedInServiceDate + 'T00:00:00.000Z').getFullYear();
+  const periodYear = new Date(period + 'T00:00:00.000Z').getFullYear();
+  if (Number.isNaN(placedYear) || Number.isNaN(periodYear)) return 1;
+  return periodYear - placedYear + 1;
 }
 
 /**

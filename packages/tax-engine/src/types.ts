@@ -27,6 +27,7 @@ export interface Account {
   accountNumber: string;
   name: string;
   type: 'Income' | 'Expense' | 'Asset' | 'Liability' | 'Equity';
+  placedInServiceDate?: string;
 }
 
 export interface TrialBalanceLine {
@@ -34,6 +35,8 @@ export interface TrialBalanceLine {
   accountId: string;
   period: string;
   balance: USD;
+  placedInServiceDate?: string;
+  assetAgeYears?: number;
 }
 
 export enum Jurisdiction {
@@ -100,6 +103,8 @@ export interface BookTaxDifference {
   diffType: 'permanent' | 'temporary' | 'no_diff';
   timingCategory?: string;
   reversalPeriod?: string;
+  depreciationAgeSource?: 'placed_in_service' | 'explicit_age' | 'assumed_first_year' | 'no_metadata';
+  assetAgeYears?: number;
 }
 
 export interface PermanentDifferenceItem {

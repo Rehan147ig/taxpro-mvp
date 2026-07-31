@@ -196,6 +196,29 @@ provisionRoutes.post('/run', zValidator('json', runProvisionSchema), async (c) =
       }).where(eq(provisionRuns.id, run.id));
 
       const calculation = runProvisionMath(calculationInput, resolveJurisdiction(tenantEntities[0]?.taxJurisdiction));
+      const missingMetadata = calculationInput.missingDepreciationMetadata ?? [];
+      for (const accountId of missingMetadata) {
+        const account = accountMap.get(accountId);
+        await tx.insert(reviewItems).values({
+          tenantId: user.tenantId,
+          provisionRunId: run.id,
+          itemType: 'missing_depreciation_metadata',
+          severity: 'medium',
+          title: `Missing depreciation metadata for ${account?.name ?? accountId}`,
+          description: 'No placed-in-service date or asset age is recorded for this depreciable asset. First-year MACRS was assumed for the calculation; add the placed-in-service date to remove the assumption.',
+          accountId,
+          sourceRef: account?.accountNumber,
+          confidenceScore: 30,
+        });
+      }
+      if (missingMetadata.length > 0) {
+        await tx.update(provisionRuns).set({
+          status: 'needs_review',
+          approvalStatus: 'pending',
+          exceptionSummary: `${reviewSummary.openCount + missingMetadata.length} review item(s) require attention`,
+          updatedAt: new Date(),
+        }).where(eq(provisionRuns.id, run.id));
+      }
       const detailWithLabels = {
         ...calculation,
         lineItems: {
@@ -774,6 +797,7 @@ function buildDeterministicCalculationInput(args: {
     diffType: 'temporary';
     timingCategory?: string;
   }[] = [];
+  const missingDepreciationMetadata: string[] = [];
 
   for (const [accountId, balance] of args.grouped) {
     const mapping = args.mappingMap.get(accountId);
@@ -785,14 +809,25 @@ function buildDeterministicCalculationInput(args: {
     if (mapping.bookTreatment === 'permanent') {
       permanentDifferences.push({ amount: balance, label: mapping.taxAccountType });
     } else if (mapping.bookTreatment === 'temporary') {
-      const entityId = args.tbData.find((t) => t.accountId === accountId)?.entityId ?? args.entityId ?? 'consolidated';
+      const tbLine = args.tbData.find((t) => t.accountId === accountId);
+      const entityId = tbLine?.entityId ?? args.entityId ?? 'consolidated';
       const computedList = computeBookTaxDifferences(
-        [{ accountId, entityId, period: args.period, balance: new Decimal(balance) }],
+        [{
+          accountId,
+          entityId,
+          period: args.period,
+          balance: new Decimal(balance),
+          placedInServiceDate: (tbLine?.placedInServiceDate ?? account?.placedInServiceDate) ?? undefined,
+        }],
         [],
         new Map([[accountId, { accountId, taxAccountType: mapping.taxAccountType, bookTreatment: mapping.bookTreatment, timingCategory: mapping.timingCategory ?? undefined } as any]]),
         args.period
       );
       const computed = computedList[0];
+
+      if (computed?.depreciationAgeSource === 'no_metadata' && !missingDepreciationMetadata.includes(accountId)) {
+        missingDepreciationMetadata.push(accountId);
+      }
 
       temporaryDifferences.push({
         accountId,
@@ -811,6 +846,7 @@ function buildDeterministicCalculationInput(args: {
     bookIncome: totalRevenue - totalExpenses,
     permanentDifferences,
     temporaryDifferences,
+    missingDepreciationMetadata,
     federalRate: Number(args.tenant.taxRate),
     stateRate: Number(args.tenant.stateTaxRate ?? 0),
     taxCredits: 0,
@@ -894,6 +930,7 @@ async function buildAgentCalculationInput(tx: any, args: {
       taxCredits: 0,
       estimatedPayments: 0,
       nolUtilization: 0,
+      missingDepreciationMetadata: [],
       entityId: args.entityId ?? 'consolidated',
       period: args.period,
       agentReasoning: agentResult.reasoning,

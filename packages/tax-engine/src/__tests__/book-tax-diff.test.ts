@@ -97,4 +97,98 @@ describe('computeBookTaxDifferences', () => {
     const results = computeBookTaxDifferences([], [account], new Map(), '2026-01-01');
     expect(results.length).toBe(0);
   });
+
+  it('resolves current-year asset age from placed-in-service date (year 1 MACRS)', () => {
+    const results = computeBookTaxDifferences(
+      [{ entityId: 'e1', accountId: 'a1', period: '2026-01-01', balance: new Decimal('100000'), placedInServiceDate: '2026-01-15' }],
+      [account],
+      new Map([['a1', defaultMapping]]),
+      '2026-01-01',
+    );
+    expect(results[0].depreciationAgeSource).toBe('placed_in_service');
+    expect(results[0].assetAgeYears).toBe(1);
+    expect(results[0].difference.toNumber()).toBe(20_000);
+  });
+
+  it('resolves prior-year asset age (year 5 MACRS rate 0.1152)', () => {
+    const results = computeBookTaxDifferences(
+      [{ entityId: 'e1', accountId: 'a1', period: '2026-01-01', balance: new Decimal('100000'), placedInServiceDate: '2022-07-01' }],
+      [account],
+      new Map([['a1', defaultMapping]]),
+      '2026-01-01',
+    );
+    expect(results[0].depreciationAgeSource).toBe('placed_in_service');
+    expect(results[0].assetAgeYears).toBe(5);
+    expect(results[0].difference.toNumber()).toBeCloseTo(11_520, 2);
+  });
+
+  it('uses explicit assetAgeYears when placed-in-service date is missing', () => {
+    const results = computeBookTaxDifferences(
+      [{ entityId: 'e1', accountId: 'a1', period: '2026-01-01', balance: new Decimal('100000'), assetAgeYears: 3 }],
+      [account],
+      new Map([['a1', defaultMapping]]),
+      '2026-01-01',
+    );
+    expect(results[0].depreciationAgeSource).toBe('explicit_age');
+    expect(results[0].assetAgeYears).toBe(3);
+    expect(results[0].difference.toNumber()).toBe(19_200);
+  });
+
+  it('falls back to account-level placed-in-service date', () => {
+    const results = computeBookTaxDifferences(
+      [{ entityId: 'e1', accountId: 'a1', period: '2026-01-01', balance: new Decimal('100000') }],
+      [{ ...account, placedInServiceDate: '2021-01-01' }],
+      new Map([['a1', defaultMapping]]),
+      '2026-01-01',
+    );
+    expect(results[0].depreciationAgeSource).toBe('placed_in_service');
+    expect(results[0].assetAgeYears).toBe(6);
+    expect(results[0].difference.toNumber()).toBe(5_760);
+  });
+
+  it('flags missing metadata instead of silently assuming first-year MACRS', () => {
+    const results = computeBookTaxDifferences(
+      [{ entityId: 'e1', accountId: 'a1', period: '2026-01-01', balance: new Decimal('100000') }],
+      [account],
+      new Map([['a1', defaultMapping]]),
+      '2026-01-01',
+    );
+    expect(results[0].depreciationAgeSource).toBe('no_metadata');
+    expect(results[0].assetAgeYears).toBe(1);
+    expect(results[0].difference.toNumber()).toBe(20_000);
+  });
+
+  it('uses zero MACRS factor once the asset is fully depreciated', () => {
+    const results = computeBookTaxDifferences(
+      [{ entityId: 'e1', accountId: 'a1', period: '2026-01-01', balance: new Decimal('100000'), placedInServiceDate: '2018-01-01' }],
+      [account],
+      new Map([['a1', defaultMapping]]),
+      '2026-01-01',
+    );
+    // 5-year MACRS fully depreciated after year 6 -> factor 0
+    expect(results[0].assetAgeYears).toBe(9);
+    expect(results[0].difference.toNumber()).toBe(0);
+  });
+
+  it('applies different MACRS class factors (15-year amortization vs 5-year depreciation)', () => {
+    const results = computeBookTaxDifferences(
+      [{ entityId: 'e1', accountId: 'a1', period: '2026-01-01', balance: new Decimal('100000'), placedInServiceDate: '2026-01-01' }],
+      [account],
+      new Map([['a1', { ...defaultMapping, taxAccountType: 'TEMP_AMORTIZATION' }]]),
+      '2026-01-01',
+    );
+    expect(results[0].depreciationAgeSource).toBe('placed_in_service');
+    expect(results[0].difference.toNumber()).toBeCloseTo(5_000, 2);
+  });
+
+  it('never flags UK (non-MACRS) categories for depreciation metadata', () => {
+    const results = computeBookTaxDifferences(
+      [{ entityId: 'e1', accountId: 'a1', period: '2026-01-01', balance: new Decimal('100000') }],
+      [account],
+      new Map([['a1', { ...defaultMapping, taxAccountType: 'UK_TEMP_OTHER' }]]),
+      '2026-01-01',
+    );
+    expect(results[0].depreciationAgeSource).toBe('assumed_first_year');
+    expect(results[0].difference.abs().toNumber()).toBe(10_000);
+  });
 });

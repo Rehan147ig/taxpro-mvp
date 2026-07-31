@@ -3,8 +3,8 @@
 **Status:** In development — build verified, benchmark harnesses green, NOT filing-ready.
 **Date:** 2026-08-01
 **Branch:** master
-**Test Suite:** 283 tests passing (110 tax-engine + 173 API), 0 failures
-**E2E Pipeline:** 7/8 integration steps pass, 1 skipped (requires live AI provider)
+**Test Suite:** 291 tests passing (118 tax-engine + 173 API), 0 failures
+**E2E Pipeline:** 8/8 integration steps pass (in-process Hono + live Postgres; subagent calls degrade to fallback when the AI provider is unreachable)
 
 ---
 
@@ -13,9 +13,9 @@
 | Gate | Command | Result |
 |---|---|---|
 | Lint / typecheck | `npm run lint` | PASS |
-| Unit tests | `npm test` | 283/283 PASS (110 engine + 173 API) |
+| Unit tests | `npm test` | 291/291 PASS (118 engine + 173 API) |
 | Build | `npm run build` | PASS |
-| Provision integration flow | `npm run test:integration -w @taxpro/api` | 7/8, 1 skipped |
+| Provision integration flow | `npm run test:integration -w @taxpro/api` | 8/8 PASS |
 | US EDGAR eval | `OFFLINE=1 npm run eval` | 2 PASS, 4 WARN, 6 SKIPPED (of 12) |
 | UK eval | `npm run eval:uk` | 9/9 PASS, mean ETR delta 1.3 bp |
 
@@ -114,7 +114,7 @@ Production must connect as `taxpro_app` (NOBYPASSRLS). A startup guard that fail
 
 ### Must fix before major release
 - US EDGAR eval coverage: 6/12 filings skipped; mapping expansion (state tax, valuation allowance, credits, contingencies) in progress.
-- MACRS assumes first-year treatment without placed-in-service date; must surface review item + low confidence instead of silent assumption.
+- US EDGAR eval coverage: 6/12 filings skipped; mapping expansion (state tax, valuation allowance, credits, contingencies) in progress.
 - Runtime DB role guard (superuser detection at startup in production).
 - pg deprecation warning in API tests (`client.query()` concurrency).
 - Frontend bundle > 500 kB warning; code-split routes.
