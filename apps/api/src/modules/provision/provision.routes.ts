@@ -28,6 +28,7 @@ import { runMappingAgent } from '../../agent/subagents/mapping-agent.js';
 import { draftAuditMemo } from '../../agent/subagents/audit-defense.js';
 import { mineCredits } from '../../agent/subagents/credit-miner.js';
 import { completeAiRun, failAiRun, startAiRun } from '../../eve/trace-store.js';
+import { runTracedSubagent } from '../../eve/subagent-runner.js';
 import { withSpan } from '@superlog/otel-helpers';
 import { tracer, agentRunCounter, provisionRunCounter, reviewResolutionCounter, packageExportCounter } from '../../lib/observability.js';
 import { runProvisionMath, resolveJurisdiction } from './provision-calculator.js';
@@ -902,48 +903,6 @@ async function buildAgentCalculationInput(tx: any, args: {
     logger.error({ err, provisionRunId: args.provisionRunId }, '[Provision] Eve workflow failed');
     throw err;
   }
-}
-
-async function runTracedSubagent<Input, Output>(tx: any, args: {
-  tenantId: string;
-  userId: string;
-  provisionRunId: string;
-  workflowName: string;
-  promptVersion: string;
-  input: Input;
-  execute: (input: Input) => Promise<Output>;
-}) {
-  return withSpan(
-    `subagent.${args.workflowName}`,
-    async () => {
-      const aiRun = await startAiRun(tx, {
-        tenantId: args.tenantId,
-        userId: args.userId,
-        provisionRunId: args.provisionRunId,
-        workflowName: args.workflowName,
-        promptVersion: args.promptVersion,
-      }, args.input);
-
-      try {
-        const output = await args.execute(args.input);
-        await completeAiRun(aiRun.id, output, tx);
-        agentRunCounter.add(1, { workflow: args.workflowName, outcome: 'success' });
-        return output;
-      } catch (err) {
-        await failAiRun(aiRun.id, err, tx);
-        agentRunCounter.add(1, { workflow: args.workflowName, outcome: 'failure' });
-        throw err;
-      }
-    },
-    {
-      tracer,
-      attributes: {
-        'taxpro.tenant_id': args.tenantId,
-        'taxpro.provision_run_id': args.provisionRunId,
-        'taxpro.workflow_name': args.workflowName,
-      },
-    },
-  );
 }
 
 async function createReviewItemsForRun(

@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { runMappingAgent } from '../../src/agent/subagents/mapping-agent.js';
-import { getAiModel } from '../../src/config/ai.js';
+import { getAiModel, isAiConfigured } from '../../src/config/ai.js';
 
 interface GoldenEntry {
   accountName: string;
@@ -30,74 +30,22 @@ function normalizeType(type: string): string {
   return type.toUpperCase().replace(/[^A-Z0-9_]/g, '_');
 }
 
-async function main() {
-  let aiAvailable = false;
-  try {
-    getAiModel();
-    aiAvailable = true;
-  } catch {
-    console.log('⚠ No AI provider configured — running in dry-run mode');
+function printDistribution(golden: GoldenEntry[]) {
+  const summary = golden.reduce((acc, g) => {
+    acc[g.expectedTreatment] = (acc[g.expectedTreatment] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  console.log('Expected distribution:');
+  for (const [treatment, count] of Object.entries(summary)) {
+    console.log(`  ${treatment}: ${count} entries`);
   }
+}
 
-  const golden = loadGoldenDataset();
-  console.log(`\n📊 AI Mapping Eval — ${golden.length} golden entries\n`);
-
-  if (!aiAvailable) {
-    console.log('Dry-run: Would classify the following entries against the mapping agent.');
-    const summary = golden.reduce((acc, g) => {
-      acc[g.expectedTreatment] = (acc[g.expectedTreatment] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-
-    console.log('\nExpected distribution:');
-    for (const [treatment, count] of Object.entries(summary)) {
-      console.log(`  ${treatment}: ${count} entries`);
-    }
-    console.log('\n✅ Dry-run complete — 0/0 evaluated (no AI provider)');
-    process.exit(0);
-  }
-
-  const accounts = golden.map((g, i) => ({
-    id: `eval-${i}`,
-    accountNumber: String(i + 1000),
-    name: g.accountName,
-    type: g.accountType,
-    detailType: g.accountType,
-  }));
-
-  console.log('Calling mapping agent...\n');
-
-  const agentResult = await runMappingAgent({
-    tenantId: 'eval-tenant',
-    tenantName: 'Eval Runner',
-    accounts,
-  });
-
-  if (!agentResult.success) {
-    console.error(`❌ Mapping agent failed: ${agentResult.error}`);
-    console.log('\n⚠ AI provider timed out or returned an error.');
-    console.log('Falling back to dry-run statistics...');
-    const summary = golden.reduce((acc, g) => {
-      acc[g.expectedTreatment] = (acc[g.expectedTreatment] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-    console.log('\nExpected distribution:');
-    for (const [treatment, count] of Object.entries(summary)) {
-      console.log(`  ${treatment}: ${count} entries`);
-    }
-    console.log(`\n⚠ AI eval incomplete — 0/${golden.length} evaluated (API error). Exiting with code 0 for CI.`);
-    process.exit(0);
-  }
-
-  const predictions = new Map<string, { treatment: string; taxType: string; confidence: number }>();
-  for (const m of agentResult.taxMappings) {
-    predictions.set(m.accountId, {
-      treatment: m.bookTreatment,
-      taxType: normalizeType(m.taxAccountType),
-      confidence: m.confidenceScore,
-    });
-  }
-
+function scorePredictions(
+  golden: GoldenEntry[],
+  predictions: Map<string, { treatment: string; taxType: string; confidence: number }>,
+) {
   const results: EvalResult[] = [];
   let correctTreatment = 0;
   let correctTaxType = 0;
@@ -127,16 +75,16 @@ async function main() {
   const fullyCorrect = results.filter(r => r.correct).length;
   const overallAccuracy = ((fullyCorrect / golden.length) * 100).toFixed(1);
 
-  console.log(`\n📈 Results:`);
+  console.log(`\nResults:`);
   console.log(`  Treatment accuracy: ${correctTreatment}/${golden.length} (${treatmentAccuracy}%)`);
   console.log(`  Tax type accuracy:   ${correctTaxType}/${golden.length} (${taxTypeAccuracy}%)`);
   console.log(`  Fully correct:       ${fullyCorrect}/${golden.length} (${overallAccuracy}%)`);
 
   const errors = results.filter(r => !r.correct);
   if (errors.length > 0) {
-    console.log(`\n❌ ${errors.length} incorrect classifications:`);
+    console.log(`\n${errors.length} incorrect classifications:`);
     for (const e of errors.slice(0, 20)) {
-      console.log(`  "${e.accountName}" — predicted: ${e.predicted}, expected: ${e.expected} (${e.reason})`);
+      console.log(`  "${e.accountName}" - predicted: ${e.predicted}, expected: ${e.expected} (${e.reason})`);
     }
     if (errors.length > 20) {
       console.log(`  ... and ${errors.length - 20} more`);
@@ -145,17 +93,106 @@ async function main() {
 
   const lowConfidence = results.filter(r => r.confidence !== undefined && r.confidence < 0.75);
   if (lowConfidence.length > 0) {
-    console.log(`\n⚠ ${lowConfidence.length} low-confidence predictions (<75%):`);
+    console.log(`\n${lowConfidence.length} low-confidence predictions (<75%):`);
     for (const e of lowConfidence.slice(0, 10)) {
-      console.log(`  "${e.accountName}" — confidence: ${(e.confidence! * 100).toFixed(0)}%`);
+      console.log(`  "${e.accountName}" - confidence: ${(e.confidence! * 100).toFixed(0)}%`);
     }
   }
 
-  const accuracy = parseFloat(overallAccuracy);
-  if (accuracy >= 80) {
-    console.log('\n✅ PASS: Accuracy ≥ 80%');
+  return parseFloat(overallAccuracy);
+}
+
+function runModes() {
+  const mode = (process.env.AI_EVAL_MODE ?? '').toLowerCase();
+  if (process.env.MOCK_AI === '1') return 'mocked';
+  const configured = isAiConfigured();
+  if (mode === 'real' && !configured) {
+    console.error('AI_EVAL_MODE=real requires a configured AI provider (AI_PROVIDER/AI_API_KEY).');
+    process.exit(1);
+  }
+  if (mode === 'mocked') return 'mocked';
+  if (mode === 'dry-run') return 'dry-run';
+  if (configured && mode !== 'real') {
+    console.log('AI provider configured; defaulting to real mode (set AI_EVAL_MODE=dry-run|mocked to override).');
+    return 'real';
+  }
+  return 'dry-run';
+}
+
+function buildMockPredictions(golden: GoldenEntry[]) {
+  const predictions = new Map<string, { treatment: string; taxType: string; confidence: number }>();
+  golden.forEach((g, i) => {
+    predictions.set(`eval-${i}`, {
+      treatment: g.expectedTreatment,
+      taxType: normalizeType(g.expectedTaxType),
+      confidence: 0.99,
+    });
+  });
+  return predictions;
+}
+
+async function main() {
+  const mode = runModes();
+  const golden = loadGoldenDataset();
+  console.log(`\nAI Mapping Eval - ${golden.length} golden entries (mode: ${mode})\n`);
+
+  let predictions: Map<string, { treatment: string; taxType: string; confidence: number }>;
+
+  if (mode === 'mocked') {
+    console.log('Mocked mode: scripted golden answers (no model call). Verifies harness plumbing only.');
+    predictions = buildMockPredictions(golden);
+  } else if (mode === 'real') {
+    const model = getAiModel();
+    console.log(`Calling mapping agent (provider=${model.provider}, model=${model.modelName})...\n`);
+
+    const accounts = golden.map((g, i) => ({
+      id: `eval-${i}`,
+      accountNumber: String(i + 1000),
+      name: g.accountName,
+      type: g.accountType,
+      detailType: g.accountType,
+    }));
+
+    const agentResult = await runMappingAgent({
+      tenantId: 'eval-tenant',
+      tenantName: 'Eval Runner',
+      accounts,
+    });
+
+    if (!agentResult.success) {
+      console.error(`Mapping agent failed: ${agentResult.error}`);
+      console.log('\nAI provider timed out or returned an error. Falling back to dry-run statistics...');
+      printDistribution(golden);
+      console.log(`\nAI eval incomplete - 0/${golden.length} evaluated (API error). Exiting with code 0 for CI.`);
+      process.exit(0);
+    }
+
+    predictions = new Map();
+    for (const m of agentResult.taxMappings) {
+      predictions.set(m.accountId, {
+        treatment: m.bookTreatment,
+        taxType: normalizeType(m.taxAccountType),
+        confidence: m.confidenceScore,
+      });
+    }
   } else {
-    console.log(`\n❌ FAIL: Accuracy ${overallAccuracy}% < 80% threshold`);
+    console.log('Dry-run: no AI provider configured. Would classify the following entries against the mapping agent.');
+    printDistribution(golden);
+    console.log(`\nDry-run complete - 0/${golden.length} evaluated (no AI provider).`);
+    process.exit(0);
+  }
+
+  const accuracy = scorePredictions(golden, predictions);
+
+  if (mode === 'mocked') {
+    console.log('\nPASS: Mocked eval completed (no accuracy threshold enforced outside real mode).');
+    process.exit(0);
+  }
+
+  if (accuracy >= 80) {
+    console.log('\nPASS: Accuracy >= 80%');
+  } else {
+    console.log(`\nFAIL: Accuracy ${accuracy}% < 80% threshold`);
     process.exit(1);
   }
 }

@@ -46,11 +46,21 @@ export async function startAiRun(
   return run;
 }
 
-export async function completeAiRun(id: string, output: unknown, tx?: any) {
+type AiRunStatus = 'started' | 'completed' | 'failed' | 'timeout' | 'fallback_used';
+
+async function updateAiRunStatus(
+  id: string,
+  status: AiRunStatus,
+  eventType: string,
+  reason: string,
+  extra: { errorMessage?: string; outputJson?: unknown } = {},
+  tx?: any,
+) {
   const d = resolve(tx);
   await d.update(aiRuns).set({
-    status: 'completed',
-    outputJson: output,
+    status,
+    ...(extra.errorMessage !== undefined ? { errorMessage: extra.errorMessage } : {}),
+    ...(extra.outputJson !== undefined ? { outputJson: extra.outputJson } : {}),
     completedAt: new Date(),
   }).where(eq(aiRuns.id, id));
 
@@ -63,39 +73,59 @@ export async function completeAiRun(id: string, output: unknown, tx?: any) {
     d.insert(provisionEvents).values({
       tenantId: run.tenantId,
       provisionRunId: run.provisionRunId,
-      eventType: 'ai.workflow.completed',
+      eventType,
       actorType: 'agent',
       actorAgentId: id,
       occurredAt: new Date(),
-      reason: `AI workflow ${run.workflowName} completed`,
+      reason,
     }).catch(() => {});
   }
 }
 
-export async function failAiRun(id: string, error: unknown, tx?: any) {
-  const d = resolve(tx);
-  await d.update(aiRuns).set({
-    status: 'failed',
-    errorMessage: error instanceof Error ? error.message : String(error),
-    completedAt: new Date(),
-  }).where(eq(aiRuns.id, id));
+export async function completeAiRun(id: string, output: unknown, tx?: any) {
+  await updateAiRunStatus(
+    id,
+    'completed',
+    'ai.workflow.completed',
+    'AI workflow completed',
+    { outputJson: output },
+    tx,
+  );
+}
 
-  const [run] = await d.select({
-    tenantId: aiRuns.tenantId,
-    provisionRunId: aiRuns.provisionRunId,
-    workflowName: aiRuns.workflowName,
-  }).from(aiRuns).where(eq(aiRuns.id, id)).limit(1);
-  if (run && run.provisionRunId) {
-    d.insert(provisionEvents).values({
-      tenantId: run.tenantId,
-      provisionRunId: run.provisionRunId,
-      eventType: 'ai.workflow.completed',
-      actorType: 'agent',
-      actorAgentId: id,
-      occurredAt: new Date(),
-      reason: `AI workflow ${run.workflowName} failed: ${error instanceof Error ? error.message : String(error)}`,
-    }).catch(() => {});
-  }
+export async function failAiRun(id: string, error: unknown, tx?: any) {
+  const message = error instanceof Error ? error.message : String(error);
+  await updateAiRunStatus(
+    id,
+    'failed',
+    'ai.workflow.failed',
+    `AI workflow failed: ${message}`,
+    { errorMessage: message },
+    tx,
+  );
+}
+
+export async function timeoutAiRun(id: string, error: unknown, tx?: any) {
+  const message = error instanceof Error ? error.message : String(error);
+  await updateAiRunStatus(
+    id,
+    'timeout',
+    'ai.workflow.timed_out',
+    `AI workflow timed out: ${message}`,
+    { errorMessage: message },
+    tx,
+  );
+}
+
+export async function fallbackAiRun(id: string, reason: string, tx?: any) {
+  await updateAiRunStatus(
+    id,
+    'fallback_used',
+    'ai.workflow.fallback_used',
+    `AI workflow completed via deterministic fallback: ${reason}`,
+    { errorMessage: reason },
+    tx,
+  );
 }
 
 export async function recordAiStep(aiRunId: string, sequence: number, stepName: string, input: unknown, output: unknown, tx?: any) {

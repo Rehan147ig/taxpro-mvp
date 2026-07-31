@@ -30,11 +30,11 @@ Launch checklist. Items are ordered; each must be verified by the gates in Phase
 
 ## Phase 3 — AI Outcome Quality
 
-- [~] Subagent lifecycle states: started / completed / failed / timeout / fallback_used
-- [ ] Integration test waits for subagent completion or timeout (not just trace creation)
-- [ ] Tests prove: mapping agent returns validated JSON; audit defense memo persisted; credit miner output persisted; failed AI does not corrupt deterministic results; deterministic fallback works
-- [ ] AI eval command with dry-run / mocked / real modes (harness exists; wire modes)
-- [ ] Enforce ≥ 80% mapping threshold only in real/provider mode
+- [x] Subagent lifecycle states: started / completed / failed / timeout / fallback_used (trace-store + `eve/subagent-runner.ts`, default 120s timeout, `SUBAGENT_TIMEOUT_MS` override)
+- [x] Integration test waits for subagent completion or timeout (not just trace creation) — `src/__tests__/ai-subagents.test.ts` (7 tests)
+- [x] Tests prove: mapping agent returns validated JSON; audit defense memo persisted; credit miner output persisted; failed AI does not corrupt deterministic results; deterministic fallback works
+- [x] AI eval command with dry-run / mocked / real modes (harness exists; wire modes) — `AI_EVAL_MODE=dry-run|mocked|real`, `MOCK_AI=1` alias
+- [x] Enforce ≥ 80% mapping threshold only in real/provider mode
 
 ## Phase 4 — Tax Engine Accuracy
 

@@ -3,7 +3,7 @@
 **Status:** In development — build verified, benchmark harnesses green, NOT filing-ready.
 **Date:** 2026-08-01
 **Branch:** master
-**Test Suite:** 276 tests passing (110 tax-engine + 166 API), 0 failures
+**Test Suite:** 283 tests passing (110 tax-engine + 173 API), 0 failures
 **E2E Pipeline:** 7/8 integration steps pass, 1 skipped (requires live AI provider)
 
 ---
@@ -13,7 +13,7 @@
 | Gate | Command | Result |
 |---|---|---|
 | Lint / typecheck | `npm run lint` | PASS |
-| Unit tests | `npm test` | 276/276 PASS (110 engine + 166 API) |
+| Unit tests | `npm test` | 283/283 PASS (110 engine + 173 API) |
 | Build | `npm run build` | PASS |
 | Provision integration flow | `npm run test:integration -w @taxpro/api` | 7/8, 1 skipped |
 | US EDGAR eval | `OFFLINE=1 npm run eval` | 2 PASS, 4 WARN, 6 SKIPPED (of 12) |
@@ -119,7 +119,7 @@ Production must connect as `taxpro_app` (NOBYPASSRLS). A startup guard that fail
 - pg deprecation warning in API tests (`client.query()` concurrency).
 - Frontend bundle > 500 kB warning; code-split routes.
 - Rate limiting hardening for auth + critical provision endpoints (current limiter exists for login; verify coverage).
-- AI subagent integration tests must wait for completion (not just trace creation).
+- AI provider unreachable from dev machine; real-mode AI eval currently falls back to dry-run statistics (exit 0).
 
 ---
 
