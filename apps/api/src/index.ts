@@ -19,6 +19,11 @@ import { startAutoMappingWorker } from './modules/import/auto-mapping/auto-mappi
 import { startCHWorker } from './modules/import/companies-house/worker.js';
 import { startAgentPipelineWorker } from './agent/orchestrator/state-machine.js';
 import { agentRoutes } from './modules/agent/agent.routes.js';
+import { demoRoutes } from './modules/demo/demo.routes.js';
+import { uploadRoutes } from './modules/upload/upload.routes.js';
+import { billingRoutes } from './modules/billing/billing.routes.js';
+import { xeroRoutes } from './modules/integrations/xero/xero.routes.js';
+import { qboRoutes } from './modules/integrations/quickbooks/quickbooks.routes.js';
 import { logger } from './lib/logger.js';
 import { shutdownTelemetry } from './telemetry.js';
 
@@ -51,6 +56,11 @@ app.route('/api/mapping', mappingRoutes);
 app.route('/api/provision', provisionRoutes);
 app.route('/api/import', importRoutes);
 app.route('/api/agent', agentRoutes);
+app.route('/api/demo', demoRoutes);
+app.route('/api/upload', uploadRoutes);
+app.route('/api/billing', billingRoutes);
+app.route('/api/xero', xeroRoutes);
+app.route('/api/qbo', qboRoutes);
 
 // ── Start ──
 async function main() {

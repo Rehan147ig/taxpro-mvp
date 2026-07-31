@@ -64,7 +64,7 @@ DO $$ DECLARE
     'provision_runs', 'provision_results',
     'review_items', 'tax_mappings', 'trial_balance',
     'accounts', 'entities', 'ai_runs', 'ai_steps',
-    'classification_patterns', 'connections', 'users'
+    'classification_patterns', 'connections', 'users', 'usage_events'
   ];
 BEGIN
   FOREACH t IN ARRAY full_access_tables

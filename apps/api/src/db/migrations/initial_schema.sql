@@ -100,6 +100,7 @@ CREATE TABLE IF NOT EXISTS provision_results (
   statutory_rate decimal(5,4) DEFAULT '0',
   tax_payable decimal(18,2) DEFAULT '0',
   valuation_allowance decimal(18,2) DEFAULT '0',
+  detail jsonb,
   created_at timestamp DEFAULT now(),
   UNIQUE(tenant_id, period)
 );

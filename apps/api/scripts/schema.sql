@@ -100,6 +100,7 @@ CREATE TABLE IF NOT EXISTS provision_results (
   statutory_rate decimal(5,4) DEFAULT '0',
   tax_payable decimal(18,2) DEFAULT '0',
   valuation_allowance decimal(18,2) DEFAULT '0',
+  detail jsonb,
   created_at timestamp DEFAULT now(),
   UNIQUE(tenant_id, period)
 );
@@ -118,4 +119,16 @@ CREATE TABLE IF NOT EXISTS connections (
   sync_status varchar(20) DEFAULT 'disconnected',
   created_at timestamp DEFAULT now(),
   updated_at timestamp DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS usage_events (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  event_type varchar(50) NOT NULL,
+  provision_run_id uuid REFERENCES provision_runs(id),
+  occurred_at timestamptz NOT NULL DEFAULT now(),
+  quantity numeric(12,4) NOT NULL DEFAULT 1,
+  unit_price numeric(12,2) NOT NULL,
+  amount numeric(12,2) NOT NULL,
+  metadata jsonb
 );

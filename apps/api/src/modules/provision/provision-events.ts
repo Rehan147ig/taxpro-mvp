@@ -63,4 +63,5 @@ export const EVENT_TYPES = {
   AI_ACTION_DENIED: 'ai.action.denied',
   AI_ACTION_ESCALATED: 'ai.action.escalated',
   MAPPING_SUGGESTED: 'mapping.suggested',
+  POSTED_TO_NETSUITE: 'netsuite.posted',
 } as const;

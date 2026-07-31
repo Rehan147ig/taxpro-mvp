@@ -1,1 +1,69 @@
-{"version":"7","dialect":"postgresql","entries":[{"idx":0,"version":"0000_initial","when":1720036800000,"tag":"initial_schema","breakpoints":true},{"idx":1,"version":"0001_versioning","when":1720123200000,"tag":"versioned_results","breakpoints":true},{"idx":2,"version":"0002_governance","when":1720210000000,"tag":"governance_rbac","breakpoints":true},{"idx":3,"version":"0003_rls_governance_hardening","when":1720300000000,"tag":"rls_control_hardening","breakpoints":true},{"idx":4,"version":"0004_enforce_rls_runtime_role","when":1720390000000,"tag":"enforce_rls_runtime_role","breakpoints":true}]}
+{
+    "version":  "7",
+    "dialect":  "postgresql",
+    "entries":  [
+                    {
+                        "idx":  0,
+                        "version":  "0000_initial",
+                        "when":  1720036800000,
+                        "tag":  "initial_schema",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  1,
+                        "version":  "0001_versioning",
+                        "when":  1720123200000,
+                        "tag":  "versioned_results",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  2,
+                        "version":  "0002_governance",
+                        "when":  1720210000000,
+                        "tag":  "governance_rbac",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  3,
+                        "version":  "0003_rls_governance_hardening",
+                        "when":  1720300000000,
+                        "tag":  "rls_control_hardening",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  4,
+                        "version":  "0004_enforce_rls_runtime_role",
+                        "when":  1720390000000,
+                        "tag":  "enforce_rls_runtime_role",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  5,
+                        "version":  "0005_provision_detail",
+                        "when":  1785489608000,
+                        "tag":  "provision_detail",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  6,
+                        "version":  "0006_usage_ledger",
+                        "when":  1785576008000,
+                        "tag":  "usage_ledger",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  7,
+                        "version":  "0007_xero_connections",
+                        "when":  1785662408000,
+                        "tag":  "xero_connections",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  8,
+                        "version":  "0008_qbo_connections",
+                        "when":  1785748808000,
+                        "tag":  "qbo_connections",
+                        "breakpoints":  true
+                    }
+                ]
+}

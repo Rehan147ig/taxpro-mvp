@@ -166,6 +166,46 @@ export class NetSuiteClient {
     const result = await this.querySuiteQL<TrialBalanceRow>(query);
     return result.items || [];
   }
+
+  /**
+   * Post a journal entry to NetSuite via the REST record API.
+   * /record/v1/journalEntry
+   *
+   * Lines use NetSuite internal account ids; debit and credit are numeric amounts.
+   * The posted entry must balance (debits === credits).
+   */
+  async postJournalEntry(input: {
+    subsidiaryId: string;
+    trandate: string;
+    memo: string;
+    lines: { accountId: string; debit: number; credit: number; memo?: string }[];
+  }): Promise<{ id: string }> {
+    const totalDebit = input.lines.reduce((s, l) => s + (l.debit || 0), 0);
+    const totalCredit = input.lines.reduce((s, l) => s + (l.credit || 0), 0);
+    if (Math.abs(totalDebit - totalCredit) > 1e-6) {
+      throw new Error(
+        `Journal entry does not balance: debits ${totalDebit} vs credits ${totalCredit}`,
+      );
+    }
+
+    const result = await this.request<{ id: string }>({
+      method: 'POST',
+      path: '/services/rest/record/v1/journalEntry',
+      body: {
+        subsidiary: { id: input.subsidiaryId },
+        trandate: input.trandate,
+        memo: input.memo,
+        line: input.lines.map((line) => ({
+          account: { id: line.accountId },
+          debit: line.debit || 0,
+          credit: line.credit || 0,
+          memo: line.memo,
+        })),
+      },
+    });
+
+    return { id: result.id };
+  }
 }
 
 // ── Types ──

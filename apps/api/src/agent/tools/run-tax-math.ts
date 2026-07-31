@@ -1,6 +1,6 @@
 import Decimal from 'decimal.js';
 import { logger } from '../../lib/logger.js';
-import { createEngine, Jurisdiction } from '@taxpro/tax-engine';
+import { createEngine, Jurisdiction, etrAdjustmentsForMarginalRelief } from '@taxpro/tax-engine';
 
 const engine = createEngine(Jurisdiction.US_ASC740);
 
@@ -61,7 +61,7 @@ export const runTaxMath = {
       bookIncome: currentTax.bookIncome, federalTaxRate: currentTax.federalTaxRate,
       federalTax: currentTax.federalTax, stateTax: currentTax.stateTax,
       permanentDifferences: (args.permanentDifferences ?? []).map((pd: any) => ({ amount: new Decimal(pd.amount), label: pd.label })),
-      taxCredits: currentTax.taxCredits, otherAdjustments: [],
+      taxCredits: currentTax.taxCredits, otherAdjustments: etrAdjustmentsForMarginalRelief(currentTax),
     });
 
     const totalTaxExpense = currentTax.totalTaxAfterCredits.plus(deferredTax.netDeferredTaxExpense);

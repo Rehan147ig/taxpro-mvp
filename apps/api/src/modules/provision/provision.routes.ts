@@ -30,7 +30,8 @@ import { mineCredits } from '../../agent/subagents/credit-miner.js';
 import { completeAiRun, failAiRun, startAiRun } from '../../eve/trace-store.js';
 import { withSpan } from '@superlog/otel-helpers';
 import { tracer, agentRunCounter, provisionRunCounter, reviewResolutionCounter, packageExportCounter } from '../../lib/observability.js';
-import { runProvisionMath } from './provision-calculator.js';
+import { runProvisionMath, resolveJurisdiction } from './provision-calculator.js';
+import { recordUsageEvent, pricePerProvision } from '../billing/usage.js';
 import { computeBookTaxDifferences, Decimal } from '@taxpro/tax-engine';
 import { recordProvisionEvent, getEventsForRun, EVENT_TYPES } from './provision-events.js';
 import { auditSensitiveOp } from './audit.js';
@@ -193,7 +194,19 @@ provisionRoutes.post('/run', zValidator('json', runProvisionSchema), async (c) =
         updatedAt: new Date(),
       }).where(eq(provisionRuns.id, run.id));
 
-      const calculation = runProvisionMath(calculationInput);
+      const calculation = runProvisionMath(calculationInput, resolveJurisdiction(tenantEntities[0]?.taxJurisdiction));
+      const detailWithLabels = {
+        ...calculation,
+        lineItems: {
+          permanentDifferences: (calculationInput.permanentDifferences ?? []).map(pd => ({ label: pd.label, amount: pd.amount })),
+          temporaryDifferences: (calculationInput.temporaryDifferences ?? []).map(d => ({
+            accountId: d.accountId,
+            label: accountMap.get(d.accountId)?.name ?? d.accountId,
+            difference: d.difference,
+            timingCategory: d.timingCategory ?? 'TEMP_OTHER',
+          })),
+        },
+      };
       const resultValues = {
         tenantId: user.tenantId,
         provisionRunId: run.id,
@@ -206,9 +219,17 @@ provisionRoutes.post('/run', zValidator('json', runProvisionSchema), async (c) =
         statutoryRate: String(Number(tenant.taxRate)),
         taxPayable: String(calculation.summary.taxPayable),
         status: reviewSummary.openCount > 0 ? 'review_required' : 'draft',
+        detail: detailWithLabels,
       };
 
       const [result] = await tx.insert(provisionResults).values(resultValues).returning();
+
+      await recordUsageEvent(tx, {
+        tenantId: user.tenantId,
+        provisionRunId: run.id,
+        unitPrice: pricePerProvision(),
+        metadata: { period, mode },
+      });
 
       await tx.update(provisionRuns).set({
         resultId: result.id,
@@ -491,11 +512,234 @@ provisionRoutes.get('/results/:id/export', async (c) => {
       taxPayable: Number(result.taxPayable ?? 0),
       valuationAllowance: Number(result.valuationAllowance ?? 0),
       createdAt: result.createdAt?.toISOString?.() ?? String(result.createdAt ?? ''),
+      detail: result.detail as import('../export/excel-generator.js').ProvisionExportDetail | null,
     });
 
     c.header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     c.header('Content-Disposition', `attachment; filename="taxpro-provision-${result.period}.xlsx"`);
     return c.body(buf as any);
+  });
+});
+
+provisionRoutes.get('/results/:id/ct600', async (c) => {
+  const user = getUser(c);
+  const format = c.req.query('format') === 'csv' ? 'csv' : 'json';
+  return withTenantContext(user.tenantId, async (tx) => {
+    const [result] = await tx.select().from(provisionResults)
+      .where(and(
+        eq(provisionResults.id, c.req.param('id')),
+        eq(provisionResults.tenantId, user.tenantId),
+      )).limit(1);
+
+    if (!result) throw new BadRequestError('Provision result not found');
+
+    const [run] = await tx.select({ id: provisionRuns.id, entityId: provisionRuns.entityId, endPeriod: provisionRuns.endPeriod, status: provisionRuns.status, approvalStatus: provisionRuns.approvalStatus }).from(provisionRuns)
+      .where(and(eq(provisionRuns.tenantId, user.tenantId), eq(provisionRuns.resultId, result.id))).limit(1);
+
+    if (!canMutate(user.role) && run) {
+      if (run.approvalStatus !== 'approved' && run.status !== 'locked') {
+        throw new ForbiddenError('Read-only roles may only export approved or locked provision results');
+      }
+    }
+
+    let company = { companyName: 'Unknown company', utr: '0000000000' } as { companyName: string; utr: string; companiesHouseNumber?: string };
+    if (run?.entityId) {
+      const [entity] = await tx.select({ name: entities.name, externalId: entities.externalId })
+        .from(entities).where(and(eq(entities.tenantId, user.tenantId), eq(entities.id, run.entityId))).limit(1);
+      if (entity) {
+        const utrQuery = c.req.query('utr');
+        const utr = utrQuery?.match(/^\d{10}$/)?.[0]
+          ?? entity.externalId?.match(/^\d{10}$/)?.[0]
+          ?? '0000000000';
+        company = { companyName: entity.name, utr, companiesHouseNumber: entity.externalId };
+      }
+    }
+
+    const detail = (result.detail ?? null) as import('../export/excel-generator.js').ProvisionExportDetail | null;
+    const ct600 = await (async () => {
+      const { ct600FromProvisionDetail } = await import('../export/ct600.js');
+      return ct600FromProvisionDetail(company, { start: result.period, end: String(run?.endPeriod ?? result.period) }, {
+        currentTax: {
+          bookIncome: Number(result.bookIncome ?? 0),
+          totalPermanentAdjustments: 0,
+          taxableIncome: detail?.currentTax?.taxableIncome ?? Number(result.bookIncome ?? 0),
+          federalTax: Number(result.currentTaxExpense ?? 0),
+          marginalRelief: detail?.currentTax?.marginalRelief,
+          taxCredits: detail?.currentTax?.taxCredits ?? 0,
+          taxPayable: Number(result.taxPayable ?? 0),
+          estimatedPayments: detail?.currentTax?.estimatedPayments ?? 0,
+          totalTaxAfterCredits: Number(result.taxPayable ?? 0),
+        },
+      });
+    })();
+
+    if (run) {
+      await recordProvisionEvent({
+        tenantId: user.tenantId,
+        provisionRunId: run.id,
+        eventType: EVENT_TYPES.EXPORT_WORKPAPER,
+        actorType: 'user',
+        actorUserId: user.userId,
+        reason: `CT600 export for period ${result.period}`,
+        metadata: { resultId: result.id, format },
+      }, tx);
+    }
+
+    if (format === 'csv') {
+      const { ct600ToCsv } = await import('../export/ct600.js');
+      c.header('Content-Type', 'text/csv');
+      c.header('Content-Disposition', `attachment; filename="taxpro-ct600-${result.period}.csv"`);
+      return c.body(ct600ToCsv(ct600));
+    }
+    return c.json(ct600);
+  });
+});
+
+provisionRoutes.get('/results/:id/rd-claim', async (c) => {
+  const user = getUser(c);
+  return withTenantContext(user.tenantId, async (tx) => {
+    const [result] = await tx.select().from(provisionResults)
+      .where(and(
+        eq(provisionResults.id, c.req.param('id')),
+        eq(provisionResults.tenantId, user.tenantId),
+      )).limit(1);
+
+    if (!result) throw new BadRequestError('Provision result not found');
+
+    const detail = (result.detail ?? null) as import('../export/excel-generator.js').ProvisionExportDetail | null;
+    const creditMined = (detail as any)?.creditMiner?.qualifyingExpenditure ?? 0;
+    const spend = Number(c.req.query('spend')) || Number(creditMined) || 0;
+    const scheme = c.req.query('scheme') === 'rdec' ? 'rdec' : undefined;
+    const bookIncome = Number(result.bookIncome ?? 0);
+    const taxableProfit = Math.max(0, bookIncome);
+    const headcount = Number(c.req.query('headcount')) || 250;
+    const payeAndNic = Number(c.req.query('paye')) || 0;
+    const totalCosts = Number(c.req.query('totalCosts')) || Math.max(spend * 3, 1);
+
+    const { buildRdClaimPackage } = await import('../export/rd-claim.js');
+    const pkg = buildRdClaimPackage({
+      qualifyingExpenditure: spend,
+      scheme,
+      taxableProfit,
+      payeAndNicLiability: payeAndNic,
+      headcount,
+      totalCosts,
+      isLossMaking: bookIncome <= 0,
+      periodStart: result.period,
+      periodEnd: String((result as any).periodEnd ?? result.period),
+    });
+
+    if (spend === 0) {
+      return c.json({ ...pkg, notice: 'No qualifying R&D spend found in the provision detail. Pass ?spend=<amount> or run the credit-miner on the trial balance.' });
+    }
+    return c.json(pkg);
+  });
+});
+
+provisionRoutes.get('/results/:id/mtd-readiness', async (c) => {
+  const user = getUser(c);
+  return withTenantContext(user.tenantId, async (tx) => {
+    const [result] = await tx.select().from(provisionResults)
+      .where(and(
+        eq(provisionResults.id, c.req.param('id')),
+        eq(provisionResults.tenantId, user.tenantId),
+      )).limit(1);
+    if (!result) throw new BadRequestError('Provision result not found');
+
+    const [run] = await tx.select({ entityId: provisionRuns.entityId }).from(provisionRuns)
+      .where(and(eq(provisionRuns.tenantId, user.tenantId), eq(provisionRuns.resultId, result.id))).limit(1);
+
+    let utr = c.req.query('utr') ?? '0000000000';
+    let chNumber: string | undefined;
+    if (run?.entityId) {
+      const [entity] = await tx.select({ name: entities.name, externalId: entities.externalId })
+        .from(entities).where(and(eq(entities.tenantId, user.tenantId), eq(entities.id, run.entityId))).limit(1);
+      if (entity) {
+        chNumber = entity.externalId;
+        const utrMatch = c.req.query('utr') ?? entity.externalId?.match(/^\d{10}$/)?.[0];
+        if (utrMatch) utr = utrMatch;
+      }
+    }
+
+    const { buildMtdReadinessReport } = await import('../mtd/mtd-client.js');
+    const report = buildMtdReadinessReport({
+      utr,
+      companiesHouseNumber: chNumber,
+      periodStart: result.period,
+      hasAgentAuthority: c.req.query('agentAuthorised') === 'true',
+      signedUpToMtd: c.req.query('signedUp') === 'true',
+      softwareConnected: c.req.query('softwareConnected') === 'true',
+    });
+    return c.json(report);
+  });
+});
+
+provisionRoutes.get('/results/:id/cto-xml', async (c) => {
+  const user = getUser(c);
+  return withTenantContext(user.tenantId, async (tx) => {
+    const [result] = await tx.select().from(provisionResults)
+      .where(and(
+        eq(provisionResults.id, c.req.param('id')),
+        eq(provisionResults.tenantId, user.tenantId),
+      )).limit(1);
+    if (!result) throw new BadRequestError('Provision result not found');
+
+    const [run] = await tx.select({ id: provisionRuns.id, entityId: provisionRuns.entityId, endPeriod: provisionRuns.endPeriod, status: provisionRuns.status, approvalStatus: provisionRuns.approvalStatus }).from(provisionRuns)
+      .where(and(eq(provisionRuns.tenantId, user.tenantId), eq(provisionRuns.resultId, result.id))).limit(1);
+
+    if (!canMutate(user.role) && run) {
+      if (run.approvalStatus !== 'approved' && run.status !== 'locked') {
+        throw new ForbiddenError('Read-only roles may only export approved or locked provision results');
+      }
+    }
+
+    let company = { companyName: 'Unknown company', utr: '0000000000', companiesHouseNumber: undefined as string | undefined };
+    if (run?.entityId) {
+      const [entity] = await tx.select({ name: entities.name, externalId: entities.externalId })
+        .from(entities).where(and(eq(entities.tenantId, user.tenantId), eq(entities.id, run.entityId))).limit(1);
+      if (entity) {
+        company = {
+          companyName: entity.name,
+          utr: c.req.query('utr')?.match(/^\d{10}$/)?.[0] ?? entity.externalId?.match(/^\d{10}$/)?.[0] ?? '0000000000',
+          companiesHouseNumber: entity.externalId,
+        };
+      }
+    }
+
+    const detail = (result.detail ?? null) as import('../export/excel-generator.js').ProvisionExportDetail | null;
+    const { ctoFromCt600 } = await import('../export/cto-xml.js');
+    const submission = ctoFromCt600({
+      company,
+      period: { start: result.period, end: String(run?.endPeriod ?? result.period) },
+      computed: { totalTaxCharge: Number(result.currentTaxExpense ?? 0), taxPayable: Number(result.taxPayable ?? 0) },
+      boxes: [
+        { box: 5, name: 'Profits chargeable', value: detail?.currentTax?.taxableIncome ?? Number(result.bookIncome ?? 0) },
+        { box: 10, name: 'Taxable total profits', value: detail?.currentTax?.taxableIncome ?? Number(result.bookIncome ?? 0) },
+        { box: 12, name: 'Corporation tax at main rate', value: detail?.currentTax?.federalTax ?? Number(result.currentTaxExpense ?? 0) },
+        { box: 13, name: 'Corporation tax at small profits rate', value: 0 },
+        { box: 14, name: 'Marginal relief', value: detail?.currentTax?.marginalRelief ?? 0 },
+      ],
+    }, {
+      gatewayTest: c.req.query('test') !== 'false',
+      vendorId: c.req.query('vendorId'),
+      senderId: c.req.query('senderId'),
+    });
+
+    if (run) {
+      await recordProvisionEvent({
+        tenantId: user.tenantId,
+        provisionRunId: run.id,
+        eventType: EVENT_TYPES.EXPORT_WORKPAPER,
+        actorType: 'user',
+        actorUserId: user.userId,
+        reason: `CTO XML export for period ${result.period}`,
+        metadata: { resultId: result.id },
+      }, tx);
+    }
+
+    c.header('Content-Type', 'text/xml');
+    c.header('Content-Disposition', `attachment; filename="${submission.filename}"`);
+    return c.body(submission.xml);
   });
 });
 

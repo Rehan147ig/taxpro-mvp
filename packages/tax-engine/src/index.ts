@@ -10,7 +10,17 @@ export { generateRollforward } from './rollforward.js';
 export { calculateETR } from './etr-reconciliation.js';
 export { generateJournalEntries } from './journal-entries.js';
 export { calculateUkDeferredTax, ukDeferredTaxLine } from './uk-frs102-s29/deferred-tax.js';
-export { getRateForFiscalYear } from './uk-frs102-s29/rules.js';
+export { calculateUkCurrentTax } from './uk-frs102-s29/current-tax.js';
+export {
+  getRateForFiscalYear,
+  calculateUkMarginalRelief,
+  getUkMarginalReliefConfig,
+  etrAdjustmentsForMarginalRelief,
+  UK_SMALL_PROFITS_RATE,
+  UK_SMALL_PROFITS_THRESHOLD,
+  UK_MARGINAL_RELIEF_UPPER,
+  UK_MARGINAL_RELIEF_FRACTION,
+} from './uk-frs102-s29/rules.js';
 export { Jurisdiction } from './types.js';
 export { createEngine } from './engine-factory.js';
 export type { TaxEngine } from './engine-factory.js';

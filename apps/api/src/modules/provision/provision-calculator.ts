@@ -1,7 +1,5 @@
 import Decimal from 'decimal.js';
-import { createEngine, Jurisdiction } from '@taxpro/tax-engine';
-
-const engine = createEngine(Jurisdiction.US_ASC740);
+import { createEngine, Jurisdiction, etrAdjustmentsForMarginalRelief } from '@taxpro/tax-engine';
 
 export interface ProvisionMathInput {
   bookIncome: number;
@@ -25,7 +23,16 @@ export interface ProvisionMathInput {
   period: string;
 }
 
-export function runProvisionMath(input: ProvisionMathInput) {
+/** Map a persisted entity.taxJurisdiction string to the engine Jurisdiction enum. */
+export function resolveJurisdiction(taxJurisdiction?: string | null): Jurisdiction {
+  if (!taxJurisdiction) return Jurisdiction.US_ASC740;
+  const normalized = taxJurisdiction.trim().toLowerCase();
+  if (normalized.includes('uk') || normalized.includes('frs')) return Jurisdiction.UK_FRS102_S29;
+  return Jurisdiction.US_ASC740;
+}
+
+export function runProvisionMath(input: ProvisionMathInput, jurisdiction: Jurisdiction = Jurisdiction.US_ASC740) {
+  const engine = createEngine(jurisdiction);
   const bookIncome = money(input.bookIncome);
   const federalRate = rate(input.federalRate);
   const stateRate = input.stateRate && input.stateRate > 0 ? rate(input.stateRate) : undefined;
@@ -93,7 +100,7 @@ export function runProvisionMath(input: ProvisionMathInput) {
     stateTax: currentTax.stateTax,
     permanentDifferences,
     taxCredits: currentTax.taxCredits,
-    otherAdjustments: [],
+    otherAdjustments: etrAdjustmentsForMarginalRelief(currentTax),
   });
 
   const journalEntries = engine.generateJournalEntries(
@@ -108,6 +115,7 @@ export function runProvisionMath(input: ProvisionMathInput) {
   const effectiveTaxRate = bookIncome.greaterThan(0) ? totalTaxExpense.div(bookIncome) : money(0);
 
   return {
+    jurisdiction,
     summary: {
       bookIncome: bookIncome.toNumber(),
       totalTaxExpense: totalTaxExpense.toNumber(),
@@ -188,6 +196,14 @@ export function runProvisionMath(input: ProvisionMathInput) {
       totalDebit: entry.totalDebit.toNumber(),
       totalCredit: entry.totalCredit.toNumber(),
     })),
+    lineItems: {
+      permanentDifferences: input.permanentDifferences.map((pd) => ({ label: pd.label, amount: pd.amount })),
+      temporaryDifferences: input.temporaryDifferences.map((d) => ({
+        accountId: d.accountId,
+        difference: d.difference,
+        timingCategory: d.timingCategory ?? 'TEMP_OTHER',
+      })),
+    },
   };
 }
 

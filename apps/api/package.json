@@ -8,7 +8,7 @@
     "predev": "npm run build -w @taxpro/tax-engine",
     "prebuild": "npm run build -w @taxpro/tax-engine",
     "dev": "tsx watch --import ./src/telemetry.ts src/index.ts",
-    "build": "tsc",
+    "build": "tsc && node -e \"require('fs').copyFileSync('src/agent/instructions.md','dist/agent/instructions.md')\"",
     "lint": "tsc --noEmit",
     "start": "node --import ./dist/telemetry.js dist/index.js",
     "db:generate": "drizzle-kit generate",
@@ -19,6 +19,7 @@
     "test": "vitest run",
     "eval": "tsx scripts/eval/run-eval.ts",
     "eval:uk": "tsx scripts/eval/run-uk-eval.ts",
+    "eval:ai-mapping": "tsx scripts/eval/run-ai-mapping-eval.ts",
     "test:integration": "tsx scripts/test-provision-flow.ts"
   },
   "dependencies": {
@@ -62,6 +63,7 @@
     "@types/pg": "^8.11.0",
     "drizzle-kit": "^0.28.0",
     "tsx": "^4.19.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10"
   }
 }

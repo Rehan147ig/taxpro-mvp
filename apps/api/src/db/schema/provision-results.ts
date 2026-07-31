@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, decimal, date, timestamp } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, decimal, date, timestamp, jsonb } from 'drizzle-orm/pg-core';
 import { tenants } from './tenants.js';
 import { provisionRuns } from './provision-runs.js';
 
@@ -16,5 +16,6 @@ export const provisionResults = pgTable('provision_results', {
   statutoryRate: decimal('statutory_rate', { precision: 5, scale: 4 }).default('0'),
   taxPayable: decimal('tax_payable', { precision: 18, scale: 2 }).default('0'),
   valuationAllowance: decimal('valuation_allowance', { precision: 18, scale: 2 }).default('0'),
+  detail: jsonb('detail'),
   createdAt: timestamp('created_at').defaultNow(),
 });

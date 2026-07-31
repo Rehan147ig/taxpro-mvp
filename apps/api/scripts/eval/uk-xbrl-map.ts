@@ -1,5 +1,5 @@
 /**
- * UK FRS 102 fixture → tax-engine input mapper.
+ * UK fixture → tax-engine input mapper (works for FRS 102 / FRS 101 / IFRS).
  *
  * Reconciliation items from filed statutory accounts are classified into
  * permanent, timing, and other categories, then fed through calculateETR
@@ -14,8 +14,6 @@ import Decimal from 'decimal.js';
 import { calculateETR, calculateUkDeferredTax } from '@taxpro/tax-engine';
 import type { ETRResult, DeferredTaxResult, BookTaxDifference } from '@taxpro/tax-engine';
 import type { UkTaxFootnote, UkReconItem } from './uk-ground-truth.js';
-
-const UK_CORP_RATE = new Decimal('0.25');
 
 export interface UkEngineRun {
   etr: ETRResult;
@@ -37,9 +35,16 @@ function classify(items: UkReconItem[]) {
 export function runEngine(footnote: UkTaxFootnote): UkEngineRun {
   const classified = classify(footnote.reconciliationItems);
 
+  // Rate-agnostic: the expected-charge line in each filing's ETR reconciliation
+  // is presented at the statutory rate the preparer used (e.g. 25% post-1 Apr
+  // 2023, 23.52% blended for periods straddling the April 2023 rate change).
+  // Permanent differences are stored as tax-effect amounts and grossed back at
+  // that rate, matching how the engine consumes them.
+  const statRate = new Decimal(footnote.statutoryRate);
+
   const permanentDifferences = classified.permanent.map(item => ({
     label: item.label,
-    amount: new Decimal(item.amount).div(UK_CORP_RATE),
+    amount: new Decimal(item.amount).div(statRate),
   }));
 
   const otherAdjustments = [...classified.timing, ...classified.other].map(item => ({
@@ -48,11 +53,11 @@ export function runEngine(footnote: UkTaxFootnote): UkEngineRun {
   }));
 
   const bookIncome = new Decimal(footnote.pretaxProfit);
-  const federalTax = bookIncome.mul(UK_CORP_RATE);
+  const federalTax = bookIncome.mul(statRate);
 
   const etr = calculateETR({
     bookIncome,
-    federalTaxRate: UK_CORP_RATE,
+    federalTaxRate: statRate,
     federalTax,
     stateTax: new Decimal(0),
     permanentDifferences,
@@ -60,18 +65,22 @@ export function runEngine(footnote: UkTaxFootnote): UkEngineRun {
     otherAdjustments,
   });
 
-  // Deferred tax: two paths —
-  //   1. recon_timing:  ETR reconciliation includes timing items → feed through
-  //                      calculateUkDeferredTax for full engine validation.
-  //   2. balance_sheet_fallback:  No ETR timing items; derive directly from the
-  //                      disclosed balance-sheet deferred tax balances (Note 14).
-  //                      No synthetic temporary differences are fabricated.
+  // Deferred tax: two paths, selected explicitly by the fixture —
+  //   1. recon_timing:  The fixture asserts its ETR reconciliation timing items
+  //                      exhaustively explain the deferred tax movement; they
+  //                      are fed through calculateUkDeferredTax for full engine
+  //                      validation. Rare: in most real filings the recon timing
+  //                      lines are a subset of the balance-sheet movement.
+  //   2. balance_sheet_fallback:  Derive directly from the disclosed balance-sheet
+  //                      deferred tax balances (Note 14). No synthetic temporary
+  //                      differences are fabricated.
+  const declaredSource = footnote.deferredTaxBalanceSource;
   const hasTimingItems = classified.timing.length > 0;
 
   let deferred: DeferredTaxResult;
   let deferredSource: 'recon_timing' | 'balance_sheet_fallback';
 
-  if (hasTimingItems) {
+  if (declaredSource === 'recon_timing' && hasTimingItems) {
     deferredSource = 'recon_timing';
     const temporaryDifferences: BookTaxDifference[] = classified.timing.map((item, i) => ({
       accountId: `fixture-timing-${i}`,
@@ -79,7 +88,7 @@ export function runEngine(footnote: UkTaxFootnote): UkEngineRun {
       period: footnote.accountingPeriodEnd,
       bookBalance: new Decimal(0),
       taxBalance: new Decimal(0),
-      difference: new Decimal(item.amount),
+      difference: new Decimal(item.amount).div(statRate),
       diffType: 'temporary',
       timingCategory: item.amount < 0 ? 'deductible_temporary' : 'taxable_temporary',
     }));

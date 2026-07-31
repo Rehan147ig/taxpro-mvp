@@ -132,6 +132,8 @@ export interface CurrentTaxResult {
   estimatedPayments: USD;
   taxPayable: USD;
   effectiveTaxRate: TaxRate;
+  /** UK only: marginal relief deducted between the small profits and upper limits (else 0). */
+  marginalRelief?: USD;
 }
 
 export interface DeferredTaxInput {

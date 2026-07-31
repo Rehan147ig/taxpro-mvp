@@ -5,7 +5,7 @@ import { parseTrialBalance } from '../parser/parser-agent.js';
 import { classifyAccounts } from '../mapping/mapping-agent.js';
 import { generateExplanation } from '../explanation/explanation-agent.js';
 import { auditProvision } from '../audit/audit-agent.js';
-import { createEngine, Jurisdiction } from '@taxpro/tax-engine';
+import { createEngine, Jurisdiction, etrAdjustmentsForMarginalRelief } from '@taxpro/tax-engine';
 import type { TaxProvisionState, PipelineStage } from '../../state/tax-provision-state.js';
 import type { BookTaxDifference, TrialBalanceLine, Account, TaxMapping, TaxAccountType, PermanentDifferenceItem } from '@taxpro/tax-engine';
 import { assertNotLocked, transitionStage } from '../../state/tax-provision-state.js';
@@ -145,7 +145,7 @@ async function processState(initial: TaxProvisionState): Promise<TaxProvisionSta
       stateTax: currentTax.stateTax,
       permanentDifferences,
       taxCredits: currentTax.taxCredits,
-      otherAdjustments: [],
+      otherAdjustments: etrAdjustmentsForMarginalRelief(currentTax),
     });
     state.engineOutput = {
       currentTax: currentTax as unknown as Record<string, unknown>,

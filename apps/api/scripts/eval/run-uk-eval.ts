@@ -1,5 +1,5 @@
 /**
- * UK FRS 102 Eval Harness — validates the TaxPro tax engine against
+ * UK Eval Harness — validates the TaxPro tax engine against
  * manually-curated ground truth fixtures from filed Companies House accounts.
  *
  * For each fixture:
@@ -8,6 +8,11 @@
  *    calculateUkDeferredTax with jurisdiction UK_FRS102_S29
  * 3. Compare engine ETR against disclosed ETR
  * 4. Compare engine deferred tax closing balance against disclosed balance
+ *
+ * Fixtures may declare any UK accounting standard (FRS 102 / FRS 101 / IFRS);
+ * the engine's ETR and deferred-tax math is standard-agnostic, so all are
+ * evaluated. NOTE: the engine returns ETR 0 for negative book income, so
+ * loss-making years are excluded from the benchmark.
  *
  * Scoring (same bp bands as US eval):
  *   PASS ≤ 25bp · WARN ≤ 100bp · FAIL > 100bp · SKIP fixture not populated
@@ -113,15 +118,15 @@ function evalFixture(footnote: UkTaxFootnote): CompanyResult {
 }
 
 function main() {
-  console.log('TaxPro UK FRS 102 Eval Harness');
+  console.log('TaxPro UK Eval Harness');
   console.log('Validating tax-engine ETR + deferred math against manually-curated Companies House fixtures');
   console.log(`\nFixtures loaded: ${fixtures.length}`);
 
   const results: CompanyResult[] = [];
   let skippedWrongStandard = 0;
   for (const footnote of fixtures) {
-    if (footnote.standard && footnote.standard !== 'FRS 102') {
-      console.log(`SKIP ${footnote.companyName} - not FRS 102 (${footnote.standard}) - excluded from benchmark`);
+    if (!footnote.standard) {
+      console.log(`SKIP ${footnote.companyName} - no accounting standard declared - excluded from benchmark`);
       skippedWrongStandard++;
       continue;
     }
@@ -140,7 +145,7 @@ function main() {
   const counts = { PASS: 0, WARN: 0, FAIL: 0, SKIP: 0 };
   results.forEach(r => counts[r.verdict]++);
   const skipCount = results.filter(r => r.verdict === 'SKIP').length;
-  const wrongStandardInfo = skippedWrongStandard > 0 ? `, ${skippedWrongStandard} wrong-standard` : '';
+  const wrongStandardInfo = skippedWrongStandard > 0 ? `, ${skippedWrongStandard} no-standard` : '';
   console.log(`\n  ${counts.PASS} passed, ${counts.WARN} warnings, ${counts.FAIL} failed, ${counts.SKIP} skipped${wrongStandardInfo}`);
 
   const evaluated = results.filter(r => r.etrDeltaBp !== null);

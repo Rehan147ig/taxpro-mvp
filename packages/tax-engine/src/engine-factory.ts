@@ -7,12 +7,13 @@ import type {
   JournalEntry, USD, TaxRate, TrialBalanceLine, Account, TaxMapping,
 } from './types.js';
 import { calculateCurrentTax } from './current-tax.js';
+import { calculateUkCurrentTax } from './uk-frs102-s29/current-tax.js';
 import { calculateDeferredTax, calculateDeferredTaxLine } from './deferred-tax.js';
 import { calculateETR } from './etr-reconciliation.js';
 import { generateRollforward } from './rollforward.js';
 import { generateJournalEntries } from './journal-entries.js';
 import { computeBookTaxDifferences } from './book-tax-diff.js';
-import { getRateForFiscalYear, US_RATES_BY_FISCAL_YEAR, UK_RATES_BY_FISCAL_YEAR } from './uk-frs102-s29/rules.js';
+import { getRateForFiscalYear, US_RATES_BY_FISCAL_YEAR, UK_RATES_BY_FISCAL_YEAR, isUkJurisdiction } from './uk-frs102-s29/rules.js';
 
 Decimal.set = ((_config: Decimal.Config): typeof Decimal => {
   throw new Error(
@@ -68,7 +69,9 @@ export function createEngine(jurisdiction: Jurisdiction): TaxEngine {
     },
 
     calculateCurrentTax(input) {
-      return calculateCurrentTax(input);
+      return isUkJurisdiction(jurisdiction)
+        ? calculateUkCurrentTax(input)
+        : calculateCurrentTax(input);
     },
 
     calculateDeferredTax(diffs, priorDTA, priorDTL, taxRates, probableRecoveryMap, asOfDate) {

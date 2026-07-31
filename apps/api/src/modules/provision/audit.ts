@@ -4,7 +4,7 @@ import { logger } from '../../lib/logger.js';
 export interface AuditSensitiveOpInput {
   tenantId: string;
   runId: string;
-  action: 'run.locked' | 'run.unlocked' | 'run.finalized' | 'run.unfinalized' | 'role.changed' | 'mapping.overridden';
+  action: 'run.locked' | 'run.unlocked' | 'run.finalized' | 'run.unfinalized' | 'role.changed' | 'mapping.overridden' | 'run.posted_to_netsuite';
   actorUserId: string;
   actorRole: string;
   details: Record<string, unknown>;
@@ -22,6 +22,7 @@ export async function auditSensitiveOp(
     'run.unfinalized': 'run.unfinalized',
     'role.changed': 'role.changed',
     'mapping.overridden': EVENT_TYPES.MAPPING_OVERRIDE,
+    'run.posted_to_netsuite': EVENT_TYPES.POSTED_TO_NETSUITE,
   };
 
   const eventType = eventTypeMap[input.action] ?? input.action;

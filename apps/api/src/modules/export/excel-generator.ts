@@ -1,5 +1,76 @@
 import Excel from 'exceljs';
 
+export interface ProvisionExportDetail {
+  summary?: Record<string, number>;
+  currentTax?: {
+    bookIncome: number;
+    totalPermanentAdjustments: number;
+    taxableIncome: number;
+    federalTaxRate: number;
+    federalTax: number;
+    marginalRelief?: number;
+    stateTax: number;
+    totalTaxBeforeCredits: number;
+    taxCredits: number;
+    totalTaxAfterCredits: number;
+    estimatedPayments: number;
+    nolUtilization?: number;
+    taxPayable?: number;
+  };
+  deferredTax?: {
+    totalOpeningDTA: number;
+    totalOpeningDTL: number;
+    totalClosingDTA: number;
+    totalClosingDTL: number;
+    netDeferredTaxExpense: number;
+    lines: Array<{
+      timingCategory: string;
+      openingBalance: number;
+      currentYearChange: number;
+      taxRate: number;
+      deferredTaxAmount: number;
+      reversals: number;
+      closingBalance: number;
+      dtType: string;
+    }>;
+  };
+  etr?: {
+    statutoryRate: number;
+    statutoryTax: number;
+    effectiveTaxRate: number;
+    totalTaxExpense: number;
+    lines: Array<{ description: string; amount: number; taxImpact: number; rateImpact: number }>;
+  };
+  rollforward?: {
+    deferredTaxRollforward: Array<{
+      timingCategory: string;
+      openingBalance: number;
+      currentYearChange: number;
+      taxRate: number;
+      deferredTaxAmount: number;
+      reversals: number;
+      closingBalance: number;
+      dtType: string;
+    }>;
+    nolRollforward: Record<string, number>;
+    creditRollforward: Record<string, number>;
+    valuationAllowance: Record<string, number>;
+  };
+  journalEntries?: Array<{
+    type: string;
+    entityId: string;
+    period: string;
+    lines: Array<{ accountId: string; debit: number; credit: number; memo?: string }>;
+    totalDebit: number;
+    totalCredit: number;
+  }>;
+  lineItems?: {
+    permanentDifferences: Array<{ label: string; amount: number }>;
+    temporaryDifferences: Array<{ accountId: string; label?: string; difference: number; timingCategory: string }>;
+  };
+  jurisdiction?: string;
+}
+
 interface ProvisionExportData {
   period: string;
   bookIncome: number;
@@ -11,7 +82,11 @@ interface ProvisionExportData {
   taxPayable: number;
   valuationAllowance: number;
   createdAt: string;
+  detail?: ProvisionExportDetail | null;
 }
+
+const HEADER_FILL = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FF1F2937' } };
+const HEADER_FONT = { bold: true, color: { argb: 'FFFFFFFF' } };
 
 export async function generateProvisionWorkbook(data: ProvisionExportData): Promise<Buffer> {
   const wb = new Excel.Workbook();
@@ -22,9 +97,17 @@ export async function generateProvisionWorkbook(data: ProvisionExportData): Prom
   addCurrentTaxTab(wb, data);
   addDeferredTaxTab(wb, data);
   addETRTab(wb, data);
+  addJournalEntriesTab(wb, data);
+  addLineItemsTab(wb, data);
 
   const buf = await wb.xlsx.writeBuffer();
   return Buffer.from(buf);
+}
+
+function styleHeaderRow(ws: Excel.Worksheet) {
+  const header = ws.getRow(1);
+  header.font = HEADER_FONT;
+  header.fill = HEADER_FILL;
 }
 
 function addSummaryTab(wb: Excel.Workbook, data: ProvisionExportData) {
@@ -35,11 +118,7 @@ function addSummaryTab(wb: Excel.Workbook, data: ProvisionExportData) {
     { header: 'Value', key: 'value', width: 20 },
   ];
 
-  // Style the header
-  const header = ws.getRow(1);
-  header.font = { bold: true, size: 12 };
-  header.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F2937' } };
-  header.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+  styleHeaderRow(ws);
 
   const rows: { metric: string; value: string | number }[] = [
     { metric: 'Period', value: data.period },
@@ -52,6 +131,7 @@ function addSummaryTab(wb: Excel.Workbook, data: ProvisionExportData) {
     { metric: 'Statutory Rate', value: `${(data.statutoryRate * 100).toFixed(2)}%` },
     { metric: 'Tax Payable', value: data.taxPayable },
     { metric: 'Valuation Allowance', value: data.valuationAllowance },
+    { metric: 'Jurisdiction', value: data.detail?.jurisdiction ?? 'US_ASC740' },
     { metric: 'Created At', value: data.createdAt },
   ];
 
@@ -59,12 +139,10 @@ function addSummaryTab(wb: Excel.Workbook, data: ProvisionExportData) {
     const row = ws.getRow(i + 2);
     row.getCell(1).value = r.metric;
     row.getCell(2).value = r.value;
-    // Style number fields
     if (typeof r.value === 'number') {
       row.getCell(2).numFmt = '#,##0.00';
     }
-    // Bold the total row
-    if (r.metric === 'Total Tax Expense') {
+    if (r.metric === 'Total Tax Expense' || r.metric === 'Jurisdiction') {
       row.getCell(1).font = { bold: true };
       row.getCell(2).font = { bold: true };
     }
@@ -80,29 +158,30 @@ function addCurrentTaxTab(wb: Excel.Workbook, data: ProvisionExportData) {
     { header: 'Rate', key: 'rate', width: 15 },
   ];
 
-  const header = ws.getRow(1);
-  header.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-  header.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F2937' } };
+  styleHeaderRow(ws);
 
-  // Compute derived amounts
-  const taxableIncome = data.bookIncome; // simplified — in real flow permanent adjustments would be subtracted
-  const federalTax = taxableIncome * data.statutoryRate;
-  const stateTax = 0; // not stored per-run, default to 0
+  const d = data.detail?.currentTax;
+  const permanent = data.detail?.lineItems?.permanentDifferences ?? [];
+  const statutoryRate = d?.federalTaxRate ?? data.statutoryRate;
 
   const rows: { component: string; amount: string | number; rate: string }[] = [
-    { component: 'Book Income (Pretax)', amount: data.bookIncome, rate: '' },
-    { component: 'Permanent Differences', amount: 0, rate: '' },
-    { component: 'Taxable Income', amount: taxableIncome, rate: `${(data.statutoryRate * 100).toFixed(1)}%` },
+    { component: 'Book Income (Pretax)', amount: d?.bookIncome ?? data.bookIncome, rate: '' },
     { component: '', amount: '', rate: '' },
-    { component: 'Federal Tax', amount: federalTax, rate: `${(data.statutoryRate * 100).toFixed(1)}%` },
-    { component: 'State Tax (net of fed benefit)', amount: stateTax, rate: '' },
-    { component: 'Tax Credits', amount: 0, rate: '' },
-    { component: 'NOL Utilization', amount: 0, rate: '' },
+    ...permanent.map(p => ({ component: `Permanent Difference: ${p.label}`, amount: p.amount, rate: '' })),
+    { component: 'Total Permanent Adjustments', amount: d?.totalPermanentAdjustments ?? 0, rate: '' },
     { component: '', amount: '', rate: '' },
-    { component: 'Total Current Tax Expense', amount: data.currentTaxExpense, rate: '' },
-    { component: 'Less: Estimated Payments', amount: 0, rate: '' },
+    { component: 'Taxable Income', amount: d?.taxableIncome ?? data.bookIncome, rate: `${(statutoryRate * 100).toFixed(1)}%` },
     { component: '', amount: '', rate: '' },
-    { component: 'Tax Payable (Receivable)', amount: data.taxPayable, rate: '' },
+    { component: 'Federal Tax', amount: d?.federalTax ?? (data.bookIncome * statutoryRate), rate: `${(statutoryRate * 100).toFixed(1)}%` },
+    { component: 'State Tax (net of fed benefit)', amount: d?.stateTax ?? 0, rate: '' },
+    { component: 'Total Tax Before Credits', amount: d?.totalTaxBeforeCredits ?? 0, rate: '' },
+    { component: 'Tax Credits', amount: d?.taxCredits ?? 0, rate: '' },
+    { component: 'NOL Utilization', amount: d?.nolUtilization ?? 0, rate: '' },
+    { component: '', amount: '', rate: '' },
+    { component: 'Total Current Tax Expense', amount: d?.totalTaxAfterCredits ?? data.currentTaxExpense, rate: '' },
+    { component: 'Less: Estimated Payments', amount: d?.estimatedPayments ?? 0, rate: '' },
+    { component: '', amount: '', rate: '' },
+    { component: 'Tax Payable (Receivable)', amount: d?.taxPayable ?? data.taxPayable, rate: '' },
   ];
 
   rows.forEach((r, i) => {
@@ -130,43 +209,56 @@ function addDeferredTaxTab(wb: Excel.Workbook, data: ProvisionExportData) {
     { header: 'Category', key: 'category', width: 35 },
     { header: 'Opening Balance', key: 'opening', width: 20 },
     { header: 'Current Year Change', key: 'change', width: 20 },
+    { header: 'Reversals', key: 'reversals', width: 20 },
+    { header: 'Rate', key: 'rate', width: 10 },
     { header: 'Closing Balance', key: 'closing', width: 20 },
+    { header: 'Type', key: 'type', width: 12 },
   ];
 
-  const header = ws.getRow(1);
-  header.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-  header.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F2937' } };
+  styleHeaderRow(ws);
 
-  // With no prior-year breakdown stored, show aggregate DTA/DTL
-  const openingDTA = 0;
-  const closingDTA = data.deferredTaxExpense > 0 ? 0 : Math.abs(data.deferredTaxExpense);
-  const openingDTL = 0;
-  const closingDTL = data.deferredTaxExpense > 0 ? data.deferredTaxExpense : 0;
+  const lines = data.detail?.deferredTax?.lines ?? [];
 
-  const rows = [
-    { category: 'Deferred Tax Assets (DTA)', opening: openingDTA, change: closingDTA - openingDTA, closing: closingDTA },
-    { category: '', opening: 0, change: 0, closing: 0 },
-    { category: 'Deferred Tax Liabilities (DTL)', opening: openingDTL, change: closingDTL - openingDTL, closing: closingDTL },
-    { category: '', opening: 0, change: 0, closing: 0 },
-    { category: 'Net Deferred Tax Expense', opening: 0, change: data.deferredTaxExpense, closing: data.deferredTaxExpense },
-  ];
-
-  rows.forEach((r, i) => {
-    const row = ws.getRow(i + 2);
-    row.getCell(1).value = r.category;
-    if (r.category) {
-      row.getCell(2).value = r.opening;
+  if (lines.length > 0) {
+    for (const line of lines) {
+      const row = ws.addRow({
+        category: line.timingCategory,
+        opening: line.openingBalance,
+        change: line.currentYearChange,
+        reversals: line.reversals,
+        rate: `${(line.taxRate * 100).toFixed(1)}%`,
+        closing: line.closingBalance,
+        type: line.dtType,
+      });
       row.getCell(2).numFmt = '#,##0.00';
-      row.getCell(3).value = r.change;
       row.getCell(3).numFmt = '#,##0.00';
-      row.getCell(4).value = r.closing;
       row.getCell(4).numFmt = '#,##0.00';
+      row.getCell(6).numFmt = '#,##0.00';
     }
-    if (r.category.startsWith('Net')) {
-      row.getCell(1).font = { bold: true };
-      row.getCell(4).font = { bold: true };
-    }
+  } else {
+    // Aggregate fallback when no per-category lines are stored
+    const closingDTA = data.deferredTaxExpense > 0 ? 0 : Math.abs(data.deferredTaxExpense);
+    const closingDTL = data.deferredTaxExpense > 0 ? data.deferredTaxExpense : 0;
+    const rows = [
+      { category: 'Deferred Tax Assets (DTA)', opening: 0, change: closingDTA, closing: closingDTA, type: 'aggregate' },
+      { category: 'Deferred Tax Liabilities (DTL)', opening: 0, change: closingDTL, closing: closingDTL, type: 'aggregate' },
+    ];
+    rows.forEach(r => {
+      const row = ws.addRow({ category: r.category, opening: r.opening, change: r.change, closing: r.closing, type: r.type });
+      row.getCell(2).numFmt = '#,##0.00';
+      row.getCell(3).numFmt = '#,##0.00';
+      row.getCell(6).numFmt = '#,##0.00';
+    });
+  }
+
+  ws.addRow({});
+  const totalRow = ws.addRow({
+    category: 'Net Deferred Tax Expense',
+    closing: data.detail?.deferredTax?.netDeferredTaxExpense ?? data.deferredTaxExpense,
   });
+  totalRow.getCell(1).font = { bold: true };
+  totalRow.getCell(6).font = { bold: true };
+  totalRow.getCell(6).numFmt = '#,##0.00';
 }
 
 function addETRTab(wb: Excel.Workbook, data: ProvisionExportData) {
@@ -178,39 +270,124 @@ function addETRTab(wb: Excel.Workbook, data: ProvisionExportData) {
     { header: 'Rate Impact', key: 'rate', width: 15 },
   ];
 
-  const header = ws.getRow(1);
-  header.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-  header.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F2937' } };
+  styleHeaderRow(ws);
 
-  const federalRate = data.statutoryRate;
-  const stateImpact = 0;
-  const otherImpact = data.effectiveTaxRate - federalRate;
+  const lines = data.detail?.etr?.lines ?? [];
 
-  const rows = [
-    { description: 'Federal Statutory Rate', amount: federalRate * data.bookIncome, rate: `${(federalRate * 100).toFixed(1)}%` },
-    { description: 'State Taxes (net of federal benefit)', amount: 0, rate: `${(stateImpact * 100).toFixed(2)}%` },
-    { description: 'Permanent Differences', amount: 0, rate: `${(Math.max(0, otherImpact - stateImpact) * 100).toFixed(2)}%` },
-    { description: 'Tax Credits', amount: 0, rate: '0.00%' },
-    { description: 'Other Adjustments', amount: 0, rate: '0.00%' },
-    { description: '', amount: 0, rate: '' },
-    { description: 'Effective Tax Rate', amount: data.totalTaxExpense, rate: `${(data.effectiveTaxRate * 100).toFixed(2)}%` },
+  if (lines.length > 0) {
+    for (const line of lines) {
+      const row = ws.addRow({
+        description: line.description,
+        amount: line.amount,
+        rate: `${(line.rateImpact * 100).toFixed(2)}%`,
+      });
+      row.getCell(2).numFmt = '#,##0.00';
+    }
+  } else {
+    const federalRate = data.statutoryRate;
+    const otherImpact = data.effectiveTaxRate - federalRate;
+    const rows = [
+      { description: 'Federal Statutory Rate', amount: federalRate * data.bookIncome, rate: `${(federalRate * 100).toFixed(1)}%` },
+      { description: 'State Taxes (net of federal benefit)', amount: 0, rate: '0.00%' },
+      { description: 'Permanent Differences', amount: 0, rate: `${(Math.max(0, otherImpact) * 100).toFixed(2)}%` },
+      { description: 'Tax Credits', amount: 0, rate: '0.00%' },
+      { description: 'Other Adjustments', amount: 0, rate: '0.00%' },
+    ];
+    rows.forEach(r => {
+      const row = ws.addRow({ description: r.description, amount: r.amount, rate: r.rate });
+      if (r.amount) row.getCell(2).numFmt = '#,##0.00';
+    });
+  }
+
+  ws.addRow({});
+  const totalRow = ws.addRow({
+    description: 'Effective Tax Rate',
+    amount: data.totalTaxExpense,
+    rate: `${(data.effectiveTaxRate * 100).toFixed(2)}%`,
+  });
+  totalRow.eachCell(cell => { cell.font = { bold: true }; });
+  totalRow.getCell(2).numFmt = '#,##0.00';
+}
+
+function addJournalEntriesTab(wb: Excel.Workbook, data: ProvisionExportData) {
+  const entries = data.detail?.journalEntries ?? [];
+  if (entries.length === 0) return;
+
+  const ws = wb.addWorksheet('Journal Entries', { views: [{ state: 'frozen', ySplit: 1 }] });
+
+  ws.columns = [
+    { header: 'Entry Type', key: 'type', width: 22 },
+    { header: 'Account', key: 'account', width: 32 },
+    { header: 'Debit', key: 'debit', width: 18 },
+    { header: 'Credit', key: 'credit', width: 18 },
+    { header: 'Memo', key: 'memo', width: 40 },
   ];
 
-  rows.forEach((r, i) => {
-    const row = ws.getRow(i + 2);
-    row.getCell(1).value = r.description;
-    if (r.amount) {
-      row.getCell(2).value = r.amount;
-      row.getCell(2).numFmt = '#,##0.00';
-    } else {
-      row.getCell(2).value = '';
-    }
-    row.getCell(3).value = r.rate;
+  styleHeaderRow(ws);
 
-    if (r.description === 'Effective Tax Rate') {
-      row.getCell(1).font = { bold: true };
-      row.getCell(2).font = { bold: true };
-      row.getCell(3).font = { bold: true };
+  for (const entry of entries) {
+    const startRow = ws.rowCount + 1;
+    for (const line of entry.lines) {
+      ws.addRow({
+        type: entry.type,
+        account: line.accountId,
+        debit: line.debit > 0 ? line.debit : 0,
+        credit: line.credit > 0 ? line.credit : 0,
+        memo: line.memo ?? '',
+      });
     }
+    const totalRow = ws.addRow({
+      type: `${entry.type} TOTAL`,
+      debit: entry.totalDebit,
+      credit: entry.totalCredit,
+    });
+    totalRow.getCell(1).font = { bold: true };
+    totalRow.getCell(3).numFmt = '#,##0.00';
+    totalRow.getCell(4).numFmt = '#,##0.00';
+    ws.addRow({});
+  }
+
+  // Apply number formats to all data rows
+  ws.eachRow((row, rowNumber) => {
+    if (rowNumber === 1) return;
+    const credit = row.getCell(4).value;
+    const debit = row.getCell(3).value;
+    if (typeof credit === 'number') row.getCell(4).numFmt = '#,##0.00';
+    if (typeof debit === 'number') row.getCell(3).numFmt = '#,##0.00';
+  });
+}
+
+function addLineItemsTab(wb: Excel.Workbook, data: ProvisionExportData) {
+  const lineItems = data.detail?.lineItems;
+  const tempItems = lineItems?.temporaryDifferences ?? [];
+  if (tempItems.length === 0) return;
+
+  const ws = wb.addWorksheet('Line Items', { views: [{ state: 'frozen', ySplit: 1 }] });
+
+  ws.columns = [
+    { header: 'Type', key: 'type', width: 14 },
+    { header: 'Label', key: 'label', width: 40 },
+    { header: 'Amount', key: 'amount', width: 20 },
+    { header: 'Category', key: 'category', width: 24 },
+  ];
+
+  styleHeaderRow(ws);
+
+  for (const pd of lineItems?.permanentDifferences ?? []) {
+    ws.addRow({ type: 'Permanent', label: pd.label, amount: pd.amount, category: '' });
+  }
+  for (const td of tempItems) {
+    ws.addRow({
+      type: 'Timing',
+      label: td.label ?? td.accountId,
+      amount: td.difference,
+      category: td.timingCategory,
+    });
+  }
+
+  ws.eachRow((row, rowNumber) => {
+    if (rowNumber === 1) return;
+    const amount = row.getCell(3).value;
+    if (typeof amount === 'number') row.getCell(3).numFmt = '#,##0.00';
   });
 }

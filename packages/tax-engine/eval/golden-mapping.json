@@ -1,0 +1,1618 @@
+[
+  {
+    "accountName": "Depreciation - Buildings",
+    "accountType": "Expense",
+    "expectedTreatment": "temporary",
+    "expectedCategory": "taxable_temporary",
+    "expectedTaxType": "TEMP_DEPRECIATION",
+    "reason": "Book SL vs MACRS depreciation (Sec 167/168)"
+  },
+  {
+    "accountName": "Meals and Entertainment",
+    "accountType": "Expense",
+    "expectedTreatment": "permanent",
+    "expectedCategory": null,
+    "expectedTaxType": "PERM_MEALS_ENTERTAINMENT",
+    "reason": "50% nondeductible under Sec 274(n)"
+  },
+  {
+    "accountName": "Office Supplies",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Fully deductible ordinary business expense"
+  },
+  {
+    "accountName": "Fines and Penalties",
+    "accountType": "Expense",
+    "expectedTreatment": "permanent",
+    "expectedCategory": null,
+    "expectedTaxType": "PERM_PENALTIES_FINES",
+    "reason": "Government fines non-deductible under Sec 162(f)"
+  },
+  {
+    "accountName": "Key Person Life Insurance Premium",
+    "accountType": "Expense",
+    "expectedTreatment": "permanent",
+    "expectedCategory": null,
+    "expectedTaxType": "PERM_LIFE_INSURANCE",
+    "reason": "Life insurance premiums non-deductible when company is beneficiary (Sec 264)"
+  },
+  {
+    "accountName": "Municipal Bond Interest Income",
+    "accountType": "Income",
+    "expectedTreatment": "permanent",
+    "expectedCategory": null,
+    "expectedTaxType": "PERM_TAX_EXEMPT_INTEREST",
+    "reason": "Tax-exempt interest under Sec 103"
+  },
+  {
+    "accountName": "Dividend Income from Subsidiary",
+    "accountType": "Income",
+    "expectedTreatment": "permanent",
+    "expectedCategory": null,
+    "expectedTaxType": "PERM_DIVIDENDS_RECEIVED_DEDUCTION",
+    "reason": "DRD allows 50-65% deduction under Sec 243"
+  },
+  {
+    "accountName": "Salaries and Wages",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_SALARIES",
+    "reason": "Fully deductible compensation expense"
+  },
+  {
+    "accountName": "Subscription Revenue",
+    "accountType": "Income",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_REVENUE",
+    "reason": "Ordinary revenue recognized same period for book and tax"
+  },
+  {
+    "accountName": "Office Rent",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_RENT",
+    "reason": "Operating lease expense, same for book and tax"
+  },
+  {
+    "accountName": "Research and Development Costs",
+    "accountType": "Expense",
+    "expectedTreatment": "temporary",
+    "expectedCategory": "taxable_temporary",
+    "expectedTaxType": "TEMP_RESEARCH_CAPITALIZATION",
+    "reason": "Sec 174 requires capitalization and amortization over 5/15 years"
+  },
+  {
+    "accountName": "Bad Debt Reserve",
+    "accountType": "Expense",
+    "expectedTreatment": "temporary",
+    "expectedCategory": "deductible_temporary",
+    "expectedTaxType": "TEMP_BAD_DEBT_RESERVE",
+    "reason": "Reserve method for books vs specific charge-off for tax (Sec 166)"
+  },
+  {
+    "accountName": "Warranty Reserve",
+    "accountType": "Expense",
+    "expectedTreatment": "temporary",
+    "expectedCategory": "deductible_temporary",
+    "expectedTaxType": "TEMP_WARRANTY_RESERVE",
+    "reason": "Accrued warranty for books, deductible when paid for tax (Sec 461)"
+  },
+  {
+    "accountName": "Deferred Revenue",
+    "accountType": "Liability",
+    "expectedTreatment": "temporary",
+    "expectedCategory": "deductible_temporary",
+    "expectedTaxType": "TEMP_DEFERRED_REVENUE",
+    "reason": "Revenue recognized for books, deferred for tax under Sec 451"
+  },
+  {
+    "accountName": "Utilities Expense",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_UTILITIES",
+    "reason": "Ordinary business expense, same treatment"
+  },
+  {
+    "accountName": "Depreciation - Equipment",
+    "accountType": "Expense",
+    "expectedTreatment": "temporary",
+    "expectedCategory": "taxable_temporary",
+    "expectedTaxType": "TEMP_DEPRECIATION",
+    "reason": "MACRS vs book depreciation timing (Sec 168)"
+  },
+  {
+    "accountName": "Bonus Depreciation - Equipment",
+    "accountType": "Expense",
+    "expectedTreatment": "temporary",
+    "expectedCategory": "taxable_temporary",
+    "expectedTaxType": "TEMP_BONUS_DEPRECIATION",
+    "reason": "80% bonus expensing under Sec 168(k)"
+  },
+  {
+    "accountName": "Section 179 Equipment",
+    "accountType": "Expense",
+    "expectedTreatment": "temporary",
+    "expectedCategory": "taxable_temporary",
+    "expectedTaxType": "TEMP_SECTION_179",
+    "reason": "Immediate expensing election under Sec 179"
+  },
+  {
+    "accountName": "Goodwill Impairment",
+    "accountType": "Expense",
+    "expectedTreatment": "permanent",
+    "expectedCategory": null,
+    "expectedTaxType": "PERM_NONDEDUCTIBLE_GOODWILL",
+    "reason": "Book impairment not deductible for tax; handled via Sec 197 amortization"
+  },
+  {
+    "accountName": "Political Contributions",
+    "accountType": "Expense",
+    "expectedTreatment": "permanent",
+    "expectedCategory": null,
+    "expectedTaxType": "PERM_OTHER",
+    "reason": "Political contributions non-deductible under Sec 162(e)"
+  },
+  {
+    "accountName": "Stock Compensation Expense",
+    "accountType": "Expense",
+    "expectedTreatment": "temporary",
+    "expectedCategory": "deductible_temporary",
+    "expectedTaxType": "TEMP_OTHER",
+    "reason": "Book expense at grant, tax deduction at exercise (Sec 83)"
+  },
+  {
+    "accountName": "Interest Expense - Bank Loan",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Interest expense deductible unless Sec 163(j) limitation applies"
+  },
+  {
+    "accountName": "Cost of Goods Sold",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "COGS treated identically for book and tax under Sec 263A"
+  },
+  {
+    "accountName": "Foreign Tax Credit",
+    "accountType": "Income",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Credit reduces tax expense, not an income/expense item per se"
+  },
+  {
+    "accountName": "Legal Fees - Tax Planning",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Ordinary and necessary business expense under Sec 162"
+  },
+  {
+    "accountName": "Depreciation - Vehicles",
+    "accountType": "Expense",
+    "expectedTreatment": "temporary",
+    "expectedCategory": "taxable_temporary",
+    "expectedTaxType": "TEMP_DEPRECIATION",
+    "reason": "Luxury auto limits under Sec 280F plus MACRS"
+  },
+  {
+    "accountName": "Insurance Expense - General Liability",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Ordinary business insurance, deductible when paid"
+  },
+  {
+    "accountName": "Marketing and Advertising",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Advertising expense deductible under Sec 162"
+  },
+  {
+    "accountName": "Travel Expenses - Sales Team",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Business travel deductible under Sec 162 (not meals - that's separate)"
+  },
+  {
+    "accountName": "Board of Directors Fees",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Director fees are ordinary business expense under Sec 162"
+  },
+  {
+    "accountName": "Software Amortization",
+    "accountType": "Expense",
+    "expectedTreatment": "temporary",
+    "expectedCategory": "taxable_temporary",
+    "expectedTaxType": "TEMP_AMORTIZATION",
+    "reason": "Book vs tax amortization of purchased software (Sec 197)"
+  },
+  {
+    "accountName": "Interest Income - Bank Deposits",
+    "accountType": "Income",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Taxable interest income, same period recognition"
+  },
+  {
+    "accountName": "Gain on Sale of Equipment",
+    "accountType": "Income",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Recognized gain, same for book and tax (Sec 1231)"
+  },
+  {
+    "accountName": "State Income Tax Expense",
+    "accountType": "Expense",
+    "expectedTreatment": "permanent",
+    "expectedCategory": null,
+    "expectedTaxType": "PERM_OTHER",
+    "reason": "State taxes are deductible for federal purposes, creating a permanent benefit"
+  },
+  {
+    "accountName": "Cash",
+    "accountType": "Asset",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_CASH",
+    "reason": "Balance sheet item, no income tax impact directly"
+  },
+  {
+    "accountName": "Accounts Receivable",
+    "accountType": "Asset",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_AR",
+    "reason": "Balance sheet item, same basis for book and tax"
+  },
+  {
+    "accountName": "Accounts Payable",
+    "accountType": "Liability",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_AP",
+    "reason": "Balance sheet item, same basis for book and tax"
+  },
+  {
+    "accountName": "Accrued Bonuses",
+    "accountType": "Liability",
+    "expectedTreatment": "temporary",
+    "expectedCategory": "deductible_temporary",
+    "expectedTaxType": "TEMP_ACCRUED_LIABILITIES",
+    "reason": "Accrued at year-end for books, deductible when paid within 2.5 months for tax (Sec 461)"
+  },
+  {
+    "accountName": "Restructuring Reserve",
+    "accountType": "Liability",
+    "expectedTreatment": "temporary",
+    "expectedCategory": "deductible_temporary",
+    "expectedTaxType": "TEMP_ACCRUED_LIABILITIES",
+    "reason": "Accrued for books when plan approved, deductible when incurred for tax"
+  },
+  {
+    "accountName": "Prepaid Insurance",
+    "accountType": "Asset",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Prepaid expenses have same basis, 12-month rule under Sec 461"
+  },
+  {
+    "accountName": "Entertainment Expenses",
+    "accountType": "Expense",
+    "expectedTreatment": "permanent",
+    "expectedCategory": null,
+    "expectedTaxType": "PERM_MEALS_ENTERTAINMENT",
+    "reason": "Entertainment expenses 100% non-deductible post-TCJA (Sec 274(a))"
+  },
+  {
+    "accountName": "Charitable Contributions",
+    "accountType": "Expense",
+    "expectedTreatment": "permanent",
+    "expectedCategory": null,
+    "expectedTaxType": "PERM_OTHER",
+    "reason": "Subject to 10% taxable income limitation (Sec 170), creates permanent difference if limited"
+  },
+  {
+    "accountName": "NOL Carryforward Utilized",
+    "accountType": "Income",
+    "expectedTreatment": "temporary",
+    "expectedCategory": "taxable_temporary",
+    "expectedTaxType": "TEMP_NOL_CARRYFORWARD",
+    "reason": "NOL reduces current taxable income, subject to 80% limitation (Sec 172)"
+  },
+  {
+    "accountName": "Subcontractor Expense",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Ordinary business expense deductible under Sec 162"
+  },
+  {
+    "accountName": "Commissions Expense",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Sales commissions deductible under Sec 162"
+  },
+  {
+    "accountName": "Cloud Computing Costs",
+    "accountType": "Expense",
+    "expectedTreatment": "temporary",
+    "expectedCategory": "taxable_temporary",
+    "expectedTaxType": "TEMP_RESEARCH_CAPITALIZATION",
+    "reason": "Software development cloud costs potentially subject to Sec 174 capitalization"
+  },
+  {
+    "accountName": "Repairs and Maintenance",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Deductible under tangible property regulations (Sec 263(a))"
+  },
+  {
+    "accountName": "Royalty Income",
+    "accountType": "Income",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Ordinary income, same recognition"
+  },
+  {
+    "accountName": "Loss on Disposal of Assets",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Recognized loss same for book and tax (Sec 1231)"
+  },
+  {
+    "accountName": "Sponsorship Fees",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Marketing expense deductible under Sec 162"
+  },
+  {
+    "accountName": "Environmental Remediation Reserve",
+    "accountType": "Liability",
+    "expectedTreatment": "temporary",
+    "expectedCategory": "deductible_temporary",
+    "expectedTaxType": "TEMP_ACCRUED_LIABILITIES",
+    "reason": "Accrued for books, deductible when remediation costs incurred for tax"
+  },
+  {
+    "accountName": "Property Tax Expense",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Deductible under Sec 164"
+  },
+  {
+    "accountName": "Patent Amortization",
+    "accountType": "Expense",
+    "expectedTreatment": "temporary",
+    "expectedCategory": "taxable_temporary",
+    "expectedTaxType": "TEMP_AMORTIZATION",
+    "reason": "Sec 197 15-year amortization vs book useful life (may differ)"
+  },
+  {
+    "accountName": "Inventory Obsolescence Reserve",
+    "accountType": "Expense",
+    "expectedTreatment": "temporary",
+    "expectedCategory": "deductible_temporary",
+    "expectedTaxType": "TEMP_OTHER",
+    "reason": "Book reserve vs tax deduction when inventory written off"
+  },
+  {
+    "accountName": "Deferred Tax Asset - NOL",
+    "accountType": "Asset",
+    "expectedTreatment": "temporary",
+    "expectedCategory": "deductible_temporary",
+    "expectedTaxType": "TEMP_NOL_CARRYFORWARD",
+    "reason": "NOL carryforward creates DTA"
+  },
+  {
+    "accountName": "Deferred Tax Liability - Fixed Assets",
+    "accountType": "Liability",
+    "expectedTreatment": "temporary",
+    "expectedCategory": "taxable_temporary",
+    "expectedTaxType": "TEMP_DEPRECIATION",
+    "reason": "Accelerated tax depreciation creates DTL"
+  },
+  {
+    "accountName": "Income Tax Payable",
+    "accountType": "Liability",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Tax liability account, not an income statement item"
+  },
+  {
+    "accountName": "Lobbying Expenses",
+    "accountType": "Expense",
+    "expectedTreatment": "permanent",
+    "expectedCategory": null,
+    "expectedTaxType": "PERM_OTHER",
+    "reason": "Lobbying expenses non-deductible under Sec 162(e)"
+  },
+  {
+    "accountName": "Conference and Training",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Employee training deductible under Sec 162"
+  },
+  {
+    "accountName": "Equity in Earnings of Affiliates",
+    "accountType": "Income",
+    "expectedTreatment": "permanent",
+    "expectedCategory": null,
+    "expectedTaxType": "PERM_DIVIDENDS_RECEIVED_DEDUCTION",
+    "reason": "DRD applies to dividends from domestic subsidiaries (Sec 243)"
+  },
+  {
+    "accountName": "Foreign Exchange Gain/Loss",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "FX gains/losses recognized same period for book and tax (Sec 988)"
+  },
+  {
+    "accountName": "Pension Expense - Defined Benefit",
+    "accountType": "Expense",
+    "expectedTreatment": "temporary",
+    "expectedCategory": "deductible_temporary",
+    "expectedTaxType": "TEMP_ACCRUED_LIABILITIES",
+    "reason": "Book accrual vs tax deduction when contributions made (Sec 404)"
+  },
+  {
+    "accountName": "401(k) Match Contribution",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Deductible when contributed within deadline (Sec 404)"
+  },
+  {
+    "accountName": "Self-Insurance Reserve",
+    "accountType": "Liability",
+    "expectedTreatment": "temporary",
+    "expectedCategory": "deductible_temporary",
+    "expectedTaxType": "TEMP_ACCRUED_LIABILITIES",
+    "reason": "Book reserve vs tax deduction when claims paid (Sec 461)"
+  },
+  {
+    "accountName": "Asset Retirement Obligation",
+    "accountType": "Liability",
+    "expectedTreatment": "temporary",
+    "expectedCategory": "deductible_temporary",
+    "expectedTaxType": "TEMP_ACCRUED_LIABILITIES",
+    "reason": "Book liability vs tax deduction when remediation performed"
+  },
+  {
+    "accountName": "Leasehold Improvements",
+    "accountType": "Expense",
+    "expectedTreatment": "temporary",
+    "expectedCategory": "taxable_temporary",
+    "expectedTaxType": "TEMP_DEPRECIATION",
+    "reason": "MACRS 15-year vs book useful life (or shorter of lease term)"
+  },
+  {
+    "accountName": "Unearned Revenue",
+    "accountType": "Liability",
+    "expectedTreatment": "temporary",
+    "expectedCategory": "deductible_temporary",
+    "expectedTaxType": "TEMP_DEFERRED_REVENUE",
+    "reason": "Cash received before performance = book liability vs tax income (Sec 451)"
+  },
+  {
+    "accountName": "Shipping and Handling",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Ordinary business expense deductible under Sec 162"
+  },
+  {
+    "accountName": "Telephone and Internet",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_UTILITIES",
+    "reason": "Ordinary business expense, same treatment"
+  },
+  {
+    "accountName": "Bank Service Charges",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Ordinary expense deductible under Sec 162"
+  },
+  {
+    "accountName": "Customer Deposits",
+    "accountType": "Liability",
+    "expectedTreatment": "temporary",
+    "expectedCategory": "deductible_temporary",
+    "expectedTaxType": "TEMP_DEFERRED_REVENUE",
+    "reason": "Prepayments from customers, revenue deferred for books but may be taxable"
+  },
+  {
+    "accountName": "Safety Equipment",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Deductible business expense"
+  },
+  {
+    "accountName": "Uniforms and Work Clothing",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Deductible if required and not suitable for everyday wear"
+  },
+  {
+    "accountName": "Litigation Settlement",
+    "accountType": "Expense",
+    "expectedTreatment": "permanent",
+    "expectedCategory": null,
+    "expectedTaxType": "PERM_OTHER",
+    "reason": "Certain settlements non-deductible under TCJA Sec 162(f)"
+  },
+  {
+    "accountName": "Credit Card Processing Fees",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Ordinary business expense"
+  },
+  {
+    "accountName": "Catalog Printing Costs",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Advertising/marketing expense deductible under Sec 162"
+  },
+  {
+    "accountName": "Product Development Costs",
+    "accountType": "Expense",
+    "expectedTreatment": "temporary",
+    "expectedCategory": "taxable_temporary",
+    "expectedTaxType": "TEMP_RESEARCH_CAPITALIZATION",
+    "reason": "Sec 174 R&D capitalization for software/product development"
+  },
+  {
+    "accountName": "Property Insurance",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Insurance expense deductible when incurred"
+  },
+  {
+    "accountName": "Waste Disposal",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Operating expense deductible under Sec 162"
+  },
+  {
+    "accountName": "Interest Expense Capitalized",
+    "accountType": "Asset",
+    "expectedTreatment": "temporary",
+    "expectedCategory": "taxable_temporary",
+    "expectedTaxType": "TEMP_OTHER",
+    "reason": "Capitalized interest for books under Sec 263A, timing difference on depreciation"
+  },
+  {
+    "accountName": "Mine Reclamation Liability",
+    "accountType": "Liability",
+    "expectedTreatment": "temporary",
+    "expectedCategory": "deductible_temporary",
+    "expectedTaxType": "TEMP_ACCRUED_LIABILITIES",
+    "reason": "Book liability vs tax deduction when reclamation work performed"
+  },
+  {
+    "accountName": "Deferred Loan Origination Fees",
+    "accountType": "Asset",
+    "expectedTreatment": "temporary",
+    "expectedCategory": "taxable_temporary",
+    "expectedTaxType": "TEMP_OTHER",
+    "reason": "Amortized for books, current deduction for tax under Sec 446"
+  },
+  {
+    "accountName": "Stock Options Expense",
+    "accountType": "Expense",
+    "expectedTreatment": "temporary",
+    "expectedCategory": "deductible_temporary",
+    "expectedTaxType": "TEMP_OTHER",
+    "reason": "ASC 718 book expense vs tax deduction at exercise (Sec 83)"
+  },
+  {
+    "accountName": "Post-Retirement Benefits",
+    "accountType": "Liability",
+    "expectedTreatment": "temporary",
+    "expectedCategory": "deductible_temporary",
+    "expectedTaxType": "TEMP_ACCRUED_LIABILITIES",
+    "reason": "OPEB accrued for books, deductible when paid for tax"
+  },
+  {
+    "accountName": "Freight and Delivery",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Part of COGS/operating expense, deductible"
+  },
+  {
+    "accountName": "Lab Supplies",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Research supplies, deductible (unless part of Sec 174)"
+  },
+  {
+    "accountName": "Health Insurance Premiums",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Deductible as employee benefit"
+  },
+  {
+    "accountName": "Continuing Professional Education",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Employee education deductible under Sec 162"
+  },
+  {
+    "accountName": "Data Center Electricity",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_UTILITIES",
+    "reason": "Operating expense, same treatment"
+  },
+  {
+    "accountName": "Temporary Labor",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Contract labor deductible under Sec 162"
+  },
+  {
+    "accountName": "Relocation Expense - Employee",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Taxable to employee, deductible by employer (post-TCJA)"
+  },
+  {
+    "accountName": "Startup Costs Amortization",
+    "accountType": "Expense",
+    "expectedTreatment": "temporary",
+    "expectedCategory": "taxable_temporary",
+    "expectedTaxType": "TEMP_AMORTIZATION",
+    "reason": "Sec 195 - $5k immediate deduction + 180-month amortization"
+  },
+  {
+    "accountName": "Medicare Payroll Tax",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Payroll tax deductible as ordinary business expense"
+  },
+  {
+    "accountName": "Recruiting Expense",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Recruiting costs deductible under Sec 162"
+  },
+  {
+    "accountName": "Trade Show Booth Costs",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Marketing expense deductible"
+  },
+  {
+    "accountName": "Website Hosting",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_UTILITIES",
+    "reason": "Operating expense, same treatment"
+  },
+  {
+    "accountName": "Security Services",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Ordinary business expense deductible"
+  },
+  {
+    "accountName": "Cash Over/Short",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_CASH",
+    "reason": "Minor cash reconciling items, same treatment"
+  },
+  {
+    "accountName": "Seminars and Workshops",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Employee education deductible"
+  },
+  {
+    "accountName": "Dues and Subscriptions",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Professional memberships deductible (not lobbying organizations)"
+  },
+  {
+    "accountName": "Parking Expense - Employees",
+    "accountType": "Expense",
+    "expectedTreatment": "permanent",
+    "expectedCategory": null,
+    "expectedTaxType": "PERM_OTHER",
+    "reason": "Qualified transportation fringes non-deductible under TCJA (Sec 274(a))"
+  },
+  {
+    "accountName": "Donations In-Kind",
+    "accountType": "Expense",
+    "expectedTreatment": "permanent",
+    "expectedCategory": null,
+    "expectedTaxType": "PERM_OTHER",
+    "reason": "Charitable contributions, potentially limited by Sec 170"
+  },
+  {
+    "accountName": "Warranty Claims Paid",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Actual claim payments deductible when paid"
+  },
+  {
+    "accountName": "Employee Referral Bonus",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Compensation expense, deductible"
+  },
+  {
+    "accountName": "Late Payment Penalty - Vendor",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Late fees to vendors are deductible business expenses, not government penalties"
+  },
+  {
+    "accountName": "Software License Fees",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "SaaS/software subscription deductible as ordinary expense"
+  },
+  {
+    "accountName": "Janitorial Services",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Facilities expense deductible under Sec 162"
+  },
+  {
+    "accountName": "Alarm Monitoring",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_UTILITIES",
+    "reason": "Security services deductible"
+  },
+  {
+    "accountName": "Postage and Courier",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Ordinary business expense deductible"
+  },
+  {
+    "accountName": "Printing and Copying",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Office expense deductible"
+  },
+  {
+    "accountName": "ERP System Maintenance",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Software maintenance deductible"
+  },
+  {
+    "accountName": "Landscaping and Grounds",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Facilities maintenance deductible"
+  },
+  {
+    "accountName": "Petty Cash Replenishment",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_CASH",
+    "reason": "Minor expenses, same treatment"
+  },
+  {
+    "accountName": "Holiday Party Expense",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "100% deductible employee recreation (not meals/entertainment if all-employee)"
+  },
+  {
+    "accountName": "Office Furniture",
+    "accountType": "Asset",
+    "expectedTreatment": "temporary",
+    "expectedCategory": "taxable_temporary",
+    "expectedTaxType": "TEMP_DEPRECIATION",
+    "reason": "7-year MACRS property vs book useful life"
+  },
+  {
+    "accountName": "Tooling and Dies",
+    "accountType": "Asset",
+    "expectedTreatment": "temporary",
+    "expectedCategory": "taxable_temporary",
+    "expectedTaxType": "TEMP_DEPRECIATION",
+    "reason": "3-year MACRS property vs book useful life"
+  },
+  {
+    "accountName": "Certificate of Deposit Interest",
+    "accountType": "Income",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Interest income taxable in year earned"
+  },
+  {
+    "accountName": "Refund - Vendor Overpayment",
+    "accountType": "Income",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Recovery of expense, same treatment"
+  },
+  {
+    "accountName": "Scrap Metal Revenue",
+    "accountType": "Income",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Ordinary income, same treatment"
+  },
+  {
+    "accountName": "Vending Machine Income",
+    "accountType": "Income",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_REVENUE",
+    "reason": "Ordinary revenue, same period recognition"
+  },
+  {
+    "accountName": "Employee Advances",
+    "accountType": "Asset",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Receivable from employees, basis same for book and tax"
+  },
+  {
+    "accountName": "Gift Cards Sold",
+    "accountType": "Liability",
+    "expectedTreatment": "temporary",
+    "expectedCategory": "deductible_temporary",
+    "expectedTaxType": "TEMP_DEFERRED_REVENUE",
+    "reason": "Unearned revenue until redeemed; may be taxable on sale for tax purposes"
+  },
+  {
+    "accountName": "Franchise Fees - Initial",
+    "accountType": "Income",
+    "expectedTreatment": "temporary",
+    "expectedCategory": "deductible_temporary",
+    "expectedTaxType": "TEMP_DEFERRED_REVENUE",
+    "reason": "Deferred for book over franchise term, potentially taxable at receipt"
+  },
+  {
+    "accountName": "Customer Rebates Accrued",
+    "accountType": "Liability",
+    "expectedTreatment": "temporary",
+    "expectedCategory": "deductible_temporary",
+    "expectedTaxType": "TEMP_ACCRUED_LIABILITIES",
+    "reason": "Book accrual vs tax deduction when rebates paid"
+  },
+  {
+    "accountName": "Sales Returns Reserve",
+    "accountType": "Liability",
+    "expectedTreatment": "temporary",
+    "expectedCategory": "deductible_temporary",
+    "expectedTaxType": "TEMP_ACCRUED_LIABILITIES",
+    "reason": "Book reserve for returns vs actual returns deduction"
+  },
+  {
+    "accountName": "Rent Concession - Tenant Improvement",
+    "accountType": "Asset",
+    "expectedTreatment": "temporary",
+    "expectedCategory": "taxable_temporary",
+    "expectedTaxType": "TEMP_OTHER",
+    "reason": "Straight-line rent for books vs cash basis for tax"
+  },
+  {
+    "accountName": "Deferred Rent Credit",
+    "accountType": "Liability",
+    "expectedTreatment": "temporary",
+    "expectedCategory": "deductible_temporary",
+    "expectedTaxType": "TEMP_ACCRUED_LIABILITIES",
+    "reason": "Straight-line rent smoothing creates temporary difference"
+  },
+  {
+    "accountName": "Website Development Costs",
+    "accountType": "Asset",
+    "expectedTreatment": "temporary",
+    "expectedCategory": "taxable_temporary",
+    "expectedTaxType": "TEMP_AMORTIZATION",
+    "reason": "Capitalized for books, possibly Sec 174 for tax"
+  },
+  {
+    "accountName": "Trademark Registration Costs",
+    "accountType": "Asset",
+    "expectedTreatment": "temporary",
+    "expectedCategory": "taxable_temporary",
+    "expectedTaxType": "TEMP_AMORTIZATION",
+    "reason": "Sec 197 15-year amortization for tax, may differ from book"
+  },
+  {
+    "accountName": "Non-Compete Agreement",
+    "accountType": "Asset",
+    "expectedTreatment": "temporary",
+    "expectedCategory": "taxable_temporary",
+    "expectedTaxType": "TEMP_AMORTIZATION",
+    "reason": "Sec 197 15-year amortization regardless of contract term"
+  },
+  {
+    "accountName": "Customer List - Acquired",
+    "accountType": "Asset",
+    "expectedTreatment": "temporary",
+    "expectedCategory": "taxable_temporary",
+    "expectedTaxType": "TEMP_AMORTIZATION",
+    "reason": "Sec 197 intangible, 15-year amortization"
+  },
+  {
+    "accountName": "Offsite Backup Storage",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "IT expense deductible"
+  },
+  {
+    "accountName": "Notary Public Fees",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Minor administrative expense deductible"
+  },
+  {
+    "accountName": "Payroll Processing Fees",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Administrative expense deductible"
+  },
+  {
+    "accountName": "Employment Verification",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "HR expense deductible"
+  },
+  {
+    "accountName": "OSHA Safety Training",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Required training deductible"
+  },
+  {
+    "accountName": "Emergency Response Drills",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Safety expense deductible"
+  },
+  {
+    "accountName": "Fuel and Mileage Reimbursement",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Business mileage expense deductible under standard rate"
+  },
+  {
+    "accountName": "Uniform Rental Service",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Rental expense deductible"
+  },
+  {
+    "accountName": "Quality Control Testing",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Manufacturing expense deductible"
+  },
+  {
+    "accountName": "Assembly Line Supplies",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Manufacturing supplies deductible"
+  },
+  {
+    "accountName": "Packing Materials",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Part of COGS, deductible"
+  },
+  {
+    "accountName": "Warehouse Rent",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_RENT",
+    "reason": "Storage rent deductible as ordinary business expense"
+  },
+  {
+    "accountName": "Pallet Expense",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Shipping supplies deductible"
+  },
+  {
+    "accountName": "Inventory Shrinkage",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Inventory adjustment, same treatment"
+  },
+  {
+    "accountName": "PPE Sanitization Supplies",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Safety supplies deductible"
+  },
+  {
+    "accountName": "Fire Extinguisher Service",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Safety maintenance deductible"
+  },
+  {
+    "accountName": "Elevator Maintenance",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Building maintenance deductible"
+  },
+  {
+    "accountName": "HVAC Maintenance Contract",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Building maintenance deductible"
+  },
+  {
+    "accountName": "Snow Removal Service",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Property maintenance deductible"
+  },
+  {
+    "accountName": "Window Washing Service",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Janitorial services deductible"
+  },
+  {
+    "accountName": "Pest Control Service",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Building maintenance deductible"
+  },
+  {
+    "accountName": "Water and Sewer",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_UTILITIES",
+    "reason": "Utility expense deductible"
+  },
+  {
+    "accountName": "Natural Gas - Heating",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_UTILITIES",
+    "reason": "Utility expense deductible"
+  },
+  {
+    "accountName": "Propane - Forklift",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Fuel expense deductible"
+  },
+  {
+    "accountName": "Equipment Rental - Short Term",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Rental expense deductible"
+  },
+  {
+    "accountName": "Permits and Licenses",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Government fees, generally deductible"
+  },
+  {
+    "accountName": "Import Duties",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Duties added to inventory basis, deductible through COGS"
+  },
+  {
+    "accountName": "Certification Body Audit",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "ISO/quality audit expense deductible"
+  },
+  {
+    "accountName": "Drug Testing - Employees",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "HR compliance expense deductible"
+  },
+  {
+    "accountName": "Background Check Service",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "HR expense deductible"
+  },
+  {
+    "accountName": "Employee Assistance Program",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Employee benefit deductible"
+  },
+  {
+    "accountName": "Gym Membership - Executive",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Taxable fringe benefit to employee, deductible by employer"
+  },
+  {
+    "accountName": "Company Car Lease",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Lease expense deductible (personal use taxable to employee)"
+  },
+  {
+    "accountName": "Patent Filing Fees",
+    "accountType": "Expense",
+    "expectedTreatment": "temporary",
+    "expectedCategory": "taxable_temporary",
+    "expectedTaxType": "TEMP_AMORTIZATION",
+    "reason": "Capitalized as intangible, amortized under Sec 197"
+  },
+  {
+    "accountName": "Regulatory Filing Fee - SEC",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Ordinary business expense deductible"
+  },
+  {
+    "accountName": "Transfer Agent Fees",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Administrative expense deductible"
+  },
+  {
+    "accountName": "Annual Report Printing",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Shareholder communication expense deductible"
+  },
+  {
+    "accountName": "Proxy Solicitation Costs",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Corporate governance expense deductible"
+  },
+  {
+    "accountName": "Investor Relations Consulting",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Professional services deductible"
+  },
+  {
+    "accountName": "Environmental Impact Study",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Professional services deductible"
+  },
+  {
+    "accountName": "Fairness Opinion - M&A",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Transaction cost — may need to be capitalized under Sec 263"
+  },
+  {
+    "accountName": "Due Diligence Costs - Acquisition",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Transaction costs, may be capitalized in successful acquisition"
+  },
+  {
+    "accountName": "Shelf Registration Costs",
+    "accountType": "Asset",
+    "expectedTreatment": "temporary",
+    "expectedCategory": "deductible_temporary",
+    "expectedTaxType": "TEMP_OTHER",
+    "reason": "Deferred offering costs, amortized over shelf life"
+  },
+  {
+    "accountName": "Cafeteria Subsidy",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Employee benefit — de minimis fringe if <$125/month"
+  },
+  {
+    "accountName": "Moving Expense - Corporate Office",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Business relocation expense deductible"
+  },
+  {
+    "accountName": "Abandoned Leasehold Improvements",
+    "accountType": "Expense",
+    "expectedTreatment": "temporary",
+    "expectedCategory": "deductible_temporary",
+    "expectedTaxType": "TEMP_OTHER",
+    "reason": "Book write-off vs remaining tax basis deduction"
+  },
+  {
+    "accountName": "Asset Impairment - Non-Deductible",
+    "accountType": "Expense",
+    "expectedTreatment": "permanent",
+    "expectedCategory": null,
+    "expectedTaxType": "PERM_NONDEDUCTIBLE_GOODWILL",
+    "reason": "Goodwill impairment not deductible; handled through Sec 197"
+  },
+  {
+    "accountName": "Hedge Ineffectiveness Loss",
+    "accountType": "Expense",
+    "expectedTreatment": "temporary",
+    "expectedCategory": "deductible_temporary",
+    "expectedTaxType": "TEMP_OTHER",
+    "reason": "Mark-to-market book vs realization-based tax (Sec 1221)"
+  },
+  {
+    "accountName": "Foreign Subsidiary Translation Adj",
+    "accountType": "Equity",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "OCI item, no current tax impact until repatriation"
+  },
+  {
+    "accountName": "Unrealized Gain on Securities",
+    "accountType": "Income",
+    "expectedTreatment": "temporary",
+    "expectedCategory": "taxable_temporary",
+    "expectedTaxType": "TEMP_OTHER",
+    "reason": "Mark-to-market book income vs realized for tax"
+  },
+  {
+    "accountName": "Spotify/Apple Music - Office",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "De minimis office expense deductible"
+  },
+  {
+    "accountName": "Flowers - Client Sympathy",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "De minimis business gift deductible"
+  },
+  {
+    "accountName": "Holiday Gifts - Clients",
+    "accountType": "Expense",
+    "expectedTreatment": "permanent",
+    "expectedCategory": null,
+    "expectedTaxType": "PERM_OTHER",
+    "reason": "Business gifts limited to $25 per recipient per year (Sec 274(b))"
+  },
+  {
+    "accountName": "Flowers - Office Decoration",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Office expense deductible"
+  },
+  {
+    "accountName": "Coffee Service - Office",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "De minimis employee fringe benefit deductible"
+  },
+  {
+    "accountName": "Water Cooler Rental",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Office expense deductible"
+  },
+  {
+    "accountName": "Sanitizer Stations",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Health/safety supplies deductible"
+  },
+  {
+    "accountName": "First Aid Supplies",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Safety supplies deductible"
+  },
+  {
+    "accountName": "Defibrillator Maintenance",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Safety equipment maintenance deductible"
+  },
+  {
+    "accountName": "Forklift Fuel - Diesel",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Operating supplies deductible"
+  },
+  {
+    "accountName": "Compressed Air System Maintenance",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Equipment maintenance deductible"
+  },
+  {
+    "accountName": "Conveyor Belt Replacement",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Routine maintenance - deductible repair under Sec 263(a)"
+  },
+  {
+    "accountName": "Dock Leveler Repair",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Routine repair deductible"
+  },
+  {
+    "accountName": "Roof Repair - Patch",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Incidental repair deductible (not capital improvement)"
+  },
+  {
+    "accountName": "Roof Replacement",
+    "accountType": "Asset",
+    "expectedTreatment": "temporary",
+    "expectedCategory": "taxable_temporary",
+    "expectedTaxType": "TEMP_DEPRECIATION",
+    "reason": "Capital improvement — 39-year MACRS vs book life"
+  },
+  {
+    "accountName": "Parking Lot Resealing",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Incidental repair deductible under tangible property regs"
+  },
+  {
+    "accountName": "Parking Lot Reconstruction",
+    "accountType": "Asset",
+    "expectedTreatment": "temporary",
+    "expectedCategory": "taxable_temporary",
+    "expectedTaxType": "TEMP_DEPRECIATION",
+    "reason": "Capital improvement depreciated for tax"
+  },
+  {
+    "accountName": "Carpet Replacement - Full Floor",
+    "accountType": "Asset",
+    "expectedTreatment": "temporary",
+    "expectedCategory": "taxable_temporary",
+    "expectedTaxType": "TEMP_DEPRECIATION",
+    "reason": "Betterment/restoration, capitalized for tax"
+  },
+  {
+    "accountName": "HVAC Compressor Replacement",
+    "accountType": "Asset",
+    "expectedTreatment": "temporary",
+    "expectedCategory": "taxable_temporary",
+    "expectedTaxType": "TEMP_DEPRECIATION",
+    "reason": "Major component, capitalized as improvement"
+  },
+  {
+    "accountName": "Interior Painting",
+    "accountType": "Expense",
+    "expectedTreatment": "no_diff",
+    "expectedCategory": null,
+    "expectedTaxType": "NODIFF_OTHER",
+    "reason": "Maintenance painting, deductible"
+  },
+  {
+    "accountName": "Signage - Building Exterior",
+    "accountType": "Asset",
+    "expectedTreatment": "temporary",
+    "expectedCategory": "taxable_temporary",
+    "expectedTaxType": "TEMP_DEPRECIATION",
+    "reason": "Signage depreciable under MACRS"
+  }
+]

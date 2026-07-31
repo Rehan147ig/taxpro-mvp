@@ -161,6 +161,8 @@ taxpro/
 
 ## ⚡ Quick Start & Local Demo Setup
 
+**Live Demo:** [https://taxpro.up.railway.app](https://taxpro.up.railway.app) _(deploy pending — see `railway.json` + root `Dockerfile`)_
+
 ### Prerequisites
 
 - Node.js 22+

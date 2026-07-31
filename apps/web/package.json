@@ -24,8 +24,11 @@
     "@opentelemetry/sdk-trace-base": "^2.10.0",
     "@opentelemetry/sdk-trace-web": "^2.10.0",
     "@tanstack/react-router": "^1.82.0",
+    "@tanstack/router-cli": "^1.167.21",
+    "@tanstack/router-vite-plugin": "^1.167.23",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-error-boundary": "^6.1.2",
     "zustand": "^5.0.0"
   },
   "devDependencies": {

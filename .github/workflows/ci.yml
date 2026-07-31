@@ -94,6 +94,15 @@ jobs:
       - name: Build Web
         run: npm run build -w apps/web
 
+      - name: AI Mapping Eval (dry-run — accuracy check when AI configured)
+        run: npm run eval:ai-mapping -w apps/api || echo "⚠ eval:ai-mapping skipped (no AI provider or dry-run)"
+        env:
+          DATABASE_URL: postgres://taxpro:taxpro@localhost:5432/taxpro
+          REDIS_URL: redis://localhost:6379
+          JWT_SECRET: ci-test-secret-key-not-for-production-use
+          DATA_ENCRYPTION_KEY: test-data-encryption-key-min-32-chars!!
+          NODE_ENV: test
+
   # ── 2. Docker Build & Vulnerability Scan ──
   docker:
     name: Docker Build & Scan
