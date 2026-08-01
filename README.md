@@ -352,7 +352,7 @@ Demo credentials: `demo@taxpro.ai` / `TaxProDemo123!` (admin role; seed also cre
 
 ```bash
 npm run lint                                   # typecheck all workspaces (tsc --noEmit)
-npm test                                       # 343 unit tests (118 engine + 225 API)
+npm test                                       # 368 unit tests (118 engine + 250 API)
 npm run build                                  # full turbo build (engine → api → web)
 npm run test:integration -w @taxpro/api        # 27/27 provision lifecycle (needs Docker Postgres/Redis)
 npm run test:e2e                               # Playwright 4/4 operator workflow + auth (needs running stack)
@@ -371,7 +371,7 @@ npm run db:synthetic -w apps/api               # deterministic synthetic data (i
 | Gate | Command | Result |
 |---|---|---|
 | Lint / typecheck | `npm run lint` | PASS |
-| Unit tests | `npm test` | 343/343 PASS (118 engine + 225 API) |
+| Unit tests | `npm test` | 368/368 PASS (118 engine + 250 API) |
 | Build | `npm run build` | PASS |
 | Provision integration flow | `npm run test:integration -w @taxpro/api` | 27/27 PASS (import → mapping → provision → AI trace polling → review → finalize → submit → partner sign-off → lock → 409 → package → audit → tenant isolation across 6 resources) |
 | Operator workflow E2E | `npx playwright test` (apps/web) | 4/4 PASS |
@@ -394,7 +394,7 @@ npm run db:synthetic -w apps/api               # deterministic synthetic data (i
 
 ## Production Readiness Status
 
-**In development — build verified, benchmark harnesses green, NOT filing-ready.**
+**Verification complete — build verified, benchmark harnesses green, integration E2E green, deployment hardening verified. NOT filing-ready.**
 
 - UK FRS 102 engine validated against 9 curated real filings (0–5 bp ETR deltas).
 - US ASC 740 engine validated against a subset of public filings; coverage expansion in progress.

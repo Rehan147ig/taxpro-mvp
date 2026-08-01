@@ -1,9 +1,9 @@
 # TaxPro — Production Readiness Report
 
-**Status:** In development — build verified, benchmark harnesses green, NOT filing-ready.
+**Status:** Verification complete — build verified, benchmark harnesses green, integration E2E green, deployment hardening verified. NOT filing-ready.
 **Date:** 2026-08-01
 **Branch:** master
-**Test Suite:** 330 tests passing (118 tax-engine + 212 API), 0 failures
+**Test Suite:** 368 tests passing (118 tax-engine + 250 API), 0 failures
 **E2E Pipeline:** Playwright 4/4 (3 auth + full operator workflow with review items, AI findings, ZIP content verification, export language check); API integration flow 27/27 (in-process Hono + live Postgres, covers import → mapping → provision → AI trace polling → review → pre-lock export → submit → partner sign-off → lock → 409 → post-lock comprehensive package → audit → mapping audit → tenant isolation across 6 resources)
 
 ---
@@ -13,12 +13,19 @@
 | Gate | Command | Result |
 |---|---|---|
 | Lint / typecheck | `npm run lint` | PASS |
-| Unit tests | `npm test` | 330/330 PASS (118 engine + 212 API) |
-| Build | `npm run build` | PASS |
+| Unit tests | `npm test` | 368/368 PASS (118 engine + 250 API) |
+| Build | `npm run build` | PASS (3/3 workspaces, turbo) |
 | Provision integration flow | `npm run test:integration -w @taxpro/api` | 27/27 PASS (reset → import → import export → import validation → mappings → override → provision → run-scoped mapping override → AI trace polling → review → depreciation metadata check → single resolve → bulk resolve → finalize → pre-lock export → submit → partner sign-off → lock → verification → post-lock 409 → post-lock comprehensive package → audit lifecycle → mapping+export audit events → create foreign tenant → tenant isolation across 6 resources → verify no pending agents) |
 | Operator workflow E2E | `npx playwright test` (apps/web) | 4/4 PASS (auth x3 + provision → review items display → AI findings page → partner sign-off → lock → 409 → audit → ZIP content verification → export language check → dashboard status) |
-| US EDGAR eval | `OFFLINE=1 npm run eval` | 2 PASS, 4 WARN, 6 SKIPPED (of 12) |
-| UK eval | `npm run eval:uk` | 9/9 PASS, mean ETR delta 1.3 bp |
+| US EDGAR eval | `OFFLINE=1 npm run eval` | 2 PASS, 4 WARN, 6 SKIPPED (of 12), mean ETR delta 46.5 bp |
+| UK eval | `npm run eval:uk` | 9/9 PASS, mean ETR delta 1.3 bp, deferred closing 0 bp |
+| AI mapping eval | `AI_EVAL_MODE=dry-run npm run eval:ai-mapping -w @taxpro/api` | dry-run PASS (202 golden entries; expected distribution 55 temp / 17 perm / 130 no_diff printed) |
+| Agent harness (mocked) | `AI_EVAL_MODE=mocked npm run harness -w @taxpro/api` | PASS (16 fixtures, 0% fallback mocked; real 2.1% fallback Aug 2026) |
+| Docker compose E2E | `docker compose -p taxpro-gate up -d --build` | 5/5 containers healthy: api (migrations + seed + RLS validation PASS), worker (all 4 workers, RLS PASS), web (nginx SPA + API proxy), postgres, redis |
+| Graceful shutdown | SIGTERM → worker | PASS — `[Worker] Shutdown signal received` → `Workers closed` → exit 0 |
+| Prod env fail-fast | `NODE_ENV=production` + weak JWT secret | PASS — refuses to start |
+| Prod env fail-fast | `NODE_ENV=production` + superuser DATABASE_URL | PASS — `assertRuntimeDbRole` refuses to start |
+| Health checks | `GET /health`, `GET /api/health` | PASS — `{db: connected, redis: connected, checks: {db: true, redis: true, rls: true}}` |
 
 ### 1.1 UK FRS 102 Benchmark (Companies House fixtures)
 
@@ -155,4 +162,4 @@ Production must connect as `taxpro_app` (NOBYPASSRLS). `assertRuntimeDbRole` (`c
 
 ## 7. Recommendation
 
-**Not yet production-ready.** Phases 8–9 are genuinely complete: operator UI (all 9 pages, code-split), Playwright 4/4 with strengthened assertions, API integration 25/25 covering import → mapping → provision → AI trace polling → review → lock → comprehensive package export → audit → tenant isolation across 6 resources. Remaining order: complete the Phase 10–11 checklist in `docs/ROADMAP_PRODUCTION.md` (deployment hardening + final report), then external CPA review + security audit before any go-live or "filing-ready" claim.
+**Not yet production-ready — launch checklist complete, external review pending.** All Phase 10–11 gates verified (2026-08-01): lint, 368 unit tests, build, 27/27 API integration flow, 4/4 Playwright, US EDGAR offline eval (2 PASS / 4 WARN / 6 SKIP — skip reasons documented, engine not at fault), UK eval 9/9 (mean 1.3 bp), AI mapping eval dry-run, agent harness (mocked), docker-compose E2E 5/5 healthy, graceful worker shutdown exit 0, prod env fail-fast (weak JWT secret + superuser role both refused), health checks green (db/redis/rls). Remaining order: external CPA review + security audit before any go-live or "filing-ready" claim. Ranked EDGAR skip-gap fixes (P1: new-taxonomy dollar tags, minority-interest negative bucket; P2: percent-unit path, target rotation) and the real-mode mapping eval blocker (max_tokens 4096 truncation, eval-tenant UUID) are documented in `docs/EDGAR_SKIP_GAP_REPORT.md` and `docs/PRODUCTION_READINESS_REPORT.md` §6.

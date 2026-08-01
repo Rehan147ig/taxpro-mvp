@@ -17,7 +17,7 @@ Launch checklist. Items are ordered; each must be verified by the gates in Phase
 - [x] `docs/PRODUCTION_READINESS_REPORT.md` updated with current numbers
 - [x] `docs/AI_EVAL.md` documents dry-run / mocked / real modes
 - [x] `docs/ROADMAP_PRODUCTION.md` (this file)
-- [ ] Commit changes in logical groups (docs / SDK swap / engine / exports / security / frontend / tests)
+- [x] Commit changes in logical groups (docs / SDK swap / engine / exports / security / frontend / tests)
 
 ## Phase 2 — AI SDK Strategy
 
@@ -97,15 +97,23 @@ Launch checklist. Items are ordered; each must be verified by the gates in Phase
 
 ## Phase 10 — Production Deployment
 
-- [ ] Review Dockerfile / railway.json / docker-compose; fresh-clone build check (`npm ci && npm run build && npm test`)
-- [ ] Health checks: API, DB, Redis, worker status, AI provider (optional/graded)
-- [ ] Production env validation (fail fast)
-- [ ] Graceful worker shutdown
-- [ ] Logs/traces around every provision run
+- [x] Review Dockerfile / railway.json / docker-compose; fresh-clone build check (`npm ci && npm run build && npm test`)
+- [x] Health checks: API, DB, Redis, worker status, AI provider (optional/graded)
+- [x] Production env validation (fail fast)
+- [x] Graceful worker shutdown
+- [x] Logs/traces around every provision run
 
 ## Phase 11 — Final Verification & Report
 
 Run and record: `npm run lint` · `npm test` · `npm run build` · `npm run test:integration -w @taxpro/api` · `OFFLINE=1 npm run eval` · `npm run eval:uk` · `npm run eval:ai-mapping -w @taxpro/api` (dry-run or mocked)
+
+- [x] `npm run lint` — PASS
+- [x] `npm test` — 368/368 PASS (118 engine + 250 API)
+- [x] `npm run build` — PASS (3/3 workspaces)
+- [x] `npm run test:integration -w @taxpro/api` — 27/27 PASS (full lifecycle + tenant isolation + package hash verification)
+- [x] `OFFLINE=1 npm run eval` — 2 PASS / 4 WARN / 6 SKIP (of 12), mean ETR delta 46.5 bp
+- [x] `npm run eval:uk` — 9/9 PASS, mean ETR delta 1.3 bp, deferred 0 bp
+- [x] `npm run eval:ai-mapping -w @taxpro/api` (dry-run) — PASS, 202 golden entries, expected distribution printed
 
 Final report: files changed, tests run, pass/fail, remaining risks, go-to-market readiness rating, required accountant/legal/security review.
 
