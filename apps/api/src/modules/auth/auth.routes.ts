@@ -24,13 +24,13 @@ const loginSchema = z.object({
   password: z.string(),
 });
 
-authRoutes.post('/register', zValidator('json', registerSchema), async (c) => {
+authRoutes.post('/register', rateLimitMiddleware, zValidator('json', registerSchema), async (c) => {
   const { email, password, tenantName, tenantSlug } = c.req.valid('json');
 
   // Check if user exists
   const existingUser = await db.select().from(users).where(eq(users.email, email)).limit(1);
   if (existingUser.length > 0) {
-    throw new BadRequestError('User already exists with this email');
+    throw new BadRequestError('Registration failed');
   }
 
   // Create tenant

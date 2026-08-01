@@ -62,13 +62,13 @@ Launch checklist. Items are ordered; each must be verified by the gates in Phase
 
 ## Phase 7 — Security & Governance
 
-- [ ] Runtime role guard: fail startup when NODE_ENV=production and DATABASE_URL uses a superuser role
-- [ ] Verify NOBYPASSRLS role usage in production
-- [ ] Tests: tenant isolation, missing tenant context, cross-tenant access, locked-run mutation rejection, partner cannot approve own run, audit append-only
-- [ ] `.env` untracked (verified), `.env.example` complete (done)
-- [ ] Rate limiting on auth + critical provision endpoints
-- [ ] Generic auth failure messages (no information leakage)
-- [ ] Fix pg deprecation warning in API tests
+- [x] Runtime role guard: fail startup when NODE_ENV=production and DATABASE_URL uses a superuser role
+- [x] Verify NOBYPASSRLS role usage in production
+- [x] Tests: tenant isolation, missing tenant context, cross-tenant access, locked-run mutation rejection, partner cannot approve own run, audit append-only
+- [x] `.env` untracked (verified), `.env.example` complete (done)
+- [x] Rate limiting on auth + critical provision endpoints
+- [x] Generic auth failure messages (no information leakage)
+- [x] Fix pg deprecation warning in API tests
 
 ## Phase 8 — Frontend Product Completion
 

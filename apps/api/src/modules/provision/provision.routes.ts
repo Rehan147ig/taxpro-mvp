@@ -15,7 +15,8 @@ import { accounts } from '../../db/schema/accounts.js';
 import { tenants } from '../../db/schema/tenants.js';
 import { users } from '../../db/schema/users.js';
 import { authMiddleware } from '../../lib/middleware/auth.js';
-import { getUser, requireRole, requireRunAccess, assertRunIsMutable, canMutate } from '../../lib/middleware/rbac.js';
+import { strictRateLimiter } from '../../lib/middleware/rate-limiter.js';
+import { getUser, requireRole, requireRunAccess, assertRunIsMutable, canMutate, assertPartnerCanApprove } from '../../lib/middleware/rbac.js';
 import { BadRequestError, ForbiddenError } from '../../lib/errors.js';
 import { generateProvisionWorkbook } from '../export/excel-generator.js';
 import { generateWorkpaperPackage } from '../export/package-export.js';
@@ -59,7 +60,7 @@ const runProvisionSchema = z.object({
   entityId: z.string().optional(),
 });
 
-provisionRoutes.post('/run', zValidator('json', runProvisionSchema), async (c) => {
+provisionRoutes.post('/run', strictRateLimiter, zValidator('json', runProvisionSchema), async (c) => {
   const user = c.get('user');
   const { period, endPeriod, entityId } = c.req.valid('json');
   const useDirect = c.req.query('direct') === 'true';
@@ -262,7 +263,7 @@ provisionRoutes.post('/run', zValidator('json', runProvisionSchema), async (c) =
       }).where(eq(provisionRuns.id, run.id));
 
       const subagentPromises = Promise.allSettled([
-        runTracedSubagent(tx, {
+        runTracedSubagent(undefined, {
           tenantId: user.tenantId,
           userId: user.userId,
           provisionRunId: run.id,
@@ -286,7 +287,7 @@ provisionRoutes.post('/run', zValidator('json', runProvisionSchema), async (c) =
           execute: runMappingAgent,
         }),
 
-        runTracedSubagent(tx, {
+        runTracedSubagent(undefined, {
           tenantId: user.tenantId,
           userId: user.userId,
           provisionRunId: run.id,
@@ -315,7 +316,7 @@ provisionRoutes.post('/run', zValidator('json', runProvisionSchema), async (c) =
           execute: draftAuditMemo,
         }),
 
-        runTracedSubagent(tx, {
+        runTracedSubagent(undefined, {
           tenantId: user.tenantId,
           userId: user.userId,
           provisionRunId: run.id,
@@ -1101,7 +1102,7 @@ provisionRoutes.get('/results/:id/package', async (c) => {
 });
 
 // ── Eve assistant: conversational workflow operator ──
-provisionRoutes.post('/eve/ask', async (c) => {
+provisionRoutes.post('/eve/ask', strictRateLimiter, async (c) => {
   const user = c.get('user');
   const { prompt } = await c.req.json() as { prompt: string };
   if (!prompt) throw new BadRequestError('Missing "prompt" in request body');
@@ -1357,12 +1358,7 @@ provisionRoutes.post('/runs/:runId/partner-approve',
         .where(and(eq(provisionRuns.id, runId), eq(provisionRuns.tenantId, user.tenantId))).limit(1);
       if (!run) throw new BadRequestError('Provision run not found');
 
-      if (run.submittedByUserId === user.userId) {
-        throw new ForbiddenError('A partner cannot approve a run they submitted');
-      }
-      if (run.requestedByUserId === user.userId) {
-        throw new ForbiddenError('A partner cannot approve a run they requested');
-      }
+      assertPartnerCanApprove(run, user.userId);
 
       const now = new Date();
       await tx.update(provisionRuns).set({

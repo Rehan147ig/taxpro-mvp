@@ -3,6 +3,7 @@ import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 config({ path: resolve(dirname(fileURLToPath(import.meta.url)), '../../../../.env'), override: true });
 import { z } from 'zod';
+import { assertRuntimeDbRole } from './db-role-guard.js';
 
 const envSchema = z.object({
   // Runtime database connection (non-owner NOBYPASSRLS role)
@@ -40,4 +41,7 @@ if (env.NODE_ENV === 'production') {
   if (env.JWT_SECRET === 'dev-secret-change-in-production' || env.JWT_SECRET === 'change-me-in-production') {
     throw new Error('JWT_SECRET must be set to a strong secret in production');
   }
+
+  assertRuntimeDbRole(env.NODE_ENV, env.DATABASE_URL);
 }
+

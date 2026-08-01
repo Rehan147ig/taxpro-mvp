@@ -71,6 +71,20 @@ export function canMutate(userRole: string): boolean {
   return !['client_readonly', 'auditor'].includes(userRole);
 }
 
+export interface ApprovalRunContext {
+  submittedByUserId?: string | null;
+  requestedByUserId?: string | null;
+}
+
+export function assertPartnerCanApprove(run: ApprovalRunContext, approverUserId: string): void {
+  if (run.submittedByUserId === approverUserId) {
+    throw new ForbiddenError('A partner cannot approve a run they submitted');
+  }
+  if (run.requestedByUserId === approverUserId) {
+    throw new ForbiddenError('A partner cannot approve a run they requested');
+  }
+}
+
 export function ensureTenantScoped(userTenantId: string, resourceTenantId: string | null): void {
   if (!resourceTenantId || resourceTenantId !== userTenantId) {
     throw new NotFoundError('Resource');

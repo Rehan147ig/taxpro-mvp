@@ -3,7 +3,7 @@
 **Status:** In development — build verified, benchmark harnesses green, NOT filing-ready.
 **Date:** 2026-08-01
 **Branch:** master
-**Test Suite:** 304 tests passing (118 tax-engine + 186 API), 0 failures
+**Test Suite:** 316 tests passing (118 tax-engine + 198 API), 0 failures
 **E2E Pipeline:** 8/8 integration steps pass (in-process Hono + live Postgres; subagent calls degrade to fallback when the AI provider is unreachable)
 
 ---
@@ -13,7 +13,7 @@
 | Gate | Command | Result |
 |---|---|---|
 | Lint / typecheck | `npm run lint` | PASS |
-| Unit tests | `npm test` | 304/304 PASS (118 engine + 186 API) |
+| Unit tests | `npm test` | 316/316 PASS (118 engine + 198 API) |
 | Build | `npm run build` | PASS |
 | Provision integration flow | `npm run test:integration -w @taxpro/api` | 8/8 PASS |
 | US EDGAR eval | `OFFLINE=1 npm run eval` | 2 PASS, 4 WARN, 6 SKIPPED (of 12) |
@@ -59,9 +59,9 @@ Expansion of EDGAR coverage (state tax, valuation allowance, credits, contingenc
 | Production JWT secret guard | PASS | `env.ts` rejects default secret in production |
 | Secrets in source | PASS | Zero found in `src/` |
 
-### Runtime role guard (planned)
+### Runtime role guard (implemented, Phase 7)
 
-Production must connect as `taxpro_app` (NOBYPASSRLS). A startup guard that fails fast when `NODE_ENV=production` and `DATABASE_URL` uses a superuser role is on the Phase 7 checklist.
+Production must connect as `taxpro_app` (NOBYPASSRLS). `assertRuntimeDbRole` (`config/db-role-guard.ts`) fails fast at startup when `NODE_ENV=production` and `DATABASE_URL` uses a superuser-like role (postgres/root), while `validateRuntimeRoleSecurity()` refuses to start in non-development if the connected role bypasses RLS or owns tenant tables. Dev still uses superuser (documented limitation).
 
 ---
 
@@ -74,6 +74,12 @@ Production must connect as `taxpro_app` (NOBYPASSRLS). A startup guard that fail
 | Lock endpoint uses FOR UPDATE | PASS |
 | Locked runs reject mutation with 409 | PASS |
 | Cross-tenant concurrent operations | PASS (RLS + app-layer) |
+| Runtime role guard (prod superuser fail-fast) | PASS | `assertRuntimeDbRole` in `config/db-role-guard.ts` + `env.ts`; unit-tested |
+| NOBYPASSRLS role verification | PASS | `validateRuntimeRoleSecurity()` fails startup in non-dev; `taxpro_app` privilege assertions (append-only `provision_events`) |
+| Partner cannot approve own run | PASS | `assertPartnerCanApprove` in rbac + tests |
+| Auth generic failure messages | PASS | login `Invalid email or password`; register returns generic `Registration failed` (no account-existence leak) |
+| Rate limiting | PASS | login/register 5/15min; global `/api/*` 100/min; strict 20/min on `/api/provision/run` + `/api/provision/eve/ask` |
+| pg deprecation warning | FIXED | subagent traces now write through the shared pool (one connection per agent), not the transaction client |
 
 ---
 
@@ -128,14 +134,11 @@ Production must connect as `taxpro_app` (NOBYPASSRLS). A startup guard that fail
 
 ### Must fix before major release
 - US EDGAR eval coverage: 6/12 filings skipped; mapping expansion (state tax, valuation allowance, credits, contingencies) in progress.
-- Runtime DB role guard (superuser detection at startup in production).
-- pg deprecation warning in API tests (`client.query()` concurrency).
 - Frontend bundle > 500 kB warning; code-split routes.
-- Rate limiting hardening for auth + critical provision endpoints (current limiter exists for login; verify coverage).
 - AI provider unreachable from dev machine; real-mode AI eval currently falls back to dry-run statistics (exit 0).
 
 ---
 
 ## 7. Recommendation
 
-**Not yet production-ready.** Remaining order: complete Phase 7–10 checklist in `docs/ROADMAP_PRODUCTION.md`, then external CPA review + security audit before any go-live or "filing-ready" claim.
+**Not yet production-ready.** Remaining order: complete Phase 8–10 checklist in `docs/ROADMAP_PRODUCTION.md`, then external CPA review + security audit before any go-live or "filing-ready" claim.
