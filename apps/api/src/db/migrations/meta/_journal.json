@@ -78,6 +78,13 @@
                         "when":  1785921608000,
                         "tag":  "depreciation_metadata",
                         "breakpoints":  true
+                    },
+                    {
+                        "idx":  11,
+                        "version":  "0011_auth_lookup",
+                        "when":  1786176000000,
+                        "tag":  "auth_lookup_function",
+                        "breakpoints":  true
                     }
                 ]
 }
