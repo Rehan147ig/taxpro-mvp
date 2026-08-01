@@ -1,7 +1,11 @@
+import { randomUUID } from 'crypto';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { runMappingAgent } from '../../src/agent/subagents/mapping-agent.js';
 import { getAiModel, isAiConfigured } from '../../src/config/ai.js';
+
+/** Accounts per stage-2 LLM call — mirrors the production auto-mapper (BATCH_SIZE = 50). */
+const BATCH_SIZE = 50;
 
 interface GoldenEntry {
   accountName: string;
@@ -153,14 +157,34 @@ async function main() {
       detailType: g.accountType,
     }));
 
-    const agentResult = await runMappingAgent({
-      tenantId: 'eval-tenant',
-      tenantName: 'Eval Runner',
-      accounts,
-    });
+    // The eval tenant is synthetic — generate a real UUID so tenant-scoped
+    // pattern queries (classification_patterns.tenant_id is uuid) do not
+    // raise a 22P02 invalid-input-syntax error.
+    const evalTenantId = randomUUID();
 
-    if (!agentResult.success) {
-      console.error(`Mapping agent failed: ${agentResult.error}`);
+    // Chunk to stay under the model's output-token limit: 202 accounts in one
+    // stage-2 call overflows max_tokens and truncates (missing mappings).
+    // Batch at the same size as the production auto-mapper (50/call) so the
+    // measurement reflects the real classification path.
+    const allTaxMappings: Array<{ accountId: string; taxAccountType: string; bookTreatment: string; timingCategory?: string; confidenceScore: number; ircSection: string; explanation: string }> = [];
+    let failed = false;
+    for (let i = 0; i < accounts.length; i += BATCH_SIZE) {
+      const batch = accounts.slice(i, i + BATCH_SIZE);
+      const agentResult = await runMappingAgent({
+        tenantId: evalTenantId,
+        tenantName: 'Eval Runner',
+        accounts: batch,
+      });
+
+      if (!agentResult.success) {
+        console.error(`Mapping agent failed on batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(accounts.length / BATCH_SIZE)}: ${agentResult.error}`);
+        failed = true;
+        break;
+      }
+      allTaxMappings.push(...agentResult.taxMappings);
+    }
+
+    if (failed) {
       console.log('\nAI provider timed out or returned an error. Falling back to dry-run statistics...');
       printDistribution(golden);
       console.log(`\nAI eval incomplete - 0/${golden.length} evaluated (API error). Exiting with code 0 for CI.`);
@@ -168,7 +192,7 @@ async function main() {
     }
 
     predictions = new Map();
-    for (const m of agentResult.taxMappings) {
+    for (const m of allTaxMappings) {
       predictions.set(m.accountId, {
         treatment: m.bookTreatment,
         taxType: normalizeType(m.taxAccountType),

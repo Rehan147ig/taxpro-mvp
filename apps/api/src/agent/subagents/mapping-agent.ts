@@ -209,6 +209,10 @@ export async function runMappingAgent(input: MappingAgentInput): Promise<Mapping
       user: `Map these accounts to IRC tax categories. Include the specific IRC section for each.${historical}\n\nAccounts:\n${JSON.stringify(stage2Accounts, null, 2)}`,
       promptVersion: 'mapping-agent-stage2-v2',
       temperature: 0.1,
+      // A batch of 50 accounts with per-account IRC citations exceeds the
+      // 4096 default; 8192 covers a full production-size batch without
+      // truncating the tail of the JSON array (truncation = missing mappings).
+      maxTokens: 8192,
     });
 
     const taxMappings = (mappingResponse.parsed.mappings ?? []).map(m => ({
