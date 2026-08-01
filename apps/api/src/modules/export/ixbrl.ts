@@ -1,4 +1,5 @@
 import { toNumber } from './ct600.js';
+import { validateIxbrlDocument, type IxbrlValidationResult } from './ixbrl-validation.js';
 
 /**
  * iXBRL accounts generator (UK FRS 102 / Companies House filing).
@@ -55,6 +56,8 @@ export interface IxbrlDocument {
   readyStatus: 'validation_ready';
   /** Versioned UK GAAP taxonomy schema the instance is built against. */
   schemaRef: string;
+  /** Structural conformance verdict computed at build time. */
+  validation: IxbrlValidationResult;
 }
 
 const ISO_ESCAPE_RE = /[&<>"']/g;
@@ -83,7 +86,8 @@ export function buildIxbrlInstance(input: IxbrlInput): IxbrlDocument {
   }
   lines.push(`</xbrl>`);
 
-  return { format: 'instance', periodStart: input.periodStart, periodEnd: input.periodEnd, facts, content: lines.join('\n'), readyStatus: 'validation_ready', schemaRef: `${FRS102_NS}/ukgaap-frs102-2023-01-01.xsd` };
+  const content = lines.join('\n');
+  return { format: 'instance', periodStart: input.periodStart, periodEnd: input.periodEnd, facts, content, readyStatus: 'validation_ready', schemaRef: `${FRS102_NS}/ukgaap-frs102-2023-01-01.xsd`, validation: validateIxbrlDocument({ format: 'instance', periodStart: input.periodStart, periodEnd: input.periodEnd, facts, content, schemaRef: `${FRS102_NS}/ukgaap-frs102-2023-01-01.xsd` }) };
 }
 
 export function buildInlineIxbrl(input: IxbrlInput): IxbrlDocument {
@@ -115,7 +119,8 @@ export function buildInlineIxbrl(input: IxbrlInput): IxbrlDocument {
     `</html>`,
   ];
 
-  return { ...instance, format: 'inline', content: html.join('\n') };
+  const content = html.join('\n');
+  return { ...instance, format: 'inline', content, validation: validateIxbrlDocument({ format: 'inline', periodStart: instance.periodStart, periodEnd: instance.periodEnd, facts: instance.facts, content, schemaRef: instance.schemaRef }) };
 }
 
 export function ixbrlFromProvisionDetail(

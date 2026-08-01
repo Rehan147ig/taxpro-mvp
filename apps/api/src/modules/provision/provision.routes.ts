@@ -267,7 +267,7 @@ provisionRoutes.post('/run',
       }).where(eq(provisionRuns.id, run.id));
 
       const subagentPromises = Promise.allSettled([
-        runTracedSubagent(undefined, {
+        runTracedSubagent(tx, {
           tenantId: user.tenantId,
           userId: user.userId,
           provisionRunId: run.id,
@@ -291,7 +291,7 @@ provisionRoutes.post('/run',
           execute: runMappingAgent,
         }),
 
-        runTracedSubagent(undefined, {
+        runTracedSubagent(tx, {
           tenantId: user.tenantId,
           userId: user.userId,
           provisionRunId: run.id,
@@ -320,7 +320,7 @@ provisionRoutes.post('/run',
           execute: draftAuditMemo,
         }),
 
-        runTracedSubagent(undefined, {
+        runTracedSubagent(tx, {
           tenantId: user.tenantId,
           userId: user.userId,
           provisionRunId: run.id,
@@ -620,7 +620,8 @@ provisionRoutes.get('/results/:id/ct600', async (c) => {
       c.header('Content-Disposition', `attachment; filename="taxpro-ct600-${result.period}.csv"`);
       return c.body(ct600ToCsv(ct600));
     }
-    return c.json(ct600);
+    const { validateCt600Return } = await import('../export/ct600-validation.js');
+    return c.json({ ...ct600, validation: validateCt600Return(ct600) });
   });
 });
 
