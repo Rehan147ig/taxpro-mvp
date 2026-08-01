@@ -1,0 +1,56 @@
+{
+  "_fixtureId": "credit-rd-absent",
+  "_meta": {
+    "description": "Service business with zero R&D characteristics. Agents must not fabricate credits; qualifying expenditure should be 0 or absent.",
+    "jurisdiction": "US",
+    "entityType": "LLC",
+    "scenario": "credit-rd-absent"
+  },
+  "tenant": { "id": "10000000-0000-4000-8000-00000000000b", "name": "Cleanline Janitorial LLC" },
+  "fiscalYear": 2026,
+  "period": "2026-01-01",
+  "ledgerCurrency": "USD",
+  "legalEntities": [],
+  "trialBalance": [
+    { "accountId": "clean-1000", "accountNumber": "1000", "accountName": "Cash", "accountType": "Bank", "detailType": "Bank", "balance": 28600, "currency": "USD" },
+    { "accountId": "clean-1100", "accountNumber": "1100", "accountName": "Accounts Receivable", "accountType": "Accounts Receivable", "detailType": "Accounts Receivable", "balance": 41200, "currency": "USD" },
+    { "accountId": "clean-2000", "accountNumber": "2000", "accountName": "Accounts Payable", "accountType": "Accounts Payable", "detailType": "Accounts Payable", "balance": -18700, "currency": "USD" },
+    { "accountId": "clean-3000", "accountNumber": "3000", "accountName": "Owner Equity", "accountType": "Equity", "detailType": "Partner Capital", "balance": -51000, "currency": "USD" },
+    { "accountId": "clean-4000", "accountNumber": "4000", "accountName": "Sales - Services", "accountType": "Income", "detailType": "Sales", "balance": -510000, "currency": "USD" },
+    { "accountId": "clean-5000", "accountNumber": "5000", "accountName": "Wages - Janitorial Staff", "accountType": "Expense", "detailType": "Payroll Expenses", "balance": 240000, "currency": "USD" },
+    { "accountId": "clean-5100", "accountNumber": "5100", "accountName": "Cleaning Supplies", "accountType": "Expense", "detailType": "Supplies & Materials", "balance": 32000, "currency": "USD" },
+    { "accountId": "clean-5200", "accountNumber": "5200", "accountName": "Equipment Leases", "accountType": "Expense", "detailType": "Rent or Lease", "balance": 51000, "currency": "USD" },
+    { "accountId": "clean-5300", "accountNumber": "5300", "accountName": "Insurance - Liability", "accountType": "Expense", "detailType": "Insurance", "balance": 18000, "currency": "USD" },
+    { "accountId": "clean-5400", "accountNumber": "5400", "accountName": "Marketing - Flyers & Ads", "accountType": "Expense", "detailType": "Advertising", "balance": 9400, "currency": "USD" },
+    { "accountId": "clean-5500", "accountNumber": "5500", "accountName": "Office Rent", "accountType": "Expense", "detailType": "Rent or Lease", "balance": 42000, "currency": "USD" },
+    { "accountId": "clean-5600", "accountNumber": "5600", "accountName": "Uniforms & Supplies", "accountType": "Expense", "detailType": "Supplies & Materials", "balance": 8300, "currency": "USD" },
+    { "accountId": "clean-5700", "accountNumber": "5700", "accountName": "Vehicle Expenses", "accountType": "Expense", "detailType": "Automobile Expenses", "balance": 27000, "currency": "USD" }
+  ],
+  "provisionSummary": {
+    "entityName": "Cleanline Janitorial LLC",
+    "period": "2026-01-01",
+    "bookIncome": 6100,
+    "effectiveTaxRate": 0.19,
+    "statutoryRate": 0.21,
+    "totalTaxExpense": 1159,
+    "currentTaxExpense": 1000,
+    "deferredTaxExpense": 159,
+    "taxPayable": 1000,
+    "etrLines": [
+      { "description": "Vehicle expense limitation", "amount": 400, "taxImpact": 84, "rateImpact": 0.014 }
+    ],
+    "permanentDifferences": [],
+    "temporaryDifferences": [
+      { "timingCategory": "deductible_temporary", "difference": 400 }
+    ],
+    "previousYearETR": 0.2,
+    "entities": 1,
+    "accountingMethod": "accrual",
+    "taxYear": 2026
+  },
+  "expectations": {
+    "mapping": "Service payroll and supplies are ordinary deductible expenses; no R&D/energy/credit characteristics.",
+    "audit": "Memo produced without inventing credits or deductions.",
+    "credit": "No R&D, energy, or WOTC accounts; qualifying expenditure is 0 or absent; agents must not hallucinate credits."
+  }
+}

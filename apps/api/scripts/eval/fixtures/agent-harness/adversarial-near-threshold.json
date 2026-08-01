@@ -1,0 +1,64 @@
+{
+  "_fixtureId": "adversarial-near-threshold",
+  "_meta": {
+    "description": "Sec 179 near phase-out threshold: delivery vehicle with 55% business use (Sec 280F limits), Sec 179 equipment under phase-out, bonus depreciation fixtures, client entertainment.",
+    "jurisdiction": "US",
+    "entityType": "LLC",
+    "scenario": "adversarial-threshold"
+  },
+  "tenant": { "id": "10000000-0000-4000-8000-00000000000f", "name": "Summit Auto Group LLC" },
+  "fiscalYear": 2026,
+  "period": "2026-01-01",
+  "ledgerCurrency": "USD",
+  "legalEntities": [],
+  "trialBalance": [
+    { "accountId": "summit-1000", "accountNumber": "1000", "accountName": "Cash", "accountType": "Bank", "detailType": "Bank", "balance": 184000, "currency": "USD" },
+    { "accountId": "summit-1100", "accountNumber": "1100", "accountName": "Accounts Receivable - Fleet Accounts", "accountType": "Accounts Receivable", "detailType": "Accounts Receivable", "balance": 142000, "currency": "USD" },
+    { "accountId": "summit-1200", "accountNumber": "1200", "accountName": "Inventory - Vehicles", "accountType": "Other Current Asset", "detailType": "Inventory", "balance": 890000, "currency": "USD" },
+    { "accountId": "summit-1500", "accountNumber": "1500", "accountName": "Vehicles - Delivery Fleet (net)", "accountType": "Fixed Asset", "detailType": "Vehicles", "balance": 61000, "currency": "USD" },
+    { "accountId": "summit-1510", "accountNumber": "1510", "accountName": "Equipment - Diagnostic (net)", "accountType": "Fixed Asset", "detailType": "Machinery & Equipment", "balance": 214000, "currency": "USD" },
+    { "accountId": "summit-1520", "accountNumber": "1520", "accountName": "Leasehold Improvements - Fixtures", "accountType": "Fixed Asset", "detailType": "Leasehold Improvements", "balance": 97000, "currency": "USD" },
+    { "accountId": "summit-2000", "accountNumber": "2000", "accountName": "Accounts Payable", "accountType": "Accounts Payable", "detailType": "Accounts Payable", "balance": -168000, "currency": "USD" },
+    { "accountId": "summit-2100", "accountNumber": "2100", "accountName": "Floor Plan Financing", "accountType": "Long Term Liability", "detailType": "Notes Payable", "balance": -320000, "currency": "USD" },
+    { "accountId": "summit-3000", "accountNumber": "3000", "accountName": "Member Equity", "accountType": "Equity", "detailType": "Partner Capital", "balance": -830000, "currency": "USD" },
+    { "accountId": "summit-4000", "accountNumber": "4000", "accountName": "Sales - Vehicles", "accountType": "Income", "detailType": "Sales", "balance": -1750000, "currency": "USD" },
+    { "accountId": "summit-4100", "accountNumber": "4100", "accountName": "Sales - Parts & Service", "accountType": "Income", "detailType": "Sales", "balance": -640000, "currency": "USD" },
+    { "accountId": "summit-4200", "accountNumber": "4200", "accountName": "COGS - Vehicles", "accountType": "Cost of Goods Sold", "detailType": "Supplies & Materials", "balance": 1180000, "currency": "USD" },
+    { "accountId": "summit-5000", "accountNumber": "5000", "accountName": "Meals - Client Entertainment", "accountType": "Expense", "detailType": "Meals & Entertainment", "balance": 8200, "currency": "USD" },
+    { "accountId": "summit-5100", "accountNumber": "5100", "accountName": "Interest - Floor Plan", "accountType": "Expense", "detailType": "Interest Paid", "balance": 63000, "currency": "USD" },
+    { "accountId": "summit-5200", "accountNumber": "5200", "accountName": "Depreciation - Vehicles", "accountType": "Expense", "detailType": "Depreciation", "balance": 12400, "currency": "USD" },
+    { "accountId": "summit-5300", "accountNumber": "5300", "accountName": "Depreciation - Equipment & Fixtures", "accountType": "Expense", "detailType": "Depreciation", "balance": 41100, "currency": "USD" }
+  ],
+  "provisionSummary": {
+    "entityName": "Summit Auto Group LLC",
+    "period": "2026-01-01",
+    "bookIncome": 98200,
+    "effectiveTaxRate": 0.2,
+    "statutoryRate": 0.21,
+    "totalTaxExpense": 19640,
+    "currentTaxExpense": 17000,
+    "deferredTaxExpense": 2640,
+    "taxPayable": 17000,
+    "etrLines": [
+      { "description": "Sec 179 / bonus depreciation timing", "amount": 31000, "taxImpact": 6510, "rateImpact": 0.066 },
+      { "description": "Meals - client entertainment 50% limitation", "amount": 4100, "taxImpact": 861, "rateImpact": 0.009 },
+      { "description": "Vehicle business-use limitation (Sec 280F)", "amount": 2750, "taxImpact": 578, "rateImpact": 0.006 }
+    ],
+    "permanentDifferences": [
+      { "label": "Meals 50% limitation (Sec 274(n))", "amount": 4100 },
+      { "label": "Vehicle luxury cap (Sec 280F)", "amount": 2750 }
+    ],
+    "temporaryDifferences": [
+      { "timingCategory": "deductible_temporary", "difference": 31000 }
+    ],
+    "previousYearETR": 0.208,
+    "entities": 1,
+    "accountingMethod": "accrual",
+    "taxYear": 2026
+  },
+  "expectations": {
+    "mapping": "Depreciation accounts flagged temporary with Sec 179/bonus consideration; client entertainment permanent 50% limitation; vehicle luxury cap permanent.",
+    "audit": "Memo discusses Sec 280F vehicle caps and Sec 179 phase-out risk; risk flags note documentation burden.",
+    "credit": "No R&D/energy/WOTC accounts; no credits identified."
+  }
+}

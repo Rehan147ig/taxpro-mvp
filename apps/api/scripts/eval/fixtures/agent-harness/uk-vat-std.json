@@ -1,0 +1,60 @@
+{
+  "_fixtureId": "uk-vat-std",
+  "_meta": {
+    "description": "UK limited company, standard-rated VAT (20%), AIA plant & machinery, PAYE/NIC controls. UK corporation tax at 25%.",
+    "jurisdiction": "UK",
+    "entityType": "Ltd",
+    "scenario": "uk-standard"
+  },
+  "tenant": { "id": "10000000-0000-4000-8000-000000000004", "name": "Threadline Apparel Ltd" },
+  "fiscalYear": 2026,
+  "period": "2026-01-01",
+  "ledgerCurrency": "GBP",
+  "legalEntities": [],
+  "trialBalance": [
+    { "accountId": "thread-1000", "accountNumber": "1000", "accountName": "Bank", "accountType": "Bank", "detailType": "Bank", "balance": 18250, "currency": "GBP" },
+    { "accountId": "thread-1100", "accountNumber": "1100", "accountName": "Accounts Receivable", "accountType": "Accounts Receivable", "detailType": "Accounts Receivable", "balance": 34200, "currency": "GBP" },
+    { "accountId": "thread-1200", "accountNumber": "1200", "accountName": "Stock", "accountType": "Other Current Asset", "detailType": "Inventory", "balance": 56700, "currency": "GBP" },
+    { "accountId": "thread-1500", "accountNumber": "1500", "accountName": "Plant & Machinery (net)", "accountType": "Fixed Asset", "detailType": "Machinery & Equipment", "balance": 89000, "currency": "GBP" },
+    { "accountId": "thread-2100", "accountNumber": "2100", "accountName": "VAT Control - Output", "accountType": "Other Current Liability", "detailType": "VAT Control", "balance": -23400, "currency": "GBP" },
+    { "accountId": "thread-2200", "accountNumber": "2200", "accountName": "VAT Input Recoverable", "accountType": "Other Current Asset", "detailType": "VAT Control", "balance": 12100, "currency": "GBP" },
+    { "accountId": "thread-2300", "accountNumber": "2300", "accountName": "PAYE & NIC Control", "accountType": "Other Current Liability", "detailType": "Payroll Liabilities", "balance": -9800, "currency": "GBP" },
+    { "accountId": "thread-2400", "accountNumber": "2400", "accountName": "Corporation Tax Payable", "accountType": "Other Current Liability", "detailType": "Taxes Payable", "balance": -17500, "currency": "GBP" },
+    { "accountId": "thread-4000", "accountNumber": "4000", "accountName": "Sales - UK Standard Rated", "accountType": "Income", "detailType": "Sales", "balance": -412000, "currency": "GBP" },
+    { "accountId": "thread-5000", "accountNumber": "5000", "accountName": "Purchases - Standard Rated", "accountType": "Expense", "detailType": "Supplies & Materials", "balance": 150000, "currency": "GBP" },
+    { "accountId": "thread-5100", "accountNumber": "5100", "accountName": "Wages & Salaries", "accountType": "Expense", "detailType": "Payroll Expenses", "balance": 89000, "currency": "GBP" },
+    { "accountId": "thread-5200", "accountNumber": "5200", "accountName": "Rent", "accountType": "Expense", "detailType": "Rent or Lease", "balance": 24000, "currency": "GBP" },
+    { "accountId": "thread-5300", "accountNumber": "5300", "accountName": "Utilities", "accountType": "Expense", "detailType": "Utilities", "balance": 8600, "currency": "GBP" },
+    { "accountId": "thread-5400", "accountNumber": "5400", "accountName": "Marketing", "accountType": "Expense", "detailType": "Advertising", "balance": 9200, "currency": "GBP" },
+    { "accountId": "thread-5500", "accountNumber": "5500", "accountName": "Professional Fees", "accountType": "Expense", "detailType": "Legal & Professional", "balance": 12400, "currency": "GBP" },
+    { "accountId": "thread-5600", "accountNumber": "5600", "accountName": "Depreciation - Plant & Machinery", "accountType": "Expense", "detailType": "Depreciation", "balance": 17800, "currency": "GBP" }
+  ],
+  "provisionSummary": {
+    "entityName": "Threadline Apparel Ltd",
+    "period": "2026-01-01",
+    "bookIncome": 42800,
+    "effectiveTaxRate": 0.235,
+    "statutoryRate": 0.25,
+    "totalTaxExpense": 10058,
+    "currentTaxExpense": 9300,
+    "deferredTaxExpense": 758,
+    "taxPayable": 9300,
+    "etrLines": [
+      { "description": "Depreciation add-back / capital allowances (AIA)", "amount": 17800, "taxImpact": 4450, "rateImpact": 0.104 },
+      { "description": "Capital allowances on plant (100% AIA)", "amount": -89000, "taxImpact": -22250, "rateImpact": -0.520 }
+    ],
+    "permanentDifferences": [],
+    "temporaryDifferences": [
+      { "timingCategory": "deductible_temporary", "difference": 17800 }
+    ],
+    "previousYearETR": 0.24,
+    "entities": 1,
+    "accountingMethod": "accrual",
+    "taxYear": 2026
+  },
+  "expectations": {
+    "mapping": "VAT control accounts are balance-sheet controls with no profit-and-loss impact; depreciation add-back creates a deferred tax timing difference offset by AIA capital allowances.",
+    "audit": "Memo references UK corporation tax rate 25%, capital allowances (AIA), and the depreciation timing difference.",
+    "credit": "No US IRC credits applicable to UK entities; no R&D/energy/WOTC accounts."
+  }
+}

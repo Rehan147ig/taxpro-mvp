@@ -14,10 +14,7 @@ import { netsuiteRoutes } from './modules/netsuite/netsuite.routes.js';
 import { mappingRoutes } from './modules/mapping/mapping.routes.js';
 import { provisionRoutes } from './modules/provision/provision.routes.js';
 import { importRoutes } from './modules/import/import.routes.js';
-import { startMappingWorker } from './modules/mapping/ai/worker.js';
-import { startAutoMappingWorker } from './modules/import/auto-mapping/auto-mapping.worker.js';
-import { startCHWorker } from './modules/import/companies-house/worker.js';
-import { startAgentPipelineWorker } from './agent/orchestrator/state-machine.js';
+import { startAllWorkers } from './workers.js';
 import { agentRoutes } from './modules/agent/agent.routes.js';
 import { demoRoutes } from './modules/demo/demo.routes.js';
 import { uploadRoutes } from './modules/upload/upload.routes.js';
@@ -83,26 +80,13 @@ async function main() {
     port: env.PORT,
   });
 
-  // Start background workers
-  const mappingWorker = startMappingWorker();
-  logger.info('[API] Mapping worker started');
-
-  const autoMappingWorker = startAutoMappingWorker();
-  logger.info('[API] Auto-mapping worker started');
-
-  const chWorker = startCHWorker();
-  logger.info('[API] Companies House worker started');
-
-  const agentPipelineWorker = startAgentPipelineWorker();
-  logger.info('[API] Agent pipeline worker started');
+  // Start background workers unless delegated to a dedicated worker process
+  const workerHandles = env.RUN_WORKERS === 'true' ? startAllWorkers() : null;
 
   // Graceful shutdown
   const shutdown = async (signal: string) => {
     logger.info({ signal }, '[API] Shutdown signal received');
-    await chWorker.close();
-    await autoMappingWorker.close();
-    await mappingWorker.close();
-    await agentPipelineWorker.close();
+    await workerHandles?.closeAll();
     server.close(async () => {
       logger.info('[API] Server closed');
       await closeDb();

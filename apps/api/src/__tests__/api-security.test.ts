@@ -1,10 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { Hono } from 'hono';
+import jwt from 'jsonwebtoken';
 import { authRoutes } from '../modules/auth/auth.routes.js';
 import { provisionRoutes } from '../modules/provision/provision.routes.js';
 import { importRoutes } from '../modules/import/import.routes.js';
 import { mappingRoutes } from '../modules/mapping/mapping.routes.js';
 import { errorHandler } from '../lib/middleware/error-handler.js';
+import { env } from '../config/env.js';
 
 const app = new Hono();
 app.onError(errorHandler);
@@ -79,6 +81,20 @@ describe('Phase 4.2 — Protected endpoint access', () => {
       headers: { Authorization: 'Basic not-bearer' },
     });
     expect(res.status).toBe(401);
+  });
+
+  it('returns 401 with an expired token', async () => {
+    const expiredToken = jwt.sign(
+      { userId: 'expired-user', tenantId: '00000000-0000-0000-0000-000000000000', email: 'expired@test.local', role: 'admin' },
+      env.JWT_SECRET,
+      { expiresIn: '1s' }
+    );
+    await new Promise((r) => setTimeout(r, 1100));
+    const res = await app.request('/api/provision/runs', {
+      headers: { Authorization: `Bearer ${expiredToken}` },
+    });
+    expect(res.status).toBe(401);
+    expect(await res.text()).toContain('Invalid or expired token');
   });
 
 });

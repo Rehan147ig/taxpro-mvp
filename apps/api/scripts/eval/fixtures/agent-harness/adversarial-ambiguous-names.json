@@ -1,0 +1,58 @@
+{
+  "_fixtureId": "adversarial-ambiguous-names",
+  "_meta": {
+    "description": "Vague and ambiguous account names ('Miscellaneous', 'Sundry', 'Other') plus mixed-purpose 'General & Administrative'. Tests that agents still emit structurally valid classifications.",
+    "jurisdiction": "US",
+    "entityType": "C-Corp",
+    "scenario": "adversarial-ambiguous"
+  },
+  "tenant": { "id": "10000000-0000-4000-8000-000000000007", "name": "Consolidated Ventures Inc" },
+  "fiscalYear": 2026,
+  "period": "2026-01-01",
+  "ledgerCurrency": "USD",
+  "legalEntities": [],
+  "trialBalance": [
+    { "accountId": "consol-1000", "accountNumber": "1000", "accountName": "Cash", "accountType": "Bank", "detailType": "Bank", "balance": 118500, "currency": "USD" },
+    { "accountId": "consol-2000", "accountNumber": "2000", "accountName": "Accounts Payable", "accountType": "Accounts Payable", "detailType": "Accounts Payable", "balance": -31200, "currency": "USD" },
+    { "accountId": "consol-4000", "accountNumber": "4000", "accountName": "Miscellaneous", "accountType": "Income", "detailType": "Other Income", "balance": -5000, "currency": "USD" },
+    { "accountId": "consol-4100", "accountNumber": "4100", "accountName": "Other Income", "accountType": "Income", "detailType": "Other Income", "balance": -1200, "currency": "USD" },
+    { "accountId": "consol-4200", "accountNumber": "4200", "accountName": "Sundry", "accountType": "Expense", "detailType": "Other Expenses", "balance": 800, "currency": "USD" },
+    { "accountId": "consol-5000", "accountNumber": "5000", "accountName": "General & Administrative", "accountType": "Expense", "detailType": "Other Expenses", "balance": 34000, "currency": "USD" },
+    { "accountId": "consol-5100", "accountNumber": "5100", "accountName": "Miscellaneous Expense", "accountType": "Expense", "detailType": "Other Expenses", "balance": 2700, "currency": "USD" },
+    { "accountId": "consol-5200", "accountNumber": "5200", "accountName": "Non-Deductible Items", "accountType": "Expense", "detailType": "Other Expenses", "balance": 900, "currency": "USD" },
+    { "accountId": "consol-5300", "accountNumber": "5300", "accountName": "Office", "accountType": "Expense", "detailType": "Office Expenses", "balance": 4500, "currency": "USD" },
+    { "accountId": "consol-5400", "accountNumber": "5400", "accountName": "Professional", "accountType": "Expense", "detailType": "Legal & Professional", "balance": 7800, "currency": "USD" },
+    { "accountId": "consol-5500", "accountNumber": "5500", "accountName": "Travel & Entertainment", "accountType": "Expense", "detailType": "Meals & Entertainment", "balance": 4100, "currency": "USD" },
+    { "accountId": "consol-5600", "accountNumber": "5600", "accountName": "New Business Startup", "accountType": "Expense", "detailType": "Other Expenses", "balance": 15500, "currency": "USD" },
+    { "accountId": "consol-6000", "accountNumber": "6000", "accountName": "Sales", "accountType": "Income", "detailType": "Sales", "balance": -282000, "currency": "USD" }
+  ],
+  "provisionSummary": {
+    "entityName": "Consolidated Ventures Inc",
+    "period": "2026-01-01",
+    "bookIncome": 14500,
+    "effectiveTaxRate": 0.19,
+    "statutoryRate": 0.21,
+    "totalTaxExpense": 2755,
+    "currentTaxExpense": 2400,
+    "deferredTaxExpense": 355,
+    "taxPayable": 2400,
+    "etrLines": [
+      { "description": "Travel & entertainment limitation", "amount": 2050, "taxImpact": 430.5, "rateImpact": 0.030 },
+      { "description": "Non-deductible items (Sec 162(f) / 274)", "amount": 900, "taxImpact": 189, "rateImpact": 0.013 }
+    ],
+    "permanentDifferences": [
+      { "label": "T&E 50% limitation", "amount": 2050 },
+      { "label": "Non-deductible items", "amount": 900 }
+    ],
+    "temporaryDifferences": [],
+    "previousYearETR": 0.2,
+    "entities": 1,
+    "accountingMethod": "accrual",
+    "taxYear": 2026
+  },
+  "expectations": {
+    "mapping": "Ambiguous names classified with a best-effort treatment (e.g., other_expense/other_income), 'Non-Deductible Items' flagged, T&E subject to 50% limitation; every account still gets a structurally valid mapping.",
+    "audit": "Memo acknowledges ambiguous classification and flags positions; risk flags non-empty.",
+    "credit": "No qualifying credit accounts; no R&D/energy/WOTC identified."
+  }
+}

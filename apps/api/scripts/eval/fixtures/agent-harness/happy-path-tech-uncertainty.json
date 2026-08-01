@@ -1,0 +1,65 @@
+{
+  "_fixtureId": "happy-path-tech-uncertainty",
+  "_meta": {
+    "description": "Venture-backed software startup: material Sec 174 software capitalization, RSU compensation timing, cloud infrastructure, sales commissions. Uncertainty profile.",
+    "jurisdiction": "US",
+    "entityType": "C-Corp",
+    "scenario": "happy-path-uncertainty"
+  },
+  "tenant": { "id": "10000000-0000-4000-8000-00000000000d", "name": "Nexus AI Inc" },
+  "fiscalYear": 2026,
+  "period": "2026-01-01",
+  "ledgerCurrency": "USD",
+  "legalEntities": [],
+  "trialBalance": [
+    { "accountId": "nexus-1000", "accountNumber": "1000", "accountName": "Cash", "accountType": "Bank", "detailType": "Bank", "balance": 320000, "currency": "USD" },
+    { "accountId": "nexus-1100", "accountNumber": "1100", "accountName": "Accounts Receivable", "accountType": "Accounts Receivable", "detailType": "Accounts Receivable", "balance": 89000, "currency": "USD" },
+    { "accountId": "nexus-1300", "accountNumber": "1300", "accountName": "Capitalized Software Development Costs", "accountType": "Other Asset", "detailType": "Intangible Assets", "balance": 890000, "currency": "USD" },
+    { "accountId": "nexus-2000", "accountNumber": "2000", "accountName": "Accounts Payable", "accountType": "Accounts Payable", "detailType": "Accounts Payable", "balance": -67000, "currency": "USD" },
+    { "accountId": "nexus-2100", "accountNumber": "2100", "accountName": "Accrued RSU Compensation", "accountType": "Other Current Liability", "detailType": "Accrued Liabilities", "balance": -45000, "currency": "USD" },
+    { "accountId": "nexus-3000", "accountNumber": "3000", "accountName": "Preferred Stock & APIC", "accountType": "Equity", "detailType": "Paid In Capital", "balance": -1900000, "currency": "USD" },
+    { "accountId": "nexus-4000", "accountNumber": "4000", "accountName": "Sales - Software", "accountType": "Income", "detailType": "Sales", "balance": -2500000, "currency": "USD" },
+    { "accountId": "nexus-4100", "accountNumber": "4100", "accountName": "COGS - Hosting & Support", "accountType": "Cost of Goods Sold", "detailType": "Supplies & Materials", "balance": 180000, "currency": "USD" },
+    { "accountId": "nexus-5000", "accountNumber": "5000", "accountName": "R&D Wages - Engineering", "accountType": "Expense", "detailType": "Payroll Expenses", "balance": 640000, "currency": "USD" },
+    { "accountId": "nexus-5100", "accountNumber": "5100", "accountName": "RSU Compensation Expense", "accountType": "Expense", "detailType": "Payroll Expenses", "balance": 45000, "currency": "USD" },
+    { "accountId": "nexus-5200", "accountNumber": "5200", "accountName": "Cloud Infrastructure", "accountType": "Expense", "detailType": "Other Expenses", "balance": 98000, "currency": "USD" },
+    { "accountId": "nexus-5300", "accountNumber": "5300", "accountName": "Sales Commissions", "accountType": "Expense", "detailType": "Other Expenses", "balance": 175000, "currency": "USD" },
+    { "accountId": "nexus-5400", "accountNumber": "5400", "accountName": "Market Research", "accountType": "Expense", "detailType": "Other Expenses", "balance": 40000, "currency": "USD" },
+    { "accountId": "nexus-5500", "accountNumber": "5500", "accountName": "Meals & Entertainment", "accountType": "Expense", "detailType": "Meals & Entertainment", "balance": 3000, "currency": "USD" },
+    { "accountId": "nexus-5600", "accountNumber": "5600", "accountName": "Legal - IP Protection", "accountType": "Expense", "detailType": "Legal & Professional", "balance": 52000, "currency": "USD" },
+    { "accountId": "nexus-5700", "accountNumber": "5700", "accountName": "Depreciation - 3yr Equipment", "accountType": "Expense", "detailType": "Depreciation", "balance": 16000, "currency": "USD" },
+    { "accountId": "nexus-5800", "accountNumber": "5800", "accountName": "Depreciation - 5yr Equipment", "accountType": "Expense", "detailType": "Depreciation", "balance": 41500, "currency": "USD" }
+  ],
+  "provisionSummary": {
+    "entityName": "Nexus AI Inc",
+    "period": "2026-01-01",
+    "bookIncome": 220000,
+    "effectiveTaxRate": 0.19,
+    "statutoryRate": 0.21,
+    "totalTaxExpense": 41800,
+    "currentTaxExpense": 26000,
+    "deferredTaxExpense": 15800,
+    "taxPayable": 26000,
+    "etrLines": [
+      { "description": "Sec 174 software capitalization (5-yr amortization)", "amount": 178000, "taxImpact": 37380, "rateImpact": 0.170 },
+      { "description": "RSU compensation timing (Sec 409A)", "amount": 45000, "taxImpact": 9450, "rateImpact": 0.043 },
+      { "description": "Meals 50% limitation", "amount": 1500, "taxImpact": 315, "rateImpact": 0.001 }
+    ],
+    "permanentDifferences": [
+      { "label": "Meals 50% limitation (Sec 274(n))", "amount": 1500 }
+    ],
+    "temporaryDifferences": [
+      { "timingCategory": "deductible_temporary", "difference": 178000 },
+      { "timingCategory": "deductible_temporary", "difference": 45000 }
+    ],
+    "previousYearETR": 0.21,
+    "entities": 1,
+    "accountingMethod": "accrual",
+    "taxYear": 2026
+  },
+  "expectations": {
+    "mapping": "Capitalized software is a Sec 174 temporary difference (5-yr amortization); RSU compensation is temporary; cloud infrastructure potentially qualifying R&D under Sec 41.",
+    "audit": "Memo covers Sec 174 capitalization, RSU timing, and Sec 274(n); risk flags include 409A valuation considerations.",
+    "credit": "Engineering wages and cloud costs are R&D credit candidates; qualifying expenditure finite and > 0."
+  }
+}

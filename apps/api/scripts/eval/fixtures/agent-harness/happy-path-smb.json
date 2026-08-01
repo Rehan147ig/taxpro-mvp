@@ -1,0 +1,60 @@
+{
+  "_fixtureId": "happy-path-smb",
+  "_meta": {
+    "description": "US S-Corp small business bakery: standard COGS, meals limitation, equipment depreciation. The 'does a normal book keep' baseline.",
+    "jurisdiction": "US",
+    "entityType": "S-Corp",
+    "scenario": "happy-path"
+  },
+  "tenant": { "id": "10000000-0000-4000-8000-000000000001", "name": "Maple Street Bakery LLC" },
+  "fiscalYear": 2026,
+  "period": "2026-01-01",
+  "ledgerCurrency": "USD",
+  "legalEntities": [],
+  "trialBalance": [
+    { "accountId": "maple-1000", "accountNumber": "1000", "accountName": "Cash - Operating", "accountType": "Bank", "detailType": "Bank", "balance": 42500, "currency": "USD" },
+    { "accountId": "maple-1100", "accountNumber": "1100", "accountName": "Accounts Receivable", "accountType": "Accounts Receivable", "detailType": "Accounts Receivable", "balance": 12800, "currency": "USD" },
+    { "accountId": "maple-1200", "accountNumber": "1200", "accountName": "Inventory - Ingredients", "accountType": "Other Current Asset", "detailType": "Inventory", "balance": 9500, "currency": "USD" },
+    { "accountId": "maple-1500", "accountNumber": "1500", "accountName": "Equipment - Ovens & Mixers (net)", "accountType": "Fixed Asset", "detailType": "Furniture & Equipment", "balance": 42300, "currency": "USD" },
+    { "accountId": "maple-2000", "accountNumber": "2000", "accountName": "Accounts Payable", "accountType": "Accounts Payable", "detailType": "Accounts Payable", "balance": -8300, "currency": "USD" },
+    { "accountId": "maple-2300", "accountNumber": "2300", "accountName": "Notes Payable - Bakery Loan", "accountType": "Long Term Liability", "detailType": "Notes Payable", "balance": -52000, "currency": "USD" },
+    { "accountId": "maple-3000", "accountNumber": "3000", "accountName": "Member Equity", "accountType": "Equity", "detailType": "Partner Capital", "balance": -10000, "currency": "USD" },
+    { "accountId": "maple-4000", "accountNumber": "4000", "accountName": "Sales - Retail & Wholesale", "accountType": "Income", "detailType": "Sales", "balance": -214500, "currency": "USD" },
+    { "accountId": "maple-4100", "accountNumber": "4100", "accountName": "COGS - Ingredients & Supplies", "accountType": "Cost of Goods Sold", "detailType": "Supplies & Materials", "balance": 61200, "currency": "USD" },
+    { "accountId": "maple-5000", "accountNumber": "5000", "accountName": "Meals & Entertainment", "accountType": "Expense", "detailType": "Meals & Entertainment", "balance": 2400, "currency": "USD" },
+    { "accountId": "maple-5100", "accountNumber": "5100", "accountName": "Rent - Storefront", "accountType": "Expense", "detailType": "Rent or Lease", "balance": 36000, "currency": "USD" },
+    { "accountId": "maple-5200", "accountNumber": "5200", "accountName": "Utilities", "accountType": "Expense", "detailType": "Utilities", "balance": 8100, "currency": "USD" },
+    { "accountId": "maple-5300", "accountNumber": "5300", "accountName": "Wages - Staff", "accountType": "Expense", "detailType": "Payroll Expenses", "balance": 84200, "currency": "USD" },
+    { "accountId": "maple-5400", "accountNumber": "5400", "accountName": "Payroll Taxes - Employer", "accountType": "Expense", "detailType": "Payroll Taxes", "balance": 6440, "currency": "USD" }
+  ],
+  "provisionSummary": {
+    "entityName": "Maple Street Bakery LLC",
+    "period": "2026-01-01",
+    "bookIncome": 24800,
+    "effectiveTaxRate": 0.19,
+    "statutoryRate": 0.21,
+    "totalTaxExpense": 4712,
+    "currentTaxExpense": 4100,
+    "deferredTaxExpense": 612,
+    "taxPayable": 4100,
+    "etrLines": [
+      { "description": "Meals & entertainment 50% limitation", "amount": 1200, "taxImpact": 252, "rateImpact": 0.010 },
+      { "description": "State tax true-up", "amount": 500, "taxImpact": 105, "rateImpact": 0.004 }
+    ],
+    "permanentDifferences": [
+      { "label": "Meals 50% limitation (Sec 274(n))", "amount": 1200 }
+    ],
+    "temporaryDifferences": [
+      { "timingCategory": "deductible_temporary", "difference": 2500 }
+    ],
+    "previousYearETR": 0.22,
+    "entities": 1,
+    "accountingMethod": "accrual",
+    "taxYear": 2026
+  },
+  "expectations": {
+    "mapping": "Meals limited to 50% (Sec 274(n), permanent difference); inventory is a COGS account with no book-tax difference; equipment depreciation is temporary (Sec 167/168 MACRS).",
+    "audit": "Executive summary and ETR walk cover the meals limitation and deferred tax on depreciation; risk flags populated; memo non-empty.",
+    "credit": "No R&D, energy, or WOTC accounts; no credits identified."
+  }
+}

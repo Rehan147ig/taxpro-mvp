@@ -1,0 +1,69 @@
+{
+  "_fixtureId": "happy-path-corp-rcr",
+  "_meta": {
+    "description": "US C-Corp manufacturer with R&E capitalization (Sec 174), permanent items (Sec 162(f), Sec 264, Sec 274(n)), and MACRS depreciation. Rate-change-recognition (RCR) profile.",
+    "jurisdiction": "US",
+    "entityType": "C-Corp",
+    "scenario": "happy-path-rcr"
+  },
+  "tenant": { "id": "10000000-0000-4000-8000-000000000002", "name": "Meridian Manufacturing Inc" },
+  "fiscalYear": 2026,
+  "period": "2026-01-01",
+  "ledgerCurrency": "USD",
+  "legalEntities": [],
+  "trialBalance": [
+    { "accountId": "meridian-1000", "accountNumber": "1000", "accountName": "Cash", "accountType": "Bank", "detailType": "Bank", "balance": 148200, "currency": "USD" },
+    { "accountId": "meridian-1100", "accountNumber": "1100", "accountName": "Accounts Receivable", "accountType": "Accounts Receivable", "detailType": "Accounts Receivable", "balance": 96100, "currency": "USD" },
+    { "accountId": "meridian-1200", "accountNumber": "1200", "accountName": "Inventory - Finished Goods", "accountType": "Other Current Asset", "detailType": "Inventory", "balance": 143000, "currency": "USD" },
+    { "accountId": "meridian-1500", "accountNumber": "1500", "accountName": "PP&E - 5yr Class (net)", "accountType": "Fixed Asset", "detailType": "Machinery & Equipment", "balance": 88400, "currency": "USD" },
+    { "accountId": "meridian-1510", "accountNumber": "1510", "accountName": "PP&E - 7yr Class (net)", "accountType": "Fixed Asset", "detailType": "Furniture & Equipment", "balance": 152000, "currency": "USD" },
+    { "accountId": "meridian-1600", "accountNumber": "1600", "accountName": "Goodwill (net)", "accountType": "Other Asset", "detailType": "Intangible Assets", "balance": 21000, "currency": "USD" },
+    { "accountId": "meridian-1700", "accountNumber": "1700", "accountName": "R&D Contractors - Capitalized R&E", "accountType": "Other Asset", "detailType": "Intangible Assets", "balance": 120000, "currency": "USD" },
+    { "accountId": "meridian-2000", "accountNumber": "2000", "accountName": "Accounts Payable", "accountType": "Accounts Payable", "detailType": "Accounts Payable", "balance": -77000, "currency": "USD" },
+    { "accountId": "meridian-2400", "accountNumber": "2400", "accountName": "Deferred Tax Liability", "accountType": "Long Term Liability", "detailType": "Deferred Tax Liability", "balance": -18900, "currency": "USD" },
+    { "accountId": "meridian-4000", "accountNumber": "4000", "accountName": "Sales", "accountType": "Income", "detailType": "Sales", "balance": -980000, "currency": "USD" },
+    { "accountId": "meridian-4100", "accountNumber": "4100", "accountName": "COGS", "accountType": "Cost of Goods Sold", "detailType": "Supplies & Materials", "balance": 410000, "currency": "USD" },
+    { "accountId": "meridian-5000", "accountNumber": "5000", "accountName": "Life Insurance Premiums - Key Person", "accountType": "Expense", "detailType": "Insurance", "balance": 14800, "currency": "USD" },
+    { "accountId": "meridian-5100", "accountNumber": "5100", "accountName": "Penalties & Fines", "accountType": "Expense", "detailType": "Penalties & Settlements", "balance": 3500, "currency": "USD" },
+    { "accountId": "meridian-5200", "accountNumber": "5200", "accountName": "Meals & Entertainment", "accountType": "Expense", "detailType": "Meals & Entertainment", "balance": 15800, "currency": "USD" },
+    { "accountId": "meridian-5300", "accountNumber": "5300", "accountName": "State Income Taxes", "accountType": "Expense", "detailType": "Taxes Paid", "balance": 28000, "currency": "USD" },
+    { "accountId": "meridian-5400", "accountNumber": "5400", "accountName": "Wages", "accountType": "Expense", "detailType": "Payroll Expenses", "balance": 210000, "currency": "USD" },
+    { "accountId": "meridian-5500", "accountNumber": "5500", "accountName": "Prepaid Insurance", "accountType": "Expense", "detailType": "Insurance", "balance": 12400, "currency": "USD" },
+    { "accountId": "meridian-5600", "accountNumber": "5600", "accountName": "Legal Fees", "accountType": "Expense", "detailType": "Legal & Professional", "balance": 27500, "currency": "USD" }
+  ],
+  "provisionSummary": {
+    "entityName": "Meridian Manufacturing Inc",
+    "period": "2026-01-01",
+    "bookIncome": 64500,
+    "effectiveTaxRate": 0.195,
+    "statutoryRate": 0.21,
+    "totalTaxExpense": 12578,
+    "currentTaxExpense": 9300,
+    "deferredTaxExpense": 3278,
+    "taxPayable": 9300,
+    "etrLines": [
+      { "description": "Meals & entertainment 50% limitation", "amount": 7900, "taxImpact": 1659, "rateImpact": 0.026 },
+      { "description": "Non-deductible penalties (Sec 162(f))", "amount": 3500, "taxImpact": 735, "rateImpact": 0.011 },
+      { "description": "Life insurance premiums (Sec 264)", "amount": 14800, "taxImpact": 3108, "rateImpact": 0.048 },
+      { "description": "R&E capitalization amortization (Sec 174)", "amount": 24000, "taxImpact": 5040, "rateImpact": 0.078 }
+    ],
+    "permanentDifferences": [
+      { "label": "Meals 50% limitation (Sec 274(n))", "amount": 7900 },
+      { "label": "Penalties & fines (Sec 162(f))", "amount": 3500 },
+      { "label": "Life insurance premiums (Sec 264)", "amount": 14800 }
+    ],
+    "temporaryDifferences": [
+      { "timingCategory": "deductible_temporary", "difference": 24000 },
+      { "timingCategory": "deductible_temporary", "difference": 18500 }
+    ],
+    "previousYearETR": 0.21,
+    "entities": 1,
+    "accountingMethod": "accrual",
+    "taxYear": 2026
+  },
+  "expectations": {
+    "mapping": "Capitalized R&E is temporary (Sec 174, 5-yr amortization); penalties (Sec 162(f)), life insurance (Sec 264) and meals (Sec 274(n)) are permanent; MACRS depreciation temporary.",
+    "audit": "ETR walk reconciles each permanent item from 21% statutory to 19.5% effective; technical memos cite Sec 174 and Sec 274(n); quality score present.",
+    "credit": "R&D contract research eligible for R&D credit identification; no energy or WOTC accounts."
+  }
+}

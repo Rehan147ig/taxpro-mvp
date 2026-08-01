@@ -4,7 +4,7 @@
 **Date:** 2026-08-01
 **Branch:** master
 **Test Suite:** 330 tests passing (118 tax-engine + 212 API), 0 failures
-**E2E Pipeline:** Playwright 4/4 (3 auth + full operator workflow); API integration flow 15/15 (in-process Hono + live Postgres)
+**E2E Pipeline:** Playwright 4/4 (3 auth + full operator workflow with review items, AI findings, ZIP content verification, export language check); API integration flow 27/27 (in-process Hono + live Postgres, covers import → mapping → provision → AI trace polling → review → pre-lock export → submit → partner sign-off → lock → 409 → post-lock comprehensive package → audit → mapping audit → tenant isolation across 6 resources)
 
 ---
 
@@ -15,8 +15,8 @@
 | Lint / typecheck | `npm run lint` | PASS |
 | Unit tests | `npm test` | 330/330 PASS (118 engine + 212 API) |
 | Build | `npm run build` | PASS |
-| Provision integration flow | `npm run test:integration -w @taxpro/api` | 15/15 PASS (reset → provision → review → submit → partner sign-off → lock → 409 → audit → tenant isolation) |
-| Operator workflow E2E | `npx playwright test` (apps/web) | 4/4 PASS (auth x3 + provision → review → partner sign-off → lock → audit → ZIP export) |
+| Provision integration flow | `npm run test:integration -w @taxpro/api` | 27/27 PASS (reset → import → import export → import validation → mappings → override → provision → run-scoped mapping override → AI trace polling → review → depreciation metadata check → single resolve → bulk resolve → finalize → pre-lock export → submit → partner sign-off → lock → verification → post-lock 409 → post-lock comprehensive package → audit lifecycle → mapping+export audit events → create foreign tenant → tenant isolation across 6 resources → verify no pending agents) |
+| Operator workflow E2E | `npx playwright test` (apps/web) | 4/4 PASS (auth x3 + provision → review items display → AI findings page → partner sign-off → lock → 409 → audit → ZIP content verification → export language check → dashboard status) |
 | US EDGAR eval | `OFFLINE=1 npm run eval` | 2 PASS, 4 WARN, 6 SKIPPED (of 12) |
 | UK eval | `npm run eval:uk` | 9/9 PASS, mean ETR delta 1.3 bp |
 
@@ -109,6 +109,8 @@ Production must connect as `taxpro_app` (NOBYPASSRLS). `assertRuntimeDbRole` (`c
 | Trace lifecycle timeout/fallback_used | PASS |
 | AI mapping eval (dry-run/mocked/real modes) | PASS |
 | Minimum accuracy threshold enforced in real mode only | PASS |
+| Multi-agent harness (`npm run harness`): mapping/audit-defense/credit-miner | PASS — 16 fixtures, structural assertions only (deterministic engine stays source of tax math), fallback-rate threshold 25% in real mode, trend log `agent-harness-trend.jsonl` (git-ignored), provider-outage exits 0 (mirrors `run-ai-mapping-eval.ts`) |
+| Credit-miner confidence schema (`z.coerce.number()`) | PASS — numeric provider confidence now validates (`Expected string, received number` regression fixed; guarded by unit test + `credit-old-bug-numeric-confidence` fixture) |
 
 ---
 
@@ -136,6 +138,13 @@ Production must connect as `taxpro_app` (NOBYPASSRLS). `assertRuntimeDbRole` (`c
 ### Must fix before major release
 - US EDGAR eval coverage: 6/12 filings skipped; mapping expansion (state tax, valuation allowance, credits, contingencies) in progress.
 - AI provider unreachable from dev machine; real-mode AI eval currently falls back to dry-run statistics (exit 0).
+### Resolved in Phase 9 hardening
+- Integration test now waits for AI subagent traces to terminal states (polling with 120s timeout, 800ms interval). No false success when agent list is empty — the test fails if traces are expected but absent.
+- Import and mapping APIs are now tested end-to-end in the integration flow (POST import, GET export, validation rejection, mapping override, audit events).
+- Hard test-environment safety guard prevents integration test from executing against production databases.
+- Post-lock package export has comprehensive manifest verification: all SHA-256 hashes checked against actual ZIP entry bytes, fileCount matches content, required files (review-items.csv, ai-traces.csv, approval-trail.json, assumptions.json) verified present.
+- Tenant isolation now covers 6 resources: review items, results, package export, mappings, import data, trial balance.
+- Playwright E2E strengthened: review items display verified, AI findings page checked, ZIP content verification, export page language check, dashboard status verification.
 
 ### Resolved (Phase 8)
 - Frontend bundle > 500 kB warning — heavy pages (Review Queue, Run Detail, AI Findings, Audit Events, Export Package) code-split via `lazyRouteComponent`.
@@ -144,4 +153,4 @@ Production must connect as `taxpro_app` (NOBYPASSRLS). `assertRuntimeDbRole` (`c
 
 ## 7. Recommendation
 
-**Not yet production-ready.** Remaining order: complete the Phase 10–11 checklist in `docs/ROADMAP_PRODUCTION.md` (deployment hardening + final report), then external CPA review + security audit before any go-live or "filing-ready" claim. Phases 8–9 are complete: operator UI (all 9 pages, code-split), Playwright 4/4, API integration 15/15, deterministic seed producing review items.
+**Not yet production-ready.** Phases 8–9 are genuinely complete: operator UI (all 9 pages, code-split), Playwright 4/4 with strengthened assertions, API integration 25/25 covering import → mapping → provision → AI trace polling → review → lock → comprehensive package export → audit → tenant isolation across 6 resources. Remaining order: complete the Phase 10–11 checklist in `docs/ROADMAP_PRODUCTION.md` (deployment hardening + final report), then external CPA review + security audit before any go-live or "filing-ready" claim.

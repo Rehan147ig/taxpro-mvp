@@ -1,0 +1,54 @@
+{
+  "_fixtureId": "credit-rd-partial",
+  "_meta": {
+    "description": "Partial-qualification R&D: dual-purpose engineering wages (60% qualifying), lab supplies (30%), prototype tooling, production wages (non-qualifying). Agents must not treat 100% of payroll as qualifying.",
+    "jurisdiction": "US",
+    "entityType": "C-Corp",
+    "scenario": "credit-rd-partial"
+  },
+  "tenant": { "id": "10000000-0000-4000-8000-000000000010", "name": "Atlas Instrumentation LLC" },
+  "fiscalYear": 2026,
+  "period": "2026-01-01",
+  "ledgerCurrency": "USD",
+  "legalEntities": [],
+  "trialBalance": [
+    { "accountId": "atlas-1000", "accountNumber": "1000", "accountName": "Cash", "accountType": "Bank", "detailType": "Bank", "balance": 152000, "currency": "USD" },
+    { "accountId": "atlas-1100", "accountNumber": "1100", "accountName": "Accounts Receivable", "accountType": "Accounts Receivable", "detailType": "Accounts Receivable", "balance": 74500, "currency": "USD" },
+    { "accountId": "atlas-2000", "accountNumber": "2000", "accountName": "Accounts Payable", "accountType": "Accounts Payable", "detailType": "Accounts Payable", "balance": -41000, "currency": "USD" },
+    { "accountId": "atlas-3000", "accountNumber": "3000", "accountName": "Member Equity", "accountType": "Equity", "detailType": "Partner Capital", "balance": -260000, "currency": "USD" },
+    { "accountId": "atlas-4000", "accountNumber": "4000", "accountName": "Sales - Instruments", "accountType": "Income", "detailType": "Sales", "balance": -870000, "currency": "USD" },
+    { "accountId": "atlas-5000", "accountNumber": "5000", "accountName": "Engineering Wages (dual-purpose)", "accountType": "Expense", "detailType": "Payroll Expenses", "balance": 210000, "currency": "USD" },
+    { "accountId": "atlas-5100", "accountNumber": "5100", "accountName": "Lab Supplies - Testing Materials", "accountType": "Expense", "detailType": "Supplies & Materials", "balance": 34000, "currency": "USD" },
+    { "accountId": "atlas-5200", "accountNumber": "5200", "accountName": "Prototype Tooling", "accountType": "Expense", "detailType": "Other Expenses", "balance": 54000, "currency": "USD" },
+    { "accountId": "atlas-5300", "accountNumber": "5300", "accountName": "Production Wages", "accountType": "Expense", "detailType": "Payroll Expenses", "balance": 310000, "currency": "USD" },
+    { "accountId": "atlas-5400", "accountNumber": "5400", "accountName": "Quality Testing", "accountType": "Expense", "detailType": "Other Expenses", "balance": 22000, "currency": "USD" },
+    { "accountId": "atlas-5500", "accountNumber": "5500", "accountName": "Rent - Facility", "accountType": "Expense", "detailType": "Rent or Lease", "balance": 68000, "currency": "USD" }
+  ],
+  "provisionSummary": {
+    "entityName": "Atlas Instrumentation LLC",
+    "period": "2026-01-01",
+    "bookIncome": 76500,
+    "effectiveTaxRate": 0.2,
+    "statutoryRate": 0.21,
+    "totalTaxExpense": 15300,
+    "currentTaxExpense": 13000,
+    "deferredTaxExpense": 2300,
+    "taxPayable": 13000,
+    "etrLines": [
+      { "description": "R&E capitalization (Sec 174)", "amount": 26800, "taxImpact": 5628, "rateImpact": 0.074 }
+    ],
+    "permanentDifferences": [],
+    "temporaryDifferences": [
+      { "timingCategory": "deductible_temporary", "difference": 26800 }
+    ],
+    "previousYearETR": 0.205,
+    "entities": 1,
+    "accountingMethod": "accrual",
+    "taxYear": 2026
+  },
+  "expectations": {
+    "mapping": "Engineering wages and prototype tooling flagged Sec 174; production wages ordinary deductible; quality testing questionable.",
+    "audit": "Memo notes partial qualification judgment; risk flags call for contemporaneous documentation.",
+    "credit": "Only a portion of engineering wages and lab supplies qualify (dual-purpose); qualifying expenditure finite, > 0, but not 100% of payroll."
+  }
+}

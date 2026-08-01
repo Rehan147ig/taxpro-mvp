@@ -1,0 +1,54 @@
+{
+  "_fixtureId": "credit-old-bug-numeric-confidence",
+  "_meta": {
+    "description": "Regression fixture for the confidence bug: providers returning a NUMBER for confidence previously failed zod validation ('Expected string, received number') and forced every credit-miner run to fallback_used. The schema now coerces; this fixture documents the scenario and must land 'completed'.",
+    "jurisdiction": "US",
+    "entityType": "C-Corp",
+    "scenario": "credit-numeric-confidence"
+  },
+  "tenant": { "id": "10000000-0000-4000-8000-00000000000c", "name": "Quantum Forge Technologies Inc" },
+  "fiscalYear": 2026,
+  "period": "2026-01-01",
+  "ledgerCurrency": "USD",
+  "legalEntities": [],
+  "trialBalance": [
+    { "accountId": "quantum-1000", "accountNumber": "1000", "accountName": "Cash", "accountType": "Bank", "detailType": "Bank", "balance": 214000, "currency": "USD" },
+    { "accountId": "quantum-1100", "accountNumber": "1100", "accountName": "Accounts Receivable", "accountType": "Accounts Receivable", "detailType": "Accounts Receivable", "balance": 120000, "currency": "USD" },
+    { "accountId": "quantum-2000", "accountNumber": "2000", "accountName": "Accounts Payable", "accountType": "Accounts Payable", "detailType": "Accounts Payable", "balance": -66000, "currency": "USD" },
+    { "accountId": "quantum-3000", "accountNumber": "3000", "accountName": "Retained Earnings", "accountType": "Equity", "detailType": "Retained Earnings", "balance": -330000, "currency": "USD" },
+    { "accountId": "quantum-4000", "accountNumber": "4000", "accountName": "Sales", "accountType": "Income", "detailType": "Sales", "balance": -430000, "currency": "USD" },
+    { "accountId": "quantum-5000", "accountNumber": "5000", "accountName": "R&D Wages - Design & Prototyping", "accountType": "Expense", "detailType": "Payroll Expenses", "balance": 185000, "currency": "USD" },
+    { "accountId": "quantum-5100", "accountNumber": "5100", "accountName": "R&D Supplies - 3D Printing Materials", "accountType": "Expense", "detailType": "Supplies & Materials", "balance": 22000, "currency": "USD" },
+    { "accountId": "quantum-5200", "accountNumber": "5200", "accountName": "Contract Research - University", "accountType": "Expense", "detailType": "Contract Labor", "balance": 56000, "currency": "USD" },
+    { "accountId": "quantum-5300", "accountNumber": "5300", "accountName": "Server & Cloud Costs - R&D", "accountType": "Expense", "detailType": "Other Expenses", "balance": 31000, "currency": "USD" },
+    { "accountId": "quantum-5400", "accountNumber": "5400", "accountName": "Other Payroll - Admin", "accountType": "Expense", "detailType": "Payroll Expenses", "balance": 140000, "currency": "USD" },
+    { "accountId": "quantum-5500", "accountNumber": "5500", "accountName": "Depreciation - Lab Equipment", "accountType": "Expense", "detailType": "Depreciation", "balance": 78000, "currency": "USD" }
+  ],
+  "provisionSummary": {
+    "entityName": "Quantum Forge Technologies Inc",
+    "period": "2026-01-01",
+    "bookIncome": 62000,
+    "effectiveTaxRate": 0.19,
+    "statutoryRate": 0.21,
+    "totalTaxExpense": 11780,
+    "currentTaxExpense": 9800,
+    "deferredTaxExpense": 1980,
+    "taxPayable": 9800,
+    "etrLines": [
+      { "description": "R&E capitalization amortization (Sec 174)", "amount": 29400, "taxImpact": 6174, "rateImpact": 0.100 }
+    ],
+    "permanentDifferences": [],
+    "temporaryDifferences": [
+      { "timingCategory": "deductible_temporary", "difference": 29400 }
+    ],
+    "previousYearETR": 0.205,
+    "entities": 1,
+    "accountingMethod": "accrual",
+    "taxYear": 2026
+  },
+  "expectations": {
+    "mapping": "R&D wages/supplies flagged for Sec 174 capitalization (temporary); lab equipment depreciation MACRS timing.",
+    "audit": "Memo references Sec 174 five-year amortization and the deferred tax asset created.",
+    "credit": "Numeric confidence from the provider must validate (coerced) - run lands 'completed', not 'fallback_used'. R&D accounts present: qualifying expenditure finite and > 0."
+  }
+}

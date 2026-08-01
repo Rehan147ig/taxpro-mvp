@@ -1,0 +1,42 @@
+{
+  "_fixtureId": "adversarial-empty-ledger",
+  "_meta": {
+    "description": "Dormant special-purpose vehicle: an essentially empty ledger. Agents must not crash and must return structurally valid (possibly empty) results.",
+    "jurisdiction": "US",
+    "entityType": "SPV",
+    "scenario": "adversarial-empty"
+  },
+  "tenant": { "id": "10000000-0000-4000-8000-000000000006", "name": "Pinnacle Holdings SPV" },
+  "fiscalYear": 2026,
+  "period": "2026-01-01",
+  "ledgerCurrency": "USD",
+  "legalEntities": [],
+  "trialBalance": [
+    { "accountId": "pinnacle-1000", "accountNumber": "1000", "accountName": "Bank - Holding", "accountType": "Bank", "detailType": "Bank", "balance": 100, "currency": "USD" },
+    { "accountId": "pinnacle-3000", "accountNumber": "3000", "accountName": "Opening Balance Equity", "accountType": "Equity", "detailType": "Opening Balance Equity", "balance": -100, "currency": "USD" },
+    { "accountId": "pinnacle-4000", "accountNumber": "4000", "accountName": "Sales", "accountType": "Income", "detailType": "Sales", "balance": 0, "currency": "USD" }
+  ],
+  "provisionSummary": {
+    "entityName": "Pinnacle Holdings SPV",
+    "period": "2026-01-01",
+    "bookIncome": 0,
+    "effectiveTaxRate": 0.21,
+    "statutoryRate": 0.21,
+    "totalTaxExpense": 0,
+    "currentTaxExpense": 0,
+    "deferredTaxExpense": 0,
+    "taxPayable": 0,
+    "etrLines": [],
+    "permanentDifferences": [],
+    "temporaryDifferences": [],
+    "previousYearETR": 0.21,
+    "entities": 1,
+    "accountingMethod": "accrual",
+    "taxYear": 2026
+  },
+  "expectations": {
+    "mapping": "Only bank and equity balances; no income or expense classifications; a valid empty or minimal mapping set.",
+    "audit": "Memo generation should still produce a valid executive summary with empty walks; no crash on zero data.",
+    "credit": "No qualifying accounts; empty or null credit results."
+  }
+}

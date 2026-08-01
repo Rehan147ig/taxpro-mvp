@@ -1,0 +1,60 @@
+{
+  "_fixtureId": "uk-b2b-zero",
+  "_meta": {
+    "description": "UK logistics provider, B2B zero-rated export services (0% VAT), fully recoverable input VAT, vehicle fleet leases.",
+    "jurisdiction": "UK",
+    "entityType": "Ltd",
+    "scenario": "uk-zero-rated"
+  },
+  "tenant": { "id": "10000000-0000-4000-8000-000000000005", "name": "Britton Logistics Ltd" },
+  "fiscalYear": 2026,
+  "period": "2026-01-01",
+  "ledgerCurrency": "GBP",
+  "legalEntities": [],
+  "trialBalance": [
+    { "accountId": "britton-1000", "accountNumber": "1000", "accountName": "Bank", "accountType": "Bank", "detailType": "Bank", "balance": 92500, "currency": "GBP" },
+    { "accountId": "britton-1100", "accountNumber": "1100", "accountName": "Accounts Receivable - Export", "accountType": "Accounts Receivable", "detailType": "Accounts Receivable", "balance": 118000, "currency": "GBP" },
+    { "accountId": "britton-1500", "accountNumber": "1500", "accountName": "Vehicles - Fleet (net)", "accountType": "Fixed Asset", "detailType": "Vehicles", "balance": 214000, "currency": "GBP" },
+    { "accountId": "britton-2100", "accountNumber": "2100", "accountName": "VAT Control - Output (0% exports)", "accountType": "Other Current Liability", "detailType": "VAT Control", "balance": 0, "currency": "GBP" },
+    { "accountId": "britton-2200", "accountNumber": "2200", "accountName": "VAT Input Recoverable", "accountType": "Other Current Asset", "detailType": "VAT Control", "balance": 22800, "currency": "GBP" },
+    { "accountId": "britton-2400", "accountNumber": "2400", "accountName": "Corporation Tax Payable", "accountType": "Other Current Liability", "detailType": "Taxes Payable", "balance": -34200, "currency": "GBP" },
+    { "accountId": "britton-4000", "accountNumber": "4000", "accountName": "Sales - Export Freight (Zero-Rated)", "accountType": "Income", "detailType": "Sales", "balance": -860000, "currency": "GBP" },
+    { "accountId": "britton-4100", "accountNumber": "4100", "accountName": "Sales - Domestic Haulage", "accountType": "Income", "detailType": "Sales", "balance": -132000, "currency": "GBP" },
+    { "accountId": "britton-5000", "accountNumber": "5000", "accountName": "Vehicle Leases", "accountType": "Expense", "detailType": "Rent or Lease", "balance": 31200, "currency": "GBP" },
+    { "accountId": "britton-5100", "accountNumber": "5100", "accountName": "Fuel", "accountType": "Expense", "detailType": "Fuel", "balance": 84700, "currency": "GBP" },
+    { "accountId": "britton-5200", "accountNumber": "5200", "accountName": "Warehousing", "accountType": "Expense", "detailType": "Other Expenses", "balance": 41600, "currency": "GBP" },
+    { "accountId": "britton-5300", "accountNumber": "5300", "accountName": "Rent - Depot", "accountType": "Expense", "detailType": "Rent or Lease", "balance": 38000, "currency": "GBP" },
+    { "accountId": "britton-5400", "accountNumber": "5400", "accountName": "Wages - Drivers & Yard", "accountType": "Expense", "detailType": "Payroll Expenses", "balance": 175000, "currency": "GBP" },
+    { "accountId": "britton-5500", "accountNumber": "5500", "accountName": "Insurance - Fleet", "accountType": "Expense", "detailType": "Insurance", "balance": 15000, "currency": "GBP" },
+    { "accountId": "britton-5600", "accountNumber": "5600", "accountName": "Software Subscriptions", "accountType": "Expense", "detailType": "Other Expenses", "balance": 7400, "currency": "GBP" },
+    { "accountId": "britton-5700", "accountNumber": "5700", "accountName": "Depreciation - Vehicles", "accountType": "Expense", "detailType": "Depreciation", "balance": 42800, "currency": "GBP" }
+  ],
+  "provisionSummary": {
+    "entityName": "Britton Logistics Ltd",
+    "period": "2026-01-01",
+    "bookIncome": 118000,
+    "effectiveTaxRate": 0.255,
+    "statutoryRate": 0.25,
+    "totalTaxExpense": 30090,
+    "currentTaxExpense": 28000,
+    "deferredTaxExpense": 2090,
+    "taxPayable": 28000,
+    "etrLines": [
+      { "description": "Depreciation add-back", "amount": 42800, "taxImpact": 10700, "rateImpact": 0.091 },
+      { "description": "Capital allowances on vehicles (AIA)", "amount": -64000, "taxImpact": -16000, "rateImpact": -0.136 }
+    ],
+    "permanentDifferences": [],
+    "temporaryDifferences": [
+      { "timingCategory": "deductible_temporary", "difference": 42800 }
+    ],
+    "previousYearETR": 0.26,
+    "entities": 1,
+    "accountingMethod": "accrual",
+    "taxYear": 2026
+  },
+  "expectations": {
+    "mapping": "Zero-rated export sales and recoverable input VAT are balance-sheet/control items; vehicle depreciation is a timing difference with AIA offset.",
+    "audit": "Memo covers UK 25% rate, vehicle capital allowances, and export VAT treatment.",
+    "credit": "No US IRC credits applicable; no R&D/energy/WOTC accounts."
+  }
+}

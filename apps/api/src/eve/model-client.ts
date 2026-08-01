@@ -16,7 +16,12 @@ import { logger } from '../lib/logger.js';
  *    never silently coerces AI output.
  */
 
-export const DEFAULT_TIMEOUT_MS = 15000;
+/**
+ * Per-attempt timeout. Long-form subagents (audit-defense memos, maxTokens 8192)
+ * routinely exceed 15s on slower endpoints, so the default is 60s and can be
+ * tuned with EVE_MODEL_TIMEOUT_MS (e.g. CI mock servers use small values).
+ */
+export const DEFAULT_TIMEOUT_MS = Number(process.env.EVE_MODEL_TIMEOUT_MS) || 60_000;
 const MAX_RETRIES = 2;
 const DEFAULT_RETRY_DELAYS_MS = [300, 800];
 

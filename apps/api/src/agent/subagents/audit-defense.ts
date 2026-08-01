@@ -18,6 +18,16 @@ import { z } from 'zod';
 import { callJsonModel } from '../../eve/model-client.js';
 import { logger } from '../../lib/logger.js';
 
+/**
+ * Risk-level enums arrive from some providers capitalized ('Low', 'Medium').
+ * Normalize casing at the schema boundary so strict validation still holds
+ * while the enum value is always lowercase downstream.
+ */
+const riskLevelSchema = z.preprocess(
+  (v) => (typeof v === 'string' ? v.toLowerCase() : v),
+  z.enum(['low', 'medium', 'high']),
+);
+
 const auditDefenseSchema = z.object({
   executiveSummary: z.string(),
   etrWalk: z.array(z.object({
@@ -36,10 +46,10 @@ const auditDefenseSchema = z.object({
     taxImpact: z.number(),
     citation: z.string(),
     narrative: z.string(),
-    riskLevel: z.enum(['low', 'medium', 'high']),
+    riskLevel: riskLevelSchema,
   })),
   riskFlags: z.array(z.object({
-    severity: z.enum(['low', 'medium', 'high']),
+    severity: riskLevelSchema,
     description: z.string(),
     recommendation: z.string(),
   })),

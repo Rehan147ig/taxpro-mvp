@@ -24,6 +24,19 @@ const MIME_BY_EXT: Record<string, string> = {
   '.csv': 'text/csv',
 };
 
+/** Magic-byte validation so a renamed payload cannot bypass the extension allowlist.
+ *  PDF: %PDF- header. XLSX: ZIP container (PK\x03\x04). XLS: ZIP or OLE (D0 CF 11 E0). */
+function sniffMatches(buffer: Buffer, fileName: string): boolean {
+  const ext = fileName.slice(fileName.lastIndexOf('.')).toLowerCase();
+  const hasPrefix = (hex: string) =>
+    buffer.length >= hex.length / 2 &&
+    buffer.subarray(0, hex.length / 2).equals(Buffer.from(hex, 'hex'));
+  if (ext === '.pdf') return buffer.length >= 5 && buffer.subarray(0, 5).toString('latin1') === '%PDF-';
+  if (ext === '.xlsx') return hasPrefix('504b0304');
+  if (ext === '.xls') return hasPrefix('504b0304') || hasPrefix('d0cf11e0');
+  return true;
+}
+
 /** Prompt the vision model to emit trial balance rows as strict JSON. */
 const TRIAL_BALANCE_PROMPT = [
   'You are extracting a trial balance from an accounting document.',
@@ -80,6 +93,12 @@ uploadRoutes.post('/trial-balance', zValidator('form', uploadSchema), async (c) 
   if (buffer.length > MAX_UPLOAD_BYTES) {
     throw new BadRequestError(
       `File too large: ${(buffer.length / 1024 / 1024).toFixed(1)}MB. Maximum upload size is ${MAX_UPLOAD_BYTES / 1024 / 1024}MB.`
+    );
+  }
+
+  if (!sniffMatches(buffer, fileName)) {
+    throw new BadRequestError(
+      `File content does not match its extension (${fileName.slice(fileName.lastIndexOf('.'))}): rejected as a possible disguised or corrupt upload.`
     );
   }
 

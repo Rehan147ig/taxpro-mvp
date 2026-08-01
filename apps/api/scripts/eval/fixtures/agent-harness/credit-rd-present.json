@@ -1,0 +1,52 @@
+{
+  "_fixtureId": "credit-rd-present",
+  "_meta": {
+    "description": "R&D credit baseline: engineering wages, lab supplies, contract research, internal software development. Expect R&D credit (Sec 41) identification.",
+    "jurisdiction": "US",
+    "entityType": "C-Corp",
+    "scenario": "credit-rd-present"
+  },
+  "tenant": { "id": "10000000-0000-4000-8000-00000000000a", "name": "Nova Therapeutics Inc" },
+  "fiscalYear": 2026,
+  "period": "2026-01-01",
+  "ledgerCurrency": "USD",
+  "legalEntities": [],
+  "trialBalance": [
+    { "accountId": "nova-1000", "accountNumber": "1000", "accountName": "Cash", "accountType": "Bank", "detailType": "Bank", "balance": 340000, "currency": "USD" },
+    { "accountId": "nova-1100", "accountNumber": "1100", "accountName": "Accounts Receivable", "accountType": "Accounts Receivable", "detailType": "Accounts Receivable", "balance": 78000, "currency": "USD" },
+    { "accountId": "nova-2000", "accountNumber": "2000", "accountName": "Accounts Payable", "accountType": "Accounts Payable", "detailType": "Accounts Payable", "balance": -52000, "currency": "USD" },
+    { "accountId": "nova-3000", "accountNumber": "3000", "accountName": "Retained Earnings", "accountType": "Equity", "detailType": "Retained Earnings", "balance": -420000, "currency": "USD" },
+    { "accountId": "nova-4000", "accountNumber": "4000", "accountName": "Sales - Product", "accountType": "Income", "detailType": "Sales", "balance": -620000, "currency": "USD" },
+    { "accountId": "nova-5000", "accountNumber": "5000", "accountName": "R&D Wages - Engineering", "accountType": "Expense", "detailType": "Payroll Expenses", "balance": 240000, "currency": "USD" },
+    { "accountId": "nova-5100", "accountNumber": "5100", "accountName": "R&D Supplies - Lab Materials", "accountType": "Expense", "detailType": "Supplies & Materials", "balance": 45000, "currency": "USD" },
+    { "accountId": "nova-5200", "accountNumber": "5200", "accountName": "Contract Research", "accountType": "Expense", "detailType": "Contract Labor", "balance": 78000, "currency": "USD" },
+    { "accountId": "nova-5300", "accountNumber": "5300", "accountName": "Software Development - Internal", "accountType": "Expense", "detailType": "Other Expenses", "balance": 61000, "currency": "USD" },
+    { "accountId": "nova-5400", "accountNumber": "5400", "accountName": "Clinical Trial Costs", "accountType": "Expense", "detailType": "Other Expenses", "balance": 88000, "currency": "USD" },
+    { "accountId": "nova-5500", "accountNumber": "5500", "accountName": "Patent Legal Fees", "accountType": "Expense", "detailType": "Legal & Professional", "balance": 17000, "currency": "USD" },
+    { "accountId": "nova-5600", "accountNumber": "5600", "accountName": "General & Administrative", "accountType": "Expense", "detailType": "Other Expenses", "balance": 96000, "currency": "USD" },
+    { "accountId": "nova-5700", "accountNumber": "5700", "accountName": "Rent", "accountType": "Expense", "detailType": "Rent or Lease", "balance": 74000, "currency": "USD" }
+  ],
+  "provisionSummary": {
+    "entityName": "Nova Therapeutics Inc",
+    "period": "2026-01-01",
+    "bookIncome": -12000,
+    "effectiveTaxRate": 0.21,
+    "statutoryRate": 0.21,
+    "totalTaxExpense": 0,
+    "currentTaxExpense": 0,
+    "deferredTaxExpense": 0,
+    "taxPayable": 0,
+    "etrLines": [],
+    "permanentDifferences": [],
+    "temporaryDifferences": [],
+    "previousYearETR": 0.21,
+    "entities": 1,
+    "accountingMethod": "accrual",
+    "taxYear": 2026
+  },
+  "expectations": {
+    "mapping": "R&D wages and supplies flagged for Sec 174 capitalization (temporary); clinical trial costs ordinary deductible expenses.",
+    "audit": "Memo produced even with a pre-credit net loss; walks reference Sec 174 R&E capitalization.",
+    "credit": "R&D wages, lab supplies, and contract research are R&D credit candidates (Sec 41); qualifying expenditure must be a finite number > 0."
+  }
+}

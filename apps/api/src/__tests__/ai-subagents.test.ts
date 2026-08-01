@@ -10,7 +10,7 @@ import { accounts } from '../db/schema/accounts.js';
 import { suggestMapping } from '../modules/import/auto-mapping/precedent-engine.js';
 import { runMappingAgent } from '../agent/subagents/mapping-agent.js';
 import { draftAuditMemo } from '../agent/subagents/audit-defense.js';
-import { mineCredits } from '../agent/subagents/credit-miner.js';
+import { mineCredits, creditIdentificationSchema } from '../agent/subagents/credit-miner.js';
 import { runTracedSubagent, SubagentTimeoutError } from '../eve/subagent-runner.js';
 import crypto from 'crypto';
 
@@ -52,7 +52,7 @@ vi.mock('../eve/model-client.js', () => ({
     if (String(promptVersion).startsWith('credit-miner')) {
       return {
         parsed: {
-          accountMatches: [{ accountName: 'Solar Equipment', balance: 10000, creditType: 'energy_solar', confidence: 'medium', category: 'energy', description: 'solar array' }],
+          accountMatches: [{ accountId: 'acct-1', accountName: 'Solar Equipment', balance: 10000, creditType: 'energy_solar', confidence: 0.9, category: 'energy', description: 'solar array' }],
           recommendations: ['Review solar credit'],
         },
         raw: '{}',
@@ -307,5 +307,41 @@ describe('AI subagent lifecycle (Phase 3)', () => {
     );
     expect(runs[0].status).toBe('completed');
     expect((runs[0].outputJson as { energyCredits?: Array<{ estimatedCredit: number }> }).energyCredits?.[0].estimatedCredit).toBe(3000);
+  });
+
+  it('accepts numeric confidence from the provider and maps it to a label', async () => {
+    __modelState.mode = 'valid';
+
+    const result = await mineCredits({
+      tenantId: TENANT_ID,
+      tenantName: 'AI Subagent Test',
+      period: '2026-01-01',
+      fiscalYear: 2026,
+      trialBalance: [{ accountId: 'acct-1', accountName: 'Solar Equipment', accountNumber: '1000', accountType: 'Expense', balance: 10000 }],
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.energyCredits).toHaveLength(1);
+    expect(result.energyCredits[0].confidence).toBe('high');
+  });
+
+  it('credit-miner output schema validates numeric and coercible-string confidence, rejects labels', () => {
+    const base = {
+      accountMatches: [{ accountId: 'acct-1', accountName: 'R&D Wages', balance: 1000, creditType: 'rd_credit', category: 'wages', confidence: 0.9, description: 'engineer wages' }],
+      recommendations: ['review'],
+    };
+    expect(creditIdentificationSchema.safeParse({ ...base }).success).toBe(true);
+    expect(creditIdentificationSchema.safeParse({
+      ...base,
+      accountMatches: [{ ...base.accountMatches[0], confidence: 0.87 }],
+    }).success).toBe(true);
+    expect(creditIdentificationSchema.safeParse({
+      ...base,
+      accountMatches: [{ ...base.accountMatches[0], confidence: '0.87' }],
+    }).success).toBe(true);
+    expect(creditIdentificationSchema.safeParse({
+      ...base,
+      accountMatches: [{ ...base.accountMatches[0], confidence: 'medium' }],
+    }).success).toBe(false);
   });
 });

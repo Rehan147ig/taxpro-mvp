@@ -16,8 +16,11 @@ import { queueCompaniesHouseImport } from './companies-house/service.js';
 export const importRoutes = new Hono();
 importRoutes.use('*', authMiddleware);
 
+const MAX_CSV_BYTES = 10 * 1024 * 1024;
+const MAX_CSV_ROWS = 20_000;
+
 const importSchema = z.object({
-  csv: z.string().min(1),
+  csv: z.string().min(1).max(MAX_CSV_BYTES, 'CSV payload exceeds the 10MB limit'),
   source: z.string().min(1).max(20).default('csv'),
 });
 
@@ -180,6 +183,9 @@ function normalizeRow(row: ImportRow, lineNumber: number) {
 function parseCsv(csv: string): ImportRow[] {
   const lines = csv.replace(/^\uFEFF/, '').split(/\r?\n/).filter(line => line.trim().length > 0);
   if (lines.length < 2) return [];
+  if (lines.length - 1 > MAX_CSV_ROWS) {
+    throw new BadRequestError(`CSV exceeds the ${MAX_CSV_ROWS.toLocaleString()} row limit (${lines.length - 1} data rows)`);
+  }
 
   const headers = parseCsvLine(lines[0]).map(header => header.trim());
   return lines.slice(1).map((line) => {

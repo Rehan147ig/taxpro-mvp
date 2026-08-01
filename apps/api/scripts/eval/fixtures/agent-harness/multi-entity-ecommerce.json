@@ -1,0 +1,65 @@
+{
+  "_fixtureId": "multi-entity-ecommerce",
+  "_meta": {
+    "description": "Two-entity ecommerce group: inventory capitalization (Sec 263A), marketplace fees, intercompany fulfillment services, returns reserve, sales tax collected.",
+    "jurisdiction": "US",
+    "entityType": "LLC Group",
+    "scenario": "multi-entity-ecommerce"
+  },
+  "tenant": { "id": "10000000-0000-4000-8000-00000000000e", "name": "Nova Retail Group" },
+  "fiscalYear": 2026,
+  "period": "2026-01-01",
+  "ledgerCurrency": "USD",
+  "legalEntities": [
+    { "name": "Nova Retail LLC", "jurisdiction": "US-CA", "entityType": "LLC" },
+    { "name": "Nova Fulfillment LLC", "jurisdiction": "US-TN", "entityType": "LLC" }
+  ],
+  "trialBalance": [
+    { "accountId": "nova-r-1000", "accountNumber": "1000", "accountName": "Cash - Retail", "accountType": "Bank", "detailType": "Bank", "balance": 284000, "currency": "USD" },
+    { "accountId": "nova-r-1100", "accountNumber": "1100", "accountName": "Accounts Receivable - B2B", "accountType": "Accounts Receivable", "detailType": "Accounts Receivable", "balance": 96000, "currency": "USD" },
+    { "accountId": "nova-r-1200", "accountNumber": "1200", "accountName": "Inventory - Retail", "accountType": "Other Current Asset", "detailType": "Inventory", "balance": 214000, "currency": "USD" },
+    { "accountId": "nova-f-1250", "accountNumber": "1250", "accountName": "Inventory - Fulfillment", "accountType": "Other Current Asset", "detailType": "Inventory", "balance": 87000, "currency": "USD" },
+    { "accountId": "nova-r-1400", "accountNumber": "1400", "accountName": "Intercompany - Fulfillment Services", "accountType": "Other Current Asset", "detailType": "Intercompany", "balance": 48000, "currency": "USD" },
+    { "accountId": "nova-r-2000", "accountNumber": "2000", "accountName": "Sales Tax Collected", "accountType": "Other Current Liability", "detailType": "Sales Tax Payable", "balance": -175000, "currency": "USD" },
+    { "accountId": "nova-r-2100", "accountNumber": "2100", "accountName": "Returns Reserve", "accountType": "Other Current Liability", "detailType": "Accrued Liabilities", "balance": -16000, "currency": "USD" },
+    { "accountId": "nova-r-3000", "accountNumber": "3000", "accountName": "Member Equity", "accountType": "Equity", "detailType": "Partner Capital", "balance": -520000, "currency": "USD" },
+    { "accountId": "nova-r-4000", "accountNumber": "4000", "accountName": "Sales - Online Marketplace", "accountType": "Income", "detailType": "Sales", "balance": -2200000, "currency": "USD" },
+    { "accountId": "nova-r-4100", "accountNumber": "4100", "accountName": "Sales - B2B Wholesale", "accountType": "Income", "detailType": "Sales", "balance": -480000, "currency": "USD" },
+    { "accountId": "nova-r-4200", "accountNumber": "4200", "accountName": "COGS - Retail", "accountType": "Cost of Goods Sold", "detailType": "Supplies & Materials", "balance": 910000, "currency": "USD" },
+    { "accountId": "nova-r-5000", "accountNumber": "5000", "accountName": "Marketplace Fees", "accountType": "Expense", "detailType": "Other Expenses", "balance": 55000, "currency": "USD" },
+    { "accountId": "nova-f-5100", "accountNumber": "5100", "accountName": "Fulfillment Center Wages", "accountType": "Expense", "detailType": "Payroll Expenses", "balance": 340000, "currency": "USD" },
+    { "accountId": "nova-r-5200", "accountNumber": "5200", "accountName": "Shipping Costs", "accountType": "Expense", "detailType": "Other Expenses", "balance": 76000, "currency": "USD" },
+    { "accountId": "nova-r-5300", "accountNumber": "5300", "accountName": "Advertising - Digital", "accountType": "Expense", "detailType": "Advertising", "balance": 128000, "currency": "USD" },
+    { "accountId": "nova-r-5400", "accountNumber": "5400", "accountName": "Payment Processor Fees", "accountType": "Expense", "detailType": "Other Expenses", "balance": 32000, "currency": "USD" },
+    { "accountId": "nova-f-5500", "accountNumber": "5500", "accountName": "Warehouse Rent - Fulfillment", "accountType": "Expense", "detailType": "Rent or Lease", "balance": 96000, "currency": "USD" },
+    { "accountId": "nova-f-5600", "accountNumber": "5600", "accountName": "Packaging Supplies", "accountType": "Expense", "detailType": "Supplies & Materials", "balance": 41000, "currency": "USD" }
+  ],
+  "provisionSummary": {
+    "entityName": "Nova Retail Group (consolidated)",
+    "period": "2026-01-01",
+    "bookIncome": 145000,
+    "effectiveTaxRate": 0.2,
+    "statutoryRate": 0.21,
+    "totalTaxExpense": 29000,
+    "currentTaxExpense": 25000,
+    "deferredTaxExpense": 4000,
+    "taxPayable": 25000,
+    "etrLines": [
+      { "description": "Sec 263A inventory capitalization", "amount": 12000, "taxImpact": 2520, "rateImpact": 0.017 },
+      { "description": "Intercompany elimination", "amount": -48000, "taxImpact": -10080, "rateImpact": -0.069 }
+    ],
+    "permanentDifferences": [],
+    "temporaryDifferences": [
+      { "timingCategory": "deductible_temporary", "difference": 12000 }
+    ],
+    "previousYearETR": 0.205,
+    "entities": 2,
+    "accountingMethod": "accrual",
+    "taxYear": 2026
+  },
+  "expectations": {
+    "mapping": "Inventory-related costs subject to Sec 263A capitalization (temporary); sales tax collected is a balance-sheet control; marketplace and payment fees are ordinary deductible.",
+    "audit": "Memo covers the Sec 263A inventory capitalization and intercompany eliminations.",
+    "credit": "Fulfillment wages are operational, not R&D; no credits identified."
+  }
+}

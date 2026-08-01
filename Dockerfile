@@ -36,13 +36,7 @@ COPY --from=builder /app/packages/tax-engine/dist /app/packages/tax-engine/dist
 COPY --from=builder /app/packages/tax-engine/package.json /app/packages/tax-engine/package.json
 COPY --from=builder /app/apps/web/dist /app/apps/web/dist
 
-COPY apps/api/drizzle.config.ts apps/api/drizzle.config.ts
 COPY apps/api/src/db/migrations apps/api/src/db/migrations
-
-COPY --from=builder /app/node_modules/tsx /app/node_modules/tsx
-COPY apps/api/src/db/seed.ts apps/api/src/db/seed.ts
-COPY apps/api/src/db/schema apps/api/src/db/schema
-COPY apps/api/src/config/env.ts apps/api/src/config/env.ts
 
 RUN addgroup -S taxpro && adduser -S taxpro -G taxpro && chown -R taxpro:taxpro /app
 USER taxpro
@@ -52,12 +46,17 @@ EXPOSE 3001
 CMD ["sh", "-c", "\
   if [ \"$RUN_MIGRATIONS\" != \"false\" ]; then \
     echo 'Running migrations...' && \
-    npx drizzle-kit migrate --config=apps/api/drizzle.config.ts; \
+    node apps/api/dist/db/migrate.js; \
   fi; \
   if [ \"$RUN_SEED\" = \"true\" ]; then \
     echo 'Running seed...' && \
-    node --import tsx apps/api/src/db/seed.ts; \
+    node apps/api/dist/db/seed.js; \
   fi; \
-  echo 'Starting API...' && \
-  node apps/api/dist/index.js \
+  if [ \"$RUN_WORKERS\" = \"true\" ]; then \
+    echo 'Starting workers...' && \
+    node apps/api/dist/worker-entry.js; \
+  else \
+    echo 'Starting API...' && \
+    node apps/api/dist/index.js; \
+  fi; \
 "]

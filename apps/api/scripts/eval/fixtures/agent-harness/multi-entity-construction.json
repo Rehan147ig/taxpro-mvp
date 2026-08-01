@@ -1,0 +1,68 @@
+{
+  "_fixtureId": "multi-entity-construction",
+  "_meta": {
+    "description": "Consolidated construction group (3 legal entities) with percentage-of-completion (Sec 460), intercompany balances, bonding costs, and charitable contributions.",
+    "jurisdiction": "US",
+    "entityType": "Partnership / LP Group",
+    "scenario": "multi-entity"
+  },
+  "tenant": { "id": "10000000-0000-4000-8000-000000000003", "name": "Horizon Builders Group" },
+  "fiscalYear": 2026,
+  "period": "2026-01-01",
+  "ledgerCurrency": "USD",
+  "legalEntities": [
+    { "name": "Horizon Builders LLC", "jurisdiction": "US-DE", "entityType": "LLC" },
+    { "name": "Horizon Materials LLC", "jurisdiction": "US-TX", "entityType": "LLC" },
+    { "name": "Horizon Development LP", "jurisdiction": "US-FL", "entityType": "LP" }
+  ],
+  "trialBalance": [
+    { "accountId": "hzg-1000", "accountNumber": "1000", "accountName": "Cash - Consolidated", "accountType": "Bank", "detailType": "Bank", "balance": 214000, "currency": "USD" },
+    { "accountId": "hzg-1300", "accountNumber": "1300", "accountName": "Construction in Progress", "accountType": "Other Current Asset", "detailType": "Other Current Asset", "balance": 315000, "currency": "USD" },
+    { "accountId": "hzg-1400", "accountNumber": "1400", "accountName": "Intercompany - Horizon Materials", "accountType": "Other Current Asset", "detailType": "Intercompany", "balance": 25000, "currency": "USD" },
+    { "accountId": "hzg-1500", "accountNumber": "1500", "accountName": "Heavy Equipment - Cranes (net)", "accountType": "Fixed Asset", "detailType": "Machinery & Equipment", "balance": 660000, "currency": "USD" },
+    { "accountId": "hzg-2000", "accountNumber": "2000", "accountName": "Accounts Payable - Subcontractors", "accountType": "Accounts Payable", "detailType": "Accounts Payable", "balance": -98000, "currency": "USD" },
+    { "accountId": "hzg-2400", "accountNumber": "2400", "accountName": "Project Financing Loans", "accountType": "Long Term Liability", "detailType": "Notes Payable", "balance": -410000, "currency": "USD" },
+    { "accountId": "hzg-4000", "accountNumber": "4000", "accountName": "Contract Revenue", "accountType": "Income", "detailType": "Sales", "balance": -1520000, "currency": "USD" },
+    { "accountId": "hzg-4100", "accountNumber": "4100", "accountName": "Change Order Revenue", "accountType": "Income", "detailType": "Sales", "balance": -85000, "currency": "USD" },
+    { "accountId": "hzg-5000", "accountNumber": "5000", "accountName": "Payroll - Field Crew", "accountType": "Expense", "detailType": "Payroll Expenses", "balance": 890000, "currency": "USD" },
+    { "accountId": "hzg-5100", "accountNumber": "5100", "accountName": "Subcontractor Costs", "accountType": "Expense", "detailType": "Contract Labor", "balance": 410000, "currency": "USD" },
+    { "accountId": "hzg-5200", "accountNumber": "5200", "accountName": "Equipment Rental", "accountType": "Expense", "detailType": "Rent or Lease", "balance": 127000, "currency": "USD" },
+    { "accountId": "hzg-5300", "accountNumber": "5300", "accountName": "Depreciation - Cranes & Equipment", "accountType": "Expense", "detailType": "Depreciation", "balance": 66000, "currency": "USD" },
+    { "accountId": "hzg-5400", "accountNumber": "5400", "accountName": "Bonding Fees", "accountType": "Expense", "detailType": "Fees", "balance": 18000, "currency": "USD" },
+    { "accountId": "hzg-5500", "accountNumber": "5500", "accountName": "Permits & Licenses", "accountType": "Expense", "detailType": "Licenses & Permits", "balance": 9500, "currency": "USD" },
+    { "accountId": "hzg-5600", "accountNumber": "5600", "accountName": "Meals - Field Trailers", "accountType": "Expense", "detailType": "Meals & Entertainment", "balance": 3200, "currency": "USD" },
+    { "accountId": "hzg-5700", "accountNumber": "5700", "accountName": "Charitable Donations", "accountType": "Expense", "detailType": "Charitable Contributions", "balance": 5000, "currency": "USD" }
+  ],
+  "provisionSummary": {
+    "entityName": "Horizon Builders Group (consolidated)",
+    "period": "2026-01-01",
+    "bookIncome": 152000,
+    "effectiveTaxRate": 0.215,
+    "statutoryRate": 0.21,
+    "totalTaxExpense": 32680,
+    "currentTaxExpense": 28000,
+    "deferredTaxExpense": 4680,
+    "taxPayable": 28000,
+    "etrLines": [
+      { "description": "Charitable contributions 10% limitation (Sec 170)", "amount": 5000, "taxImpact": 1050, "rateImpact": 0.007 },
+      { "description": "Meals limitation (Sec 274(n))", "amount": 1600, "taxImpact": 336, "rateImpact": 0.002 },
+      { "description": "PCM deferred income (Sec 460)", "amount": -3000, "taxImpact": -630, "rateImpact": -0.004 }
+    ],
+    "permanentDifferences": [
+      { "label": "Meals 50% limitation (Sec 274(n))", "amount": 1600 },
+      { "label": "Charitable contributions limitation (Sec 170)", "amount": 5000 }
+    ],
+    "temporaryDifferences": [
+      { "timingCategory": "deductible_temporary", "difference": 3000 }
+    ],
+    "previousYearETR": 0.208,
+    "entities": 3,
+    "accountingMethod": "percentage_of_completion",
+    "taxYear": 2026
+  },
+  "expectations": {
+    "mapping": "CIP booked income is a temporary difference under Sec 460 PCM; intercompany is eliminated on consolidation (no difference); charitable donations subject to Sec 170 limitation; field crew payroll deductible (Sec 162).",
+    "audit": "ETR walk covers the Sec 460 timing item and Sec 170 limitation; memos reference percentage-of-completion accounting.",
+    "credit": "No R&D, energy, or WOTC accounts; field crew payroll does not qualify for R&D credit."
+  }
+}

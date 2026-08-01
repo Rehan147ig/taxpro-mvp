@@ -61,7 +61,7 @@ GRANT USAGE ON SCHEMA public TO taxpro_app;
 DO $$ DECLARE
   t text;
   full_access_tables text[] := ARRAY[
-    'provision_runs', 'provision_results',
+    'tenants', 'provision_runs', 'provision_results',
     'review_items', 'tax_mappings', 'trial_balance',
     'accounts', 'entities', 'ai_runs', 'ai_steps',
     'classification_patterns', 'connections', 'users', 'usage_events'

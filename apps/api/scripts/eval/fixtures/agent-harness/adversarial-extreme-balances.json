@@ -1,0 +1,58 @@
+{
+  "_fixtureId": "adversarial-extreme-balances",
+  "_meta": {
+    "description": "Extreme balance magnitudes ($1.2B revenue, $340M credit COGS, sub-penny cash). Agents must not overflow, crash, or emit non-finite numbers.",
+    "jurisdiction": "US",
+    "entityType": "C-Corp",
+    "scenario": "adversarial-extreme"
+  },
+  "tenant": { "id": "10000000-0000-4000-8000-000000000008", "name": "Mega Retail International Inc" },
+  "fiscalYear": 2026,
+  "period": "2026-01-01",
+  "ledgerCurrency": "USD",
+  "legalEntities": [],
+  "trialBalance": [
+    { "accountId": "mega-1000", "accountNumber": "1000", "accountName": "Cash", "accountType": "Bank", "detailType": "Bank", "balance": 0.01, "currency": "USD" },
+    { "accountId": "mega-1100", "accountNumber": "1100", "accountName": "Accounts Receivable", "accountType": "Accounts Receivable", "detailType": "Accounts Receivable", "balance": 88000000, "currency": "USD" },
+    { "accountId": "mega-1200", "accountNumber": "1200", "accountName": "Inventory", "accountType": "Other Current Asset", "detailType": "Inventory", "balance": 640000000, "currency": "USD" },
+    { "accountId": "mega-1300", "accountNumber": "1300", "accountName": "Accrued Liabilities", "accountType": "Other Current Liability", "detailType": "Accrued Liabilities", "balance": -999999999.99, "currency": "USD" },
+    { "accountId": "mega-1400", "accountNumber": "1400", "accountName": "Goodwill", "accountType": "Other Asset", "detailType": "Intangible Assets", "balance": 310000000, "currency": "USD" },
+    { "accountId": "mega-2000", "accountNumber": "2000", "accountName": "Accounts Payable", "accountType": "Accounts Payable", "detailType": "Accounts Payable", "balance": -270000000, "currency": "USD" },
+    { "accountId": "mega-4000", "accountNumber": "4000", "accountName": "Sales", "accountType": "Income", "detailType": "Sales", "balance": -1200000000, "currency": "USD" },
+    { "accountId": "mega-4100", "accountNumber": "4100", "accountName": "Cost of Goods Sold", "accountType": "Cost of Goods Sold", "detailType": "Supplies & Materials", "balance": 340000000, "currency": "USD" },
+    { "accountId": "mega-5000", "accountNumber": "5000", "accountName": "Depreciation - Warehouses", "accountType": "Expense", "detailType": "Depreciation", "balance": 480000000, "currency": "USD" },
+    { "accountId": "mega-5100", "accountNumber": "5100", "accountName": "R&D - Digital Innovation", "accountType": "Expense", "detailType": "Other Expenses", "balance": 95000000, "currency": "USD" },
+    { "accountId": "mega-5200", "accountNumber": "5200", "accountName": "Meals & Entertainment", "accountType": "Expense", "detailType": "Meals & Entertainment", "balance": 12500000, "currency": "USD" },
+    { "accountId": "mega-5300", "accountNumber": "5300", "accountName": "Interest Expense", "accountType": "Expense", "detailType": "Interest Paid", "balance": 88000000, "currency": "USD" }
+  ],
+  "provisionSummary": {
+    "entityName": "Mega Retail International Inc",
+    "period": "2026-01-01",
+    "bookIncome": 112000000,
+    "effectiveTaxRate": 0.19,
+    "statutoryRate": 0.21,
+    "totalTaxExpense": 21280000,
+    "currentTaxExpense": 18400000,
+    "deferredTaxExpense": 2880000,
+    "taxPayable": 18400000,
+    "etrLines": [
+      { "description": "Meals & entertainment 50% limitation", "amount": 6250000, "taxImpact": 1312500, "rateImpact": 0.012 },
+      { "description": "Goodwill amortization timing", "amount": 6200000, "taxImpact": 1302000, "rateImpact": 0.012 }
+    ],
+    "permanentDifferences": [
+      { "label": "Meals 50% limitation (Sec 274(n))", "amount": 6250000 }
+    ],
+    "temporaryDifferences": [
+      { "timingCategory": "deductible_temporary", "difference": 6200000 }
+    ],
+    "previousYearETR": 0.205,
+    "entities": 1,
+    "accountingMethod": "accrual",
+    "taxYear": 2026
+  },
+  "expectations": {
+    "mapping": "All balances classified without numeric overflow; meals permanent (Sec 274(n)); goodwill amortization timing difference; R&D flagged for Sec 174.",
+    "audit": "Memo produced with large-magnitude amounts formatted correctly; risk flags non-empty.",
+    "credit": "R&D - Digital Innovation account is a candidate for R&D credit identification; amounts must remain finite numbers."
+  }
+}

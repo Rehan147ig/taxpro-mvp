@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs';
-import { db } from '../config/db.js';
+import { migrationDb as db } from '../config/db.js';
 import { tenants } from './schema/tenants.js';
 import { users } from './schema/users.js';
 import { entities } from './schema/entities.js';

@@ -33,6 +33,8 @@ const envSchema = z.object({
 
   PORT: z.coerce.number().default(3001),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+  // Run background workers in this process ('false' = dedicated worker process in production)
+  RUN_WORKERS: z.enum(['true', 'false']).default('true'),
 });
 
 export const env = envSchema.parse(process.env);

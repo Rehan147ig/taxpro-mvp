@@ -1,21 +1,105 @@
 version: '3.8'
 
+# Production-shaped local stack: separate API, worker, and web processes
+# with RLS-enforcing runtime role (taxpro_app) and schema-owner migrations role.
+# Usage:  docker compose -p taxpro-gate up -d --build
+
 services:
   postgres:
     image: postgres:16-alpine
-    ports:
-      - "5432:5432"
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: taxpro
     volumes:
       - pgdata:/var/lib/postgresql/data
+      # Bootstraps the runtime roles on a fresh volume only
+      - ./apps/api/scripts/bootstrap-roles.sql:/docker-entrypoint-initdb.d/01-roles.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d taxpro"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
   redis:
     image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
     ports:
-      - "6379:6379"
+      - "3001:3001"
+    environment: &app_env
+      NODE_ENV: production
+      PORT: 3001
+      RUN_WORKERS: "false"
+      RUN_MIGRATIONS: "true"
+      RUN_SEED: "true"
+      DATABASE_URL: postgres://taxpro_app:change-me-app-password@postgres:5432/taxpro
+      DATABASE_URL_MIGRATIONS: postgres://taxpro_migrations:change-me-migrations-password@postgres:5432/taxpro
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-taxpro-gate-local-7f3d9c2e8b1a4f6d0e5c7a9b8d2f4e6c8a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d}
+      DATA_ENCRYPTION_KEY: ${DATA_ENCRYPTION_KEY:-taxpro-gate-local-encryption-key-0123456789abcdef0123456789abcdef}
+      CORS_ORIGIN: http://localhost:8080
+      AI_PROVIDER: ${AI_PROVIDER:-openai}
+      AI_MODEL: ${AI_MODEL:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      INTERFAZE_API_KEY: ${INTERFAZE_API_KEY:-}
+      COMPANIES_HOUSE_API_KEY: ${COMPANIES_HOUSE_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["node", "apps/api/dist/worker-entry.js"]
+    environment:
+      <<: *app_env
+      RUN_WORKERS: "true"
+      RUN_MIGRATIONS: "false"
+      RUN_SEED: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "sh -c 'kill -0 1 2>/dev/null || exit 1'"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    ports:
+      - "8080:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:80/"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
 
 volumes:
   pgdata:

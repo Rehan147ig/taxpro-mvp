@@ -2,7 +2,8 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
-import { db } from '../../config/db.js';
+import { randomUUID } from 'crypto';
+import { db, withTenantContext } from '../../config/db.js';
 import { users } from '../../db/schema/users.js';
 import { tenants } from '../../db/schema/tenants.js';
 import { signToken } from '../../lib/middleware/auth.js';
@@ -33,23 +34,28 @@ authRoutes.post('/register', rateLimitMiddleware, zValidator('json', registerSch
     throw new BadRequestError('Registration failed');
   }
 
-  // Create tenant
-  const [tenant] = await db.insert(tenants).values({
-    name: tenantName,
-    slug: tenantSlug,
-  }).returning();
-
-  // Create user
+  // Create tenant + user inside one tenant-scoped transaction.
+  // RLS write policies require app.tenant_id to be set (current_setting throws otherwise).
+  const tenantId = randomUUID();
   const passwordHash = await bcrypt.hash(password, 12);
-  const [user] = await db.insert(users).values({
-    email,
-    passwordHash,
-    tenantId: tenant.id,
-  }).returning();
+  const user = await withTenantContext(tenantId, async (tx) => {
+    await tx.insert(tenants).values({
+      id: tenantId,
+      name: tenantName,
+      slug: tenantSlug,
+    });
 
-  const token = signToken({ userId: user.id, tenantId: tenant.id, email: user.email, role: user.role ?? 'admin' });
+    const [created] = await tx.insert(users).values({
+      email,
+      passwordHash,
+      tenantId,
+    }).returning();
+    return created;
+  });
 
-  return c.json({ token, tenant: { id: tenant.id, name: tenant.name, slug: tenant.slug } }, 201);
+  const token = signToken({ userId: user.id, tenantId: user.tenantId, email: user.email, role: user.role ?? 'admin' });
+
+  return c.json({ token, tenant: { id: user.tenantId, name: tenantName, slug: tenantSlug } }, 201);
 });
 
 authRoutes.post('/login', rateLimitMiddleware, zValidator('json', loginSchema), async (c) => {

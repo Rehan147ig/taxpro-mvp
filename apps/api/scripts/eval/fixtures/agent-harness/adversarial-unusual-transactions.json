@@ -1,0 +1,60 @@
+{
+  "_fixtureId": "adversarial-unusual-transactions",
+  "_meta": {
+    "description": "Credit memos and reversals (negative revenue), partial-year period (2026-07-01), prior-period adjustment and rounding pennies. Also drives the mocked-mode malformed-credit-confidence case: the scripted credit response for this fixture uses a legacy string label ('medium'), which the fixed schema must reject -> fallback, not crash.",
+    "jurisdiction": "US",
+    "entityType": "LLC",
+    "scenario": "adversarial-unusual",
+    "harness": {
+      "mockCreditConfidence": "string-label"
+    }
+  },
+  "tenant": { "id": "10000000-0000-4000-8000-000000000009", "name": "Bluewave Trading LLC" },
+  "fiscalYear": 2026,
+  "period": "2026-07-01",
+  "ledgerCurrency": "USD",
+  "legalEntities": [],
+  "trialBalance": [
+    { "accountId": "blue-1000", "accountNumber": "1000", "accountName": "Cash", "accountType": "Bank", "detailType": "Bank", "balance": 18750, "currency": "USD" },
+    { "accountId": "blue-1100", "accountNumber": "1100", "accountName": "Accounts Receivable", "accountType": "Accounts Receivable", "detailType": "Accounts Receivable", "balance": 24300, "currency": "USD" },
+    { "accountId": "blue-2000", "accountNumber": "2000", "accountName": "Accounts Payable", "accountType": "Accounts Payable", "detailType": "Accounts Payable", "balance": -9100, "currency": "USD" },
+    { "accountId": "blue-3000", "accountNumber": "3000", "accountName": "Member Equity", "accountType": "Equity", "detailType": "Partner Capital", "balance": -28000, "currency": "USD" },
+    { "accountId": "blue-4000", "accountNumber": "4000", "accountName": "Sales - Q3 Only", "accountType": "Income", "detailType": "Sales", "balance": -96000, "currency": "USD" },
+    { "accountId": "blue-4100", "accountNumber": "4100", "accountName": "Sales Returns & Allowances", "accountType": "Income", "detailType": "Sales", "balance": 15000, "currency": "USD" },
+    { "accountId": "blue-4200", "accountNumber": "4200", "accountName": "Credit Memo Reversal", "accountType": "Income", "detailType": "Sales", "balance": 4200, "currency": "USD" },
+    { "accountId": "blue-4300", "accountNumber": "4300", "accountName": "Prior Year Adjustment", "accountType": "Equity", "detailType": "Prior Period Adjustments", "balance": -8900, "currency": "USD" },
+    { "accountId": "blue-5000", "accountNumber": "5000", "accountName": "Cost of Goods Sold", "accountType": "Cost of Goods Sold", "detailType": "Supplies & Materials", "balance": 41200, "currency": "USD" },
+    { "accountId": "blue-5050", "accountNumber": "5050", "accountName": "Research & Development - Prototype", "accountType": "Expense", "detailType": "Other Expenses", "balance": 24000, "currency": "USD" },
+    { "accountId": "blue-5100", "accountNumber": "5100", "accountName": "Provision for Bad Debt", "accountType": "Expense", "detailType": "Other Expenses", "balance": 6400, "currency": "USD" },
+    { "accountId": "blue-5200", "accountNumber": "5200", "accountName": "Legal Settlement Reserve", "accountType": "Expense", "detailType": "Other Expenses", "balance": 50000, "currency": "USD" },
+    { "accountId": "blue-5300", "accountNumber": "5300", "accountName": "Rounding Account", "accountType": "Expense", "detailType": "Other Expenses", "balance": 0.02, "currency": "USD" }
+  ],
+  "provisionSummary": {
+    "entityName": "Bluewave Trading LLC",
+    "period": "2026-07-01",
+    "bookIncome": 12100,
+    "effectiveTaxRate": 0.2,
+    "statutoryRate": 0.21,
+    "totalTaxExpense": 2420,
+    "currentTaxExpense": 2100,
+    "deferredTaxExpense": 320,
+    "taxPayable": 2100,
+    "etrLines": [
+      { "description": "Legal settlement reserve timing", "amount": 50000, "taxImpact": 10500, "rateImpact": 0.868 },
+      { "description": "Prior year adjustment", "amount": -8900, "taxImpact": -1869, "rateImpact": -0.154 }
+    ],
+    "permanentDifferences": [],
+    "temporaryDifferences": [
+      { "timingCategory": "deductible_temporary", "difference": 50000 }
+    ],
+    "previousYearETR": 0.19,
+    "entities": 1,
+    "accountingMethod": "accrual",
+    "taxYear": 2026
+  },
+  "expectations": {
+    "mapping": "Negative revenue entries (returns, credit memos) still classified; R&D-prototype flagged for Sec 174; legal settlement reserve is a temporary deduction timing item; prior year adjustment to equity.",
+    "audit": "Memo handles a partial-year period string and non-zero deferred tax without crashing.",
+    "credit": "Harness fixture: mocked-mode credit response uses a string confidence label which the fixed schema rejects; must be recorded as fallback, never a crash."
+  }
+}

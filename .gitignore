@@ -6,6 +6,8 @@ dist/
 coverage/
 .turbo/
 apps/api/scripts/eval/cache/
+# Agent harness trend log (append-only JSONL; .gitkeep placeholder is tracked)
+apps/api/scripts/eval/agent-harness-trend.jsonl
 tsconfig.tsbuildinfo
 .obsidian/
 

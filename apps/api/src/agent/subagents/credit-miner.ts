@@ -19,18 +19,26 @@ import { z } from 'zod';
 import { callJsonModel } from '../../eve/model-client.js';
 import { logger } from '../../lib/logger.js';
 
-const creditIdentificationSchema = z.object({
+export const creditIdentificationSchema = z.object({
   accountMatches: z.array(z.object({
     accountId: z.string(),
     accountName: z.string(),
     balance: z.number(),
     creditType: z.string(),
     category: z.string(),
-    confidence: z.string(),
+    // Providers commonly return numeric confidence; accept both and normalize.
+    confidence: z.coerce.number(),
     description: z.string(),
   })),
   recommendations: z.array(z.string()),
 });
+
+/** Map a numeric confidence (0-1) to the legacy high/medium/low label. */
+function confidenceLabel(score: number): 'high' | 'medium' | 'low' {
+  if (score >= 0.8) return 'high';
+  if (score >= 0.5) return 'medium';
+  return 'low';
+}
 
 // ── Types ──
 
@@ -210,7 +218,7 @@ export async function mineCredits(input: CreditMinerInput): Promise<CreditMinerR
       ircSection: m.creditType.includes('179D') ? 'Sec 179D' : m.creditType.includes('45') ? 'Sec 45' : 'Sec 48',
       qualifiedExpenses: Math.abs(m.balance),
       estimatedCredit: Math.abs(m.balance) * 0.30,
-      confidence: m.confidence as any ?? 'medium',
+      confidence: confidenceLabel(m.confidence),
       description: m.description,
     }));
 

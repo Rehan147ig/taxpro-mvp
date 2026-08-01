@@ -82,9 +82,16 @@ Launch checklist. Items are ordered; each must be verified by the gates in Phase
 
 ## Phase 9 — API Integration Tests
 
-- [x] Extend `test-provision-flow.ts`: login → import TB → mapping → provision → wait AI traces → review items → resolve → submit → partner approval (different user) → lock → mutation 409 → export package → audit events → tenant isolation
-- [x] Deterministic seed producing at least one review item
-- [x] Runnable locally with Docker Postgres/Redis
+- [x] Extend `test-provision-flow.ts`: login → import TB → mapping → provision → wait AI traces (polling with 120s timeout, terminal-state verification) → review items → resolve → submit → partner approval (different user) → lock → mutation 409 → export package (pre-lock basic + post-lock comprehensive with manifest/hash/fileCount) → audit events → tenant isolation
+- [x] Hard test-environment safety guard (NODE_ENV + TAXPRO_TEST_MODE + DB host check; fails closed before any mutation)
+- [x] Real AI trace polling with bounded timeout (800ms interval, 120s max; fails if agents still `started` or list unexpectedly empty)
+- [x] Import workflow tested (POST import, GET export, validation rejection 400)
+- [x] Mapping workflow tested (GET mappings, override before lock → 201, mapping.override audit event)
+- [x] Post-lock package export with manifest integrity verification (all SHA-256 hashes checked against actual ZIP entry bytes, fileCount matches, required files present)
+- [x] Cross-tenant isolation covers import, mappings, review items, results, package export
+- [x] Deterministic seed producing at least one review item (depreciation account 5200, no placed-in-service date)
+- [x] No pending agents at test completion
+- [x] Runnable locally with Docker Postgres/Redis + TAXPRO_TEST_MODE=1
 
 ## Phase 10 — Production Deployment
 

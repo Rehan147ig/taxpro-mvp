@@ -38,7 +38,7 @@ const stage2Schema = z.object({
     accountId: z.string(),
     taxAccountType: z.string(),
     bookTreatment: z.string(),
-    timingCategory: z.string().optional(),
+    timingCategory: z.string().nullable().optional(),
     confidenceScore: z.number(),
     ircSection: z.string(),
     explanation: z.string(),
@@ -121,6 +121,22 @@ NO DIFFERENCE (treated identically for book and tax):
 
 Return JSON: { mappings: [{ accountId, taxAccountType, bookTreatment, timingCategory?, confidenceScore, ircSection, explanation }] }`;
 
+// ── Book-treatment normalization ──
+
+/**
+ * Providers phrase book treatment differently ('no difference', 'no_difference',
+ * 'permanent difference'). Map the known variants to the canonical engine
+ * vocabulary. Unknown values are passed through unchanged so they surface as
+ * validation failures instead of being silently rewritten.
+ */
+function normalizeBookTreatment(v: string): 'permanent' | 'temporary' | 'no_diff' {
+  const key = v.trim().toLowerCase().replace(/[\s-]+/g, '_');
+  if (key === 'no_diff' || key === 'no_difference' || key === 'none' || key === 'n/a' || key === 'na') return 'no_diff';
+  if (key === 'permanent' || key === 'permanent_difference') return 'permanent';
+  if (key === 'temporary' || key === 'temporary_difference') return 'temporary';
+  return v as 'permanent' | 'temporary' | 'no_diff';
+}
+
 // ── Stage 1: Functional Category Detection ──
 
 const TYPE_CLASSIFICATION_PROMPT = `You are a cost accounting expert. Your role is to classify general ledger accounts into their functional income statement category.
@@ -198,8 +214,8 @@ export async function runMappingAgent(input: MappingAgentInput): Promise<Mapping
     const taxMappings = (mappingResponse.parsed.mappings ?? []).map(m => ({
       accountId: m.accountId,
       taxAccountType: m.taxAccountType,
-      bookTreatment: m.bookTreatment as any,
-      timingCategory: m.timingCategory as any,
+      bookTreatment: normalizeBookTreatment(m.bookTreatment),
+      timingCategory: (m.timingCategory ?? undefined) as 'deductible_temporary' | 'taxable_temporary' | undefined,
       confidenceScore: m.confidenceScore,
       ircSection: m.ircSection,
       explanation: m.explanation,
