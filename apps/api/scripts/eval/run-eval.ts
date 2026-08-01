@@ -94,7 +94,7 @@ async function evalCompany(ticker: string): Promise<CompanyResult> {
     notes.push('credit signs flipped to tie footnote (filer convention quirk)');
   }
 
-  console.log(`  Recon items:        ${classified.permanent.length} perm, ${classified.credits.length} credit, ${classified.state.length} state, ${classified.foreignRateDifferential.length} foreign, ${classified.valuationAllowance.length} val.allowance, ${classified.shareBasedCompensation.length} SBC, ${classified.contingencies.length} contingencies, ${classified.priorYearAdjustments.length} prior-yr, ${classified.other.length} other${creditSignFlipped ? '  [credits sign-flipped]' : ''}`);
+  console.log(`  Recon items:        ${classified.permanent.length} perm, ${classified.credits.length} credit, ${classified.deductions.length} deduction, ${classified.minorityInterest.length} NCI, ${classified.state.length} state, ${classified.foreignRateDifferential.length} foreign, ${classified.valuationAllowance.length} val.allowance, ${classified.shareBasedCompensation.length} SBC, ${classified.contingencies.length} contingencies, ${classified.priorYearAdjustments.length} prior-yr, ${classified.other.length} other${creditSignFlipped ? '  [credits sign-flipped]' : ''}`);
   for (const item of footnote.reconItems) {
     console.log(`    ${item.amount >= 0 ? '+' : ''}${fmt$(item.amount).replace('$-', '-$')}  ${item.label}`);
   }

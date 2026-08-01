@@ -88,14 +88,42 @@ export function extractTaxFootnote(companyFacts: any): TaxFootnote {
     'IncomeTaxReconciliationIncomeTaxExpenseBenefitAtFederalStatutoryIncomeTaxRate',
     'IncomeTaxReconciliationIncomeTaxExpenseBenefit',
     'IncomeTaxReconciliationEffectiveIncomeTaxRateContinuingOperations',
+    // New-taxonomy (2024+ US-GAAP) equivalents of the above — subtotals.
+    'EffectiveIncomeTaxRateReconciliationIncomeTaxExpenseBenefitAtFederalStatutoryIncomeTaxRate',
+    'EffectiveIncomeTaxRateReconciliationIncomeTaxExpenseBenefit',
+    'EffectiveIncomeTaxRateReconciliationEffectiveIncomeTaxRateContinuingOperations',
   ]);
 
+  /**
+   * A tag is a collectable ETR recon line if it is:
+   *  - a legacy `IncomeTaxReconciliation*` dollar tag, or
+   *  - a new-taxonomy `EffectiveIncomeTaxRateReconciliation*` tag, EXCLUDING
+   *    the `...Percent` variants (percentage-only — no dollar impact) and the
+   *    subtotals. The 2024+ US-GAAP taxonomy moved recon dollars under this
+   *    namespace; both suffixed (`...Amount`) and unsuffixed dollar forms exist.
+   */
+  const isReconLine = (tag: string): boolean => {
+    if (SKIP.has(tag)) return false;
+    if (tag.startsWith('IncomeTaxReconciliation')) return true;
+    if (tag.startsWith('EffectiveIncomeTaxRateReconciliation')) {
+      return !tag.endsWith('Percent');
+    }
+    return false;
+  };
+
   const reconItems: ReconItem[] = [];
+  const seen = new Set<string>();
   for (const [tag, entry] of Object.entries<any>(gaap)) {
-    if (!tag.startsWith('IncomeTaxReconciliation') || SKIP.has(tag)) continue;
+    if (!isReconLine(tag)) continue;
     const fact = pickAnnual(entry?.units);
     if (!fact) continue;
     if (fact.end !== totalTax.end) continue; // align to same fiscal year
+    // Dedupe: if the legacy tag and new-taxonomy tag describe the same line
+    // (same suffix after the namespace prefix), keep the one that tied best
+    // by keeping the legacy entry (filer convention consistency).
+    const suffix = tag.replace(/^EffectiveIncomeTaxRateReconciliation/, 'IncomeTaxReconciliation');
+    if (seen.has(suffix)) continue;
+    seen.add(suffix);
     reconItems.push({ tag, label: entry?.label ?? tag, amount: fact.val });
   }
 

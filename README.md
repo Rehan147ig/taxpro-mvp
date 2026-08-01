@@ -376,7 +376,7 @@ npm run db:synthetic -w apps/api               # deterministic synthetic data (i
 | Provision integration flow | `npm run test:integration -w @taxpro/api` | 27/27 PASS (import → mapping → provision → AI trace polling → review → finalize → submit → partner sign-off → lock → 409 → package → audit → tenant isolation across 6 resources) |
 | Operator workflow E2E | `npx playwright test` (apps/web) | 4/4 PASS |
 | AI subagent harness | `npm run harness` (mocked) | PASS — 16/16 mapping, 16/16 audit, 15/16 credit (deliberate regression fixture), fallback 2.1% |
-| US EDGAR eval | `OFFLINE=1 npm run eval` | 2 PASS, 4 WARN, 6 SKIPPED (of 12) |
+| US EDGAR eval | `OFFLINE=1 npm run eval` | 4 PASS, 1 WARN, 7 SKIPPED (of 12), mean ETR delta 17.4 bp |
 | UK eval | `npm run eval:uk` | 9/9 PASS, mean ETR delta 1.3 bp |
 
 ---

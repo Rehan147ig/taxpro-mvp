@@ -36,6 +36,30 @@ const CREDIT_TAGS = new Set([
   'IncomeTaxReconciliationGeneralBusinessTaxCredits',
   'IncomeTaxReconciliationEnergyTaxCredits',
   'IncomeTaxReconciliationLowIncomeHousingTaxCredits',
+  // New-taxonomy (2024+ US-GAAP) equivalents — no legacy collision for these
+  'EffectiveIncomeTaxRateReconciliationTaxCreditEnergyRelatedAmount',
+  'EffectiveIncomeTaxRateReconciliationTaxCreditsOther',
+]);
+
+/**
+ * Deduction tags — the disclosed amount is a tax deduction that REDUCES tax.
+ * These are NOT credits (the engine has a separate credits path); they flow
+ * as negative otherAdjustments (direct tax impact). Includes the new-taxonomy
+ * FDII deduction tag (2024+ US-GAAP).
+ */
+const DEDUCTION_TAGS = new Set([
+  'IncomeTaxReconciliationDeductions',
+  'IncomeTaxReconciliationDeductionsOther',
+  'IncomeTaxReconciliationDeductionsQualifiedProductionActivities',
+  'EffectiveIncomeTaxRateReconciliationFdiiAmount',
+  'EffectiveIncomeTaxRateReconciliationDeductionsOther',
+  'EffectiveIncomeTaxRateReconciliationDeductionsQualifiedProductionActivities',
+]);
+
+/** Minority-interest income — reduces consolidated tax (minority holders bear their share). */
+const NCI_TAGS = new Set([
+  'IncomeTaxReconciliationMinorityInterestIncomeExpense',
+  'EffectiveIncomeTaxRateReconciliationMinorityInterestIncomeExpense',
 ]);
 
 const PERMANENT_TAGS = new Set([
@@ -96,6 +120,8 @@ export interface EngineRun {
   classified: {
     permanent: ReconItem[];
     credits: ReconItem[];
+    deductions: ReconItem[];
+    minorityInterest: ReconItem[];
     state: ReconItem[];
     foreignRateDifferential: ReconItem[];
     valuationAllowance: ReconItem[];
@@ -116,6 +142,8 @@ function suffixOf(tag: string): string {
 }
 
 const CREDIT_SUFFIXES = new Set([...CREDIT_TAGS].map(suffixOf));
+const DEDUCTION_SUFFIXES = new Set([...DEDUCTION_TAGS].map(suffixOf));
+const NCI_SUFFIXES = new Set([...NCI_TAGS].map(suffixOf));
 const PERMANENT_SUFFIXES = new Set([...PERMANENT_TAGS].map(suffixOf));
 const STATE_SUFFIXES = new Set([...STATE_TAGS].map(suffixOf));
 const FOREIGN_SUFFIXES = new Set([...FOREIGN_TAGS].map(suffixOf));
@@ -125,6 +153,8 @@ const CONTINGENCY_SUFFIXES = new Set([...CONTINGENCY_TAGS].map(suffixOf));
 const PRIOR_YEAR_SUFFIXES = new Set([...PRIOR_YEAR_TAGS].map(suffixOf));
 
 function isCredit(tag: string) { return CREDIT_SUFFIXES.has(suffixOf(tag)); }
+function isDeduction(tag: string) { return DEDUCTION_SUFFIXES.has(suffixOf(tag)); }
+function isNci(tag: string) { return NCI_SUFFIXES.has(suffixOf(tag)); }
 function isPermanent(tag: string) { return PERMANENT_SUFFIXES.has(suffixOf(tag)); }
 function isState(tag: string) { return STATE_SUFFIXES.has(suffixOf(tag)); }
 function isForeign(tag: string) { return FOREIGN_SUFFIXES.has(suffixOf(tag)); }
@@ -137,6 +167,8 @@ function classify(items: ReconItem[]) {
   const classified = {
     permanent: [] as ReconItem[],
     credits: [] as ReconItem[],
+    deductions: [] as ReconItem[],
+    minorityInterest: [] as ReconItem[],
     state: [] as ReconItem[],
     foreignRateDifferential: [] as ReconItem[],
     valuationAllowance: [] as ReconItem[],
@@ -148,6 +180,8 @@ function classify(items: ReconItem[]) {
   for (const item of items) {
     if (isCredit(item.tag)) classified.credits.push(item);
     else if (isPermanent(item.tag)) classified.permanent.push(item);
+    else if (isDeduction(item.tag)) classified.deductions.push(item);
+    else if (isNci(item.tag)) classified.minorityInterest.push(item);
     else if (isState(item.tag)) classified.state.push(item);
     else if (isForeign(item.tag)) classified.foreignRateDifferential.push(item);
     else if (isValuationAllowance(item.tag)) classified.valuationAllowance.push(item);
@@ -163,10 +197,24 @@ function classify(items: ReconItem[]) {
 function consistencyBp(footnote: TaxFootnote, creditsFlipped: boolean): number {
   const statutory = footnote.statutoryLine ?? footnote.pretaxIncome * FED.toNumber();
   const sum = footnote.reconItems.reduce((s, item) => {
-    const amount = CREDIT_TAGS.has(item.tag) && creditsFlipped ? -item.amount : item.amount;
+    const amount = effectiveAmount(item, creditsFlipped);
     return s + amount;
   }, 0);
   return Math.abs(((statutory + sum - footnote.totalTaxExpense) / footnote.pretaxIncome) * 10_000);
+}
+
+/**
+ * The signed tax impact a disclosed item should contribute, matching how
+ * runEngine feeds the engine:
+ *  - credits: positive magnitude when flipped (engine negates credits);
+ *    otherwise as-filed.
+ *  - deductions (FDII, QPAI, other) and minority-interest income: the
+ *    disclosed positive amount represents a tax REDUCTION → negate.
+ */
+function effectiveAmount(item: ReconItem, creditsFlipped: boolean): number {
+  if (isDeduction(item.tag) || isNci(item.tag)) return -item.amount;
+  if (CREDIT_TAGS.has(item.tag) && creditsFlipped) return -item.amount;
+  return item.amount;
 }
 
 export function runEngine(footnote: TaxFootnote): EngineRun {
@@ -191,6 +239,8 @@ export function runEngine(footnote: TaxFootnote): EngineRun {
     }, new Decimal(0));
 
   const otherAdjustments = [
+    ...classified.deductions,
+    ...classified.minorityInterest,
     ...classified.state,
     ...classified.foreignRateDifferential,
     ...classified.valuationAllowance,
@@ -200,7 +250,9 @@ export function runEngine(footnote: TaxFootnote): EngineRun {
     ...classified.other,
   ].map(item => ({
     label: STATE_TAGS.has(item.tag) ? `${item.label} (as disclosed, net of federal)` : item.label,
-    amount: new Decimal(item.amount),
+    // Deductions (FDII/QPAI) and minority-interest income reduce tax → negate.
+    // All other buckets flow as-disclosed (state/foreign/etc. are direct impacts).
+    amount: new Decimal(isDeduction(item.tag) || isNci(item.tag) ? -item.amount : item.amount),
   }));
 
   const bookIncome = new Decimal(footnote.pretaxIncome);

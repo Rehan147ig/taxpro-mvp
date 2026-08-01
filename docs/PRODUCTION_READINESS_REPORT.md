@@ -17,7 +17,7 @@
 | Build | `npm run build` | PASS (3/3 workspaces, turbo) |
 | Provision integration flow | `npm run test:integration -w @taxpro/api` | 27/27 PASS (reset → import → import export → import validation → mappings → override → provision → run-scoped mapping override → AI trace polling → review → depreciation metadata check → single resolve → bulk resolve → finalize → pre-lock export → submit → partner sign-off → lock → verification → post-lock 409 → post-lock comprehensive package → audit lifecycle → mapping+export audit events → create foreign tenant → tenant isolation across 6 resources → verify no pending agents) |
 | Operator workflow E2E | `npx playwright test` (apps/web) | 4/4 PASS (auth x3 + provision → review items display → AI findings page → partner sign-off → lock → 409 → audit → ZIP content verification → export language check → dashboard status) |
-| US EDGAR eval | `OFFLINE=1 npm run eval` | 2 PASS, 4 WARN, 6 SKIPPED (of 12), mean ETR delta 46.5 bp |
+| US EDGAR eval | `OFFLINE=1 npm run eval` | 4 PASS, 1 WARN, 7 SKIPPED (of 12), mean ETR delta 17.4 bp |
 | UK eval | `npm run eval:uk` | 9/9 PASS, mean ETR delta 1.3 bp, deferred closing 0 bp |
 | AI mapping eval | `AI_EVAL_MODE=dry-run npm run eval:ai-mapping -w @taxpro/api` | dry-run PASS (202 golden entries; expected distribution 55 temp / 17 perm / 130 no_diff printed) |
 | Agent harness (mocked) | `AI_EVAL_MODE=mocked npm run harness -w @taxpro/api` | PASS (16 fixtures, 0% fallback mocked; real 2.1% fallback Aug 2026) |
@@ -47,7 +47,7 @@ The Tiny Rebel fixture exercises a genuine marginal-relief disclosure ("Tax at m
 
 ### 1.2 US ASC 740 Benchmark (SEC EDGAR)
 
-12 targeted 10-K filers. Harness semantics: PASS ≤ 25 bp, WARN ≤ 100 bp, SKIP = footnote data inadequate to test the engine (no itemized recon, or footnote does not tie internally). **SKIP is not validation.** Offline mode currently resolves 2 PASS / 4 WARN / 6 SKIPPED.
+12 targeted 10-K filers. Harness semantics: PASS ≤ 25 bp, WARN ≤ 100 bp, SKIP = footnote data inadequate to test the engine (no itemized recon, or footnote does not tie internally). **SKIP is not validation.** Offline mode currently resolves 4 PASS / 1 WARN / 7 SKIPPED (mean ETR delta 17.4 bp, was 46.5 bp). P1 fixes implemented 2026-08-01: new-taxonomy dollar-tag collection (`EffectiveIncomeTaxRateReconciliation*`, excluding `*Percent`) and minority-interest negative bucket — CHD/ROL/POOL moved to PASS, HSY 268→122 bp, NUE 663→118 bp.
 
 Expansion of EDGAR coverage (state tax, valuation allowance, credits, contingencies mapping) is an active workstream — see `docs/ROADMAP_PRODUCTION.md` and `docs/PUBLIC_DATA_VALIDATION.md`.
 
