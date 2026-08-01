@@ -38,6 +38,8 @@ $$;
 -- ---- provision_runs ----
 DROP POLICY IF EXISTS tenant_isolation_read ON provision_runs;
 DROP POLICY IF EXISTS tenant_isolation_write ON provision_runs;
+DROP POLICY IF EXISTS tenant_isolation_select ON provision_runs;
+DROP POLICY IF EXISTS tenant_isolation_insert ON provision_runs;
 DROP POLICY IF EXISTS tenant_isolation_update ON provision_runs;
 DROP POLICY IF EXISTS tenant_isolation_delete ON provision_runs;
 CREATE POLICY tenant_isolation_select ON provision_runs FOR SELECT
@@ -53,6 +55,8 @@ CREATE POLICY tenant_isolation_delete ON provision_runs FOR DELETE
 -- ---- provision_results ----
 DROP POLICY IF EXISTS tenant_isolation_read ON provision_results;
 DROP POLICY IF EXISTS tenant_isolation_write ON provision_results;
+DROP POLICY IF EXISTS tenant_isolation_select ON provision_results;
+DROP POLICY IF EXISTS tenant_isolation_insert ON provision_results;
 DROP POLICY IF EXISTS tenant_isolation_update ON provision_results;
 DROP POLICY IF EXISTS tenant_isolation_delete ON provision_results;
 CREATE POLICY tenant_isolation_select ON provision_results FOR SELECT
@@ -68,6 +72,8 @@ CREATE POLICY tenant_isolation_delete ON provision_results FOR DELETE
 -- ---- provision_events ----
 DROP POLICY IF EXISTS tenant_isolation_read ON provision_events;
 DROP POLICY IF EXISTS tenant_isolation_write ON provision_events;
+DROP POLICY IF EXISTS tenant_isolation_select ON provision_events;
+DROP POLICY IF EXISTS tenant_isolation_insert ON provision_events;
 CREATE POLICY tenant_isolation_select ON provision_events FOR SELECT
   USING (tenant_id = app_current_tenant_id());
 CREATE POLICY tenant_isolation_insert ON provision_events FOR INSERT
@@ -76,6 +82,8 @@ CREATE POLICY tenant_isolation_insert ON provision_events FOR INSERT
 -- ---- review_items ----
 DROP POLICY IF EXISTS tenant_isolation_read ON review_items;
 DROP POLICY IF EXISTS tenant_isolation_write ON review_items;
+DROP POLICY IF EXISTS tenant_isolation_select ON review_items;
+DROP POLICY IF EXISTS tenant_isolation_insert ON review_items;
 DROP POLICY IF EXISTS tenant_isolation_update ON review_items;
 DROP POLICY IF EXISTS tenant_isolation_delete ON review_items;
 CREATE POLICY tenant_isolation_select ON review_items FOR SELECT
@@ -91,6 +99,8 @@ CREATE POLICY tenant_isolation_delete ON review_items FOR DELETE
 -- ---- tax_mappings ----
 DROP POLICY IF EXISTS tenant_isolation_read ON tax_mappings;
 DROP POLICY IF EXISTS tenant_isolation_write ON tax_mappings;
+DROP POLICY IF EXISTS tenant_isolation_select ON tax_mappings;
+DROP POLICY IF EXISTS tenant_isolation_insert ON tax_mappings;
 DROP POLICY IF EXISTS tenant_isolation_update ON tax_mappings;
 DROP POLICY IF EXISTS tenant_isolation_delete ON tax_mappings;
 CREATE POLICY tenant_isolation_select ON tax_mappings FOR SELECT
@@ -106,6 +116,8 @@ CREATE POLICY tenant_isolation_delete ON tax_mappings FOR DELETE
 -- ---- trial_balance ----
 DROP POLICY IF EXISTS tenant_isolation_read ON trial_balance;
 DROP POLICY IF EXISTS tenant_isolation_write ON trial_balance;
+DROP POLICY IF EXISTS tenant_isolation_select ON trial_balance;
+DROP POLICY IF EXISTS tenant_isolation_insert ON trial_balance;
 DROP POLICY IF EXISTS tenant_isolation_update ON trial_balance;
 DROP POLICY IF EXISTS tenant_isolation_delete ON trial_balance;
 CREATE POLICY tenant_isolation_select ON trial_balance FOR SELECT
@@ -121,6 +133,8 @@ CREATE POLICY tenant_isolation_delete ON trial_balance FOR DELETE
 -- ---- accounts ----
 DROP POLICY IF EXISTS tenant_isolation_read ON accounts;
 DROP POLICY IF EXISTS tenant_isolation_write ON accounts;
+DROP POLICY IF EXISTS tenant_isolation_select ON accounts;
+DROP POLICY IF EXISTS tenant_isolation_insert ON accounts;
 DROP POLICY IF EXISTS tenant_isolation_update ON accounts;
 DROP POLICY IF EXISTS tenant_isolation_delete ON accounts;
 CREATE POLICY tenant_isolation_select ON accounts FOR SELECT
@@ -136,6 +150,8 @@ CREATE POLICY tenant_isolation_delete ON accounts FOR DELETE
 -- ---- entities ----
 DROP POLICY IF EXISTS tenant_isolation_read ON entities;
 DROP POLICY IF EXISTS tenant_isolation_write ON entities;
+DROP POLICY IF EXISTS tenant_isolation_select ON entities;
+DROP POLICY IF EXISTS tenant_isolation_insert ON entities;
 DROP POLICY IF EXISTS tenant_isolation_update ON entities;
 DROP POLICY IF EXISTS tenant_isolation_delete ON entities;
 CREATE POLICY tenant_isolation_select ON entities FOR SELECT
@@ -151,6 +167,8 @@ CREATE POLICY tenant_isolation_delete ON entities FOR DELETE
 -- ---- ai_runs ----
 DROP POLICY IF EXISTS tenant_isolation_read ON ai_runs;
 DROP POLICY IF EXISTS tenant_isolation_write ON ai_runs;
+DROP POLICY IF EXISTS tenant_isolation_select ON ai_runs;
+DROP POLICY IF EXISTS tenant_isolation_insert ON ai_runs;
 DROP POLICY IF EXISTS tenant_isolation_update ON ai_runs;
 DROP POLICY IF EXISTS tenant_isolation_delete ON ai_runs;
 CREATE POLICY tenant_isolation_select ON ai_runs FOR SELECT
@@ -166,6 +184,8 @@ CREATE POLICY tenant_isolation_delete ON ai_runs FOR DELETE
 -- ---- classification_patterns ----
 DROP POLICY IF EXISTS tenant_isolation_read ON classification_patterns;
 DROP POLICY IF EXISTS tenant_isolation_write ON classification_patterns;
+DROP POLICY IF EXISTS tenant_isolation_select ON classification_patterns;
+DROP POLICY IF EXISTS tenant_isolation_insert ON classification_patterns;
 DROP POLICY IF EXISTS tenant_isolation_update ON classification_patterns;
 DROP POLICY IF EXISTS tenant_isolation_delete ON classification_patterns;
 CREATE POLICY tenant_isolation_select ON classification_patterns FOR SELECT
@@ -181,6 +201,8 @@ CREATE POLICY tenant_isolation_delete ON classification_patterns FOR DELETE
 -- ---- connections ----
 DROP POLICY IF EXISTS tenant_isolation_read ON connections;
 DROP POLICY IF EXISTS tenant_isolation_write ON connections;
+DROP POLICY IF EXISTS tenant_isolation_select ON connections;
+DROP POLICY IF EXISTS tenant_isolation_insert ON connections;
 DROP POLICY IF EXISTS tenant_isolation_update ON connections;
 DROP POLICY IF EXISTS tenant_isolation_delete ON connections;
 CREATE POLICY tenant_isolation_select ON connections FOR SELECT
@@ -196,6 +218,8 @@ CREATE POLICY tenant_isolation_delete ON connections FOR DELETE
 -- ---- users ----
 DROP POLICY IF EXISTS tenant_isolation_read ON users;
 DROP POLICY IF EXISTS tenant_isolation_write ON users;
+DROP POLICY IF EXISTS tenant_isolation_select ON users;
+DROP POLICY IF EXISTS tenant_isolation_insert ON users;
 DROP POLICY IF EXISTS tenant_isolation_update ON users;
 DROP POLICY IF EXISTS tenant_isolation_delete ON users;
 CREATE POLICY tenant_isolation_select ON users FOR SELECT

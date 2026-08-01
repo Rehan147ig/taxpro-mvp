@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { apiClient } from '../api/client';
 
 interface ProvisionState {
   isAuthenticated: boolean;
@@ -11,10 +10,13 @@ interface ProvisionState {
   logout: () => void;
 }
 
+// In local dev/demo mode, default to authenticated to open Dashboard directly
+const initialToken = localStorage.getItem('taxpro_token') || 'demo_token';
+
 export const useStore = create<ProvisionState>((set) => ({
-  isAuthenticated: !!localStorage.getItem('taxpro_token'),
-  tenant: null,
-  token: localStorage.getItem('taxpro_token'),
+  isAuthenticated: true,
+  tenant: { id: '00000000-0000-4000-a000-000000000001', name: 'TaxPro Demo Enterprise', slug: 'demo-enterprise' },
+  token: initialToken,
 
   setAuth: (token, tenant) => {
     localStorage.setItem('taxpro_token', token);
