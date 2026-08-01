@@ -208,20 +208,7 @@ CREATE POLICY tenant_isolation_update ON users FOR UPDATE
 CREATE POLICY tenant_isolation_delete ON users FOR DELETE
   USING (tenant_id = app_current_tenant_id());
 
--- ---- ai_steps (newly added tenant_id — see section 3) ----
-DROP POLICY IF EXISTS tenant_isolation_select ON ai_steps;
-DROP POLICY IF EXISTS tenant_isolation_insert ON ai_steps;
-DROP POLICY IF EXISTS tenant_isolation_update ON ai_steps;
-DROP POLICY IF EXISTS tenant_isolation_delete ON ai_steps;
-CREATE POLICY tenant_isolation_select ON ai_steps FOR SELECT
-  USING (tenant_id = app_current_tenant_id());
-CREATE POLICY tenant_isolation_insert ON ai_steps FOR INSERT
-  WITH CHECK (tenant_id = app_current_tenant_id());
-CREATE POLICY tenant_isolation_update ON ai_steps FOR UPDATE
-  USING (tenant_id = app_current_tenant_id())
-  WITH CHECK (tenant_id = app_current_tenant_id());
-CREATE POLICY tenant_isolation_delete ON ai_steps FOR DELETE
-  USING (tenant_id = app_current_tenant_id());
+-- NOTE: ai_steps policies are created in section 3, AFTER tenant_id is added.
 
 -- ================================================================
 -- 3. Add tenant_id to ai_steps with backfill
@@ -240,6 +227,26 @@ ALTER TABLE ai_steps ALTER COLUMN tenant_id SET NOT NULL;
 
 -- Index for RLS performance
 CREATE INDEX IF NOT EXISTS idx_ai_steps_tenant_id ON ai_steps(tenant_id);
+
+-- ---- ai_steps policies (tenant_id now exists; see section 2 note) ----
+DROP POLICY IF EXISTS tenant_isolation_select ON ai_steps;
+DROP POLICY IF EXISTS tenant_isolation_insert ON ai_steps;
+DROP POLICY IF EXISTS tenant_isolation_update ON ai_steps;
+DROP POLICY IF EXISTS tenant_isolation_delete ON ai_steps;
+CREATE POLICY tenant_isolation_select ON ai_steps FOR SELECT
+  USING (tenant_id = app_current_tenant_id());
+CREATE POLICY tenant_isolation_insert ON ai_steps FOR INSERT
+  WITH CHECK (tenant_id = app_current_tenant_id());
+CREATE POLICY tenant_isolation_update ON ai_steps FOR UPDATE
+  USING (tenant_id = app_current_tenant_id())
+  WITH CHECK (tenant_id = app_current_tenant_id());
+CREATE POLICY tenant_isolation_delete ON ai_steps FOR DELETE
+  USING (tenant_id = app_current_tenant_id());
+
+-- Enable RLS on ai_steps now that it is tenant-scoped. Writes go through
+-- tenant-context transactions (ai_runs are always created in-context), so
+-- strict default-deny policies are safe here.
+ALTER TABLE ai_steps ENABLE ROW LEVEL SECURITY;
 
 -- ================================================================
 -- 4. Grant / Revoke table privileges for app_tenant role

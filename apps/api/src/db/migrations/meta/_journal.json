@@ -64,6 +64,20 @@
                         "when":  1785748808000,
                         "tag":  "qbo_connections",
                         "breakpoints":  true
+                    },
+                    {
+                        "idx":  9,
+                        "version":  "0009_mapping_status",
+                        "when":  1785835208000,
+                        "tag":  "add_mapping_status",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  10,
+                        "version":  "0010_depreciation_metadata",
+                        "when":  1785921608000,
+                        "tag":  "depreciation_metadata",
+                        "breakpoints":  true
                     }
                 ]
 }

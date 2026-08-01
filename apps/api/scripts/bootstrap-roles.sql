@@ -52,11 +52,32 @@ END $$;
 GRANT USAGE ON SCHEMA public TO taxpro_app;
 
 -- ================================================================
+-- Step 3.5: Grant the schema owner creation rights
+-- ================================================================
+-- The migrations role must be able to create the drizzle bookkeeping
+-- schema (requires CREATE on the database) and tables in the public
+-- schema (PG15+ restricts public-schema CREATE to the database owner).
+-- Database name is taken from current_database() so this works in any
+-- dev/test/prod database.
+
+DO $$
+BEGIN
+  EXECUTE format('GRANT CREATE ON DATABASE %I TO taxpro_migrations', current_database());
+  EXECUTE 'GRANT CREATE ON SCHEMA public TO taxpro_migrations';
+END $$;
+
+-- ================================================================
 -- Step 4: Grant table-level privileges to app_tenant
 -- ================================================================
 -- Full CRUD on tenant-owned tables that the app needs to modify.
 -- SELECT-only on tables that are read-only for the app.
 -- No UPDATE/DELETE on provision_events (append-only).
+--
+-- Tolerant of a fresh database: table grants are skipped when the table
+-- does not exist yet (e.g. when this script runs at container initdb,
+-- before migrations). The same grants are re-applied after migration by
+-- src/db/migrate.ts, which also enforces the provision_events restriction
+-- on top of the blanket ALTER DEFAULT PRIVILEGES below.
 
 DO $$ DECLARE
   t text;
@@ -69,12 +90,20 @@ DO $$ DECLARE
 BEGIN
   FOREACH t IN ARRAY full_access_tables
   LOOP
-    EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON %I TO taxpro_app;', t);
+    IF to_regclass(t) IS NOT NULL THEN
+      EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON %I TO taxpro_app;', t);
+    END IF;
   END LOOP;
 END $$;
 
 -- provision_events: SELECT and INSERT only
-GRANT SELECT, INSERT ON provision_events TO taxpro_app;
+DO $$
+BEGIN
+  IF to_regclass('provision_events') IS NOT NULL THEN
+    EXECUTE 'GRANT SELECT, INSERT ON provision_events TO taxpro_app';
+    EXECUTE 'REVOKE UPDATE, DELETE ON provision_events FROM taxpro_app';
+  END IF;
+END $$;
 
 -- Schema-level defaults for future tables
 ALTER DEFAULT PRIVILEGES FOR ROLE taxpro_migrations IN SCHEMA public

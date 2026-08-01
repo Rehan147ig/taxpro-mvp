@@ -1,7 +1,10 @@
 # ── TaxPro Monolith Dockerfile (Railway/Render deploy) ──
 # Multi-stage: 1) build all workspaces, 2) production runtime
 
-FROM node:22-alpine AS builder
+# node:22-slim (glibc) builder: rollup's musl binary is frequently not
+# installed by `npm ci` in alpine (npm/cli#4828), breaking `vite build`;
+# the glibc binary installs reliably. Runtime stage stays node:22-alpine.
+FROM node:22-slim AS builder
 
 WORKDIR /app
 
@@ -12,6 +15,11 @@ COPY packages/tax-engine/package.json packages/tax-engine/package.json
 COPY tsconfig.base.json ./
 
 RUN npm ci --include=dev
+
+# `npm ci` flakily omits rollup's optional platform binary (npm/cli#4828),
+# breaking `vite build`. Install the glibc binary explicitly, version-matched
+# to the installed rollup.
+RUN npm i --no-save @rollup/rollup-linux-x64-gnu@$(node -p "require('./node_modules/rollup/package.json').version")
 
 COPY apps/api apps/api
 COPY apps/web apps/web

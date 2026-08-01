@@ -10,14 +10,17 @@ healthRoutes.get('/', async (c) => {
 
   try {
     const client = await pool.connect();
-    await client.query('SELECT 1');
-    checks.db = true;
+    try {
+      await client.query('SELECT 1');
+      checks.db = true;
 
-    const rlsRes = await client.query(
-      `SELECT relrowsecurity FROM pg_class WHERE relname = 'provision_runs'`,
-    );
-    checks.rls = rlsRes.rows[0]?.relrowsecurity === true;
-    client.release();
+      const rlsRes = await client.query(
+        `SELECT relrowsecurity FROM pg_class WHERE relname = 'provision_runs'`,
+      );
+      checks.rls = rlsRes.rows[0]?.relrowsecurity === true;
+    } finally {
+      client.release();
+    }
   } catch {
     checks.db = false;
   }
@@ -28,9 +31,12 @@ healthRoutes.get('/', async (c) => {
       maxRetriesPerRequest: 1,
       lazyConnect: true,
     });
-    const pong = await redis.ping();
-    checks.redis = pong === 'PONG';
-    await redis.quit();
+    try {
+      const pong = await redis.ping();
+      checks.redis = pong === 'PONG';
+    } finally {
+      redis.disconnect();
+    }
   } catch {
     checks.redis = false;
   }
