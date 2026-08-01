@@ -8,3 +8,7 @@ coverage/
 apps/api/scripts/eval/cache/
 tsconfig.tsbuildinfo
 .obsidian/
+
+test-results/
+playwright-report/
+playwright/.cache/

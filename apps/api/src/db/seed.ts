@@ -133,6 +133,18 @@ async function main() {
     set: { tenantId: tenant.id, passwordHash, role: 'admin' },
   });
 
+  // Partner (same tenant) for the two-person sign-off workflow: a partner must
+  // never be the person who submitted the run.
+  await db.insert(users).values({
+    tenantId: tenant.id,
+    email: 'partner@taxpro.ai',
+    passwordHash,
+    role: 'admin',
+  }).onConflictDoUpdate({
+    target: users.email,
+    set: { tenantId: tenant.id, passwordHash, role: 'admin' },
+  });
+
   const [entity] = await db.insert(entities).values({
     tenantId: tenant.id,
     externalId: 'ACME-US',
@@ -241,7 +253,7 @@ async function main() {
     accountCount++;
   }
 
-  console.log(`[Seed] Demo tenant ready: demo@taxpro.ai / TaxProDemo123!`);
+  console.log(`[Seed] Demo tenant ready: demo@taxpro.ai / TaxProDemo123! (partner: partner@taxpro.ai)`);
   console.log(`[Seed] Created ${accountCount} accounts and trial-balance rows for ${DEMO_PERIOD}.`);
 }
 

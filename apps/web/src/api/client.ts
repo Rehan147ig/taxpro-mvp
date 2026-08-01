@@ -137,6 +137,23 @@ export const provision = {
     apiClient<any>(`/provision/runs/${runId}/partner-approve`, { method: 'POST' }),
   lockRun: (runId: string) =>
     apiClient<any>(`/provision/runs/${runId}/lock`, { method: 'POST' }),
+  unlockRun: (runId: string) =>
+    apiClient<any>(`/provision/runs/${runId}/unlock`, { method: 'POST' }),
+  resultDetail: (id: string) => apiClient<any>(`/provision/results/${id}`),
+  ct600: (id: string, format: 'json' | 'csv' = 'json') =>
+    format === 'csv'
+      ? textClient(`/provision/results/${id}/ct600?format=csv`)
+      : apiClient<any>(`/provision/results/${id}/ct600`),
+  rdClaim: (id: string) => apiClient<any>(`/provision/results/${id}/rd-claim`),
+  mtdReadiness: (id: string, flags: { agentAuthorised?: boolean; signedUp?: boolean; softwareConnected?: boolean } = {}) => {
+    const q = new URLSearchParams();
+    if (flags.agentAuthorised) q.set('agentAuthorised', 'true');
+    if (flags.signedUp) q.set('signedUp', 'true');
+    if (flags.softwareConnected) q.set('softwareConnected', 'true');
+    const suffix = q.toString() ? `?${q.toString()}` : '';
+    return apiClient<any>(`/provision/results/${id}/mtd-readiness${suffix}`);
+  },
+  ctoXml: (id: string) => textClient(`/provision/results/${id}/cto-xml`),
   runTrialBalanceDetail: (runId: string) =>
     apiClient<any[]>(`/provision/runs/${runId}/trial-balance-detail`),
   compare: (runId: string) =>

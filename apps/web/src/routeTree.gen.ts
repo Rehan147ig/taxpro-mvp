@@ -14,6 +14,11 @@ import { Route as ConnectionsRouteImport } from './routes/connections'
 import { Route as MappingRouteImport } from './routes/mapping'
 import { Route as ProvisionRouteImport } from './routes/provision'
 import { Route as ReviewRouteImport } from './routes/review'
+import { Route as RunsRunIdRouteImport } from './routes/runs.$runId'
+import { Route as RunsRunIdIndexRouteImport } from './routes/runs.$runId.index'
+import { Route as RunsRunIdAuditRouteImport } from './routes/runs.$runId.audit'
+import { Route as RunsRunIdExportRouteImport } from './routes/runs.$runId.export'
+import { Route as RunsRunIdFindingsRouteImport } from './routes/runs.$runId.findings'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -40,6 +45,31 @@ const ReviewRoute = ReviewRouteImport.update({
   path: '/review',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RunsRunIdRoute = RunsRunIdRouteImport.update({
+  id: '/runs/$runId',
+  path: '/runs/$runId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RunsRunIdIndexRoute = RunsRunIdIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => RunsRunIdRoute,
+} as any)
+const RunsRunIdAuditRoute = RunsRunIdAuditRouteImport.update({
+  id: '/audit',
+  path: '/audit',
+  getParentRoute: () => RunsRunIdRoute,
+} as any)
+const RunsRunIdExportRoute = RunsRunIdExportRouteImport.update({
+  id: '/export',
+  path: '/export',
+  getParentRoute: () => RunsRunIdRoute,
+} as any)
+const RunsRunIdFindingsRoute = RunsRunIdFindingsRouteImport.update({
+  id: '/findings',
+  path: '/findings',
+  getParentRoute: () => RunsRunIdRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -47,6 +77,11 @@ export interface FileRoutesByFullPath {
   '/mapping': typeof MappingRoute
   '/provision': typeof ProvisionRoute
   '/review': typeof ReviewRoute
+  '/runs/$runId': typeof RunsRunIdRouteWithChildren
+  '/runs/$runId/audit': typeof RunsRunIdAuditRoute
+  '/runs/$runId/export': typeof RunsRunIdExportRoute
+  '/runs/$runId/findings': typeof RunsRunIdFindingsRoute
+  '/runs/$runId/': typeof RunsRunIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -54,6 +89,10 @@ export interface FileRoutesByTo {
   '/mapping': typeof MappingRoute
   '/provision': typeof ProvisionRoute
   '/review': typeof ReviewRoute
+  '/runs/$runId/audit': typeof RunsRunIdAuditRoute
+  '/runs/$runId/export': typeof RunsRunIdExportRoute
+  '/runs/$runId/findings': typeof RunsRunIdFindingsRoute
+  '/runs/$runId': typeof RunsRunIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -62,13 +101,48 @@ export interface FileRoutesById {
   '/mapping': typeof MappingRoute
   '/provision': typeof ProvisionRoute
   '/review': typeof ReviewRoute
+  '/runs/$runId': typeof RunsRunIdRouteWithChildren
+  '/runs/$runId/audit': typeof RunsRunIdAuditRoute
+  '/runs/$runId/export': typeof RunsRunIdExportRoute
+  '/runs/$runId/findings': typeof RunsRunIdFindingsRoute
+  '/runs/$runId/': typeof RunsRunIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/connections' | '/mapping' | '/provision' | '/review'
+  fullPaths:
+    | '/'
+    | '/connections'
+    | '/mapping'
+    | '/provision'
+    | '/review'
+    | '/runs/$runId'
+    | '/runs/$runId/audit'
+    | '/runs/$runId/export'
+    | '/runs/$runId/findings'
+    | '/runs/$runId/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/connections' | '/mapping' | '/provision' | '/review'
-  id: '__root__' | '/' | '/connections' | '/mapping' | '/provision' | '/review'
+  to:
+    | '/'
+    | '/connections'
+    | '/mapping'
+    | '/provision'
+    | '/review'
+    | '/runs/$runId/audit'
+    | '/runs/$runId/export'
+    | '/runs/$runId/findings'
+    | '/runs/$runId'
+  id:
+    | '__root__'
+    | '/'
+    | '/connections'
+    | '/mapping'
+    | '/provision'
+    | '/review'
+    | '/runs/$runId'
+    | '/runs/$runId/audit'
+    | '/runs/$runId/export'
+    | '/runs/$runId/findings'
+    | '/runs/$runId/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -77,6 +151,7 @@ export interface RootRouteChildren {
   MappingRoute: typeof MappingRoute
   ProvisionRoute: typeof ProvisionRoute
   ReviewRoute: typeof ReviewRoute
+  RunsRunIdRoute: typeof RunsRunIdRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
@@ -116,8 +191,61 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ReviewRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/runs/$runId': {
+      id: '/runs/$runId'
+      path: '/runs/$runId'
+      fullPath: '/runs/$runId'
+      preLoaderRoute: typeof RunsRunIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/runs/$runId/': {
+      id: '/runs/$runId/'
+      path: '/'
+      fullPath: '/runs/$runId/'
+      preLoaderRoute: typeof RunsRunIdIndexRouteImport
+      parentRoute: typeof RunsRunIdRoute
+    }
+    '/runs/$runId/audit': {
+      id: '/runs/$runId/audit'
+      path: '/audit'
+      fullPath: '/runs/$runId/audit'
+      preLoaderRoute: typeof RunsRunIdAuditRouteImport
+      parentRoute: typeof RunsRunIdRoute
+    }
+    '/runs/$runId/export': {
+      id: '/runs/$runId/export'
+      path: '/export'
+      fullPath: '/runs/$runId/export'
+      preLoaderRoute: typeof RunsRunIdExportRouteImport
+      parentRoute: typeof RunsRunIdRoute
+    }
+    '/runs/$runId/findings': {
+      id: '/runs/$runId/findings'
+      path: '/findings'
+      fullPath: '/runs/$runId/findings'
+      preLoaderRoute: typeof RunsRunIdFindingsRouteImport
+      parentRoute: typeof RunsRunIdRoute
+    }
   }
 }
+
+interface RunsRunIdRouteChildren {
+  RunsRunIdAuditRoute: typeof RunsRunIdAuditRoute
+  RunsRunIdExportRoute: typeof RunsRunIdExportRoute
+  RunsRunIdFindingsRoute: typeof RunsRunIdFindingsRoute
+  RunsRunIdIndexRoute: typeof RunsRunIdIndexRoute
+}
+
+const RunsRunIdRouteChildren: RunsRunIdRouteChildren = {
+  RunsRunIdAuditRoute: RunsRunIdAuditRoute,
+  RunsRunIdExportRoute: RunsRunIdExportRoute,
+  RunsRunIdFindingsRoute: RunsRunIdFindingsRoute,
+  RunsRunIdIndexRoute: RunsRunIdIndexRoute,
+}
+
+const RunsRunIdRouteWithChildren = RunsRunIdRoute._addFileChildren(
+  RunsRunIdRouteChildren,
+)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
@@ -125,6 +253,7 @@ const rootRouteChildren: RootRouteChildren = {
   MappingRoute: MappingRoute,
   ProvisionRoute: ProvisionRoute,
   ReviewRoute: ReviewRoute,
+  RunsRunIdRoute: RunsRunIdRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

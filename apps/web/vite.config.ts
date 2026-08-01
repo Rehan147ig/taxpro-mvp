@@ -19,8 +19,11 @@ export default defineConfig({
     minify: 'esbuild',
     rollupOptions: {
       output: {
-        manualChunks: {
-          vendor: ['react', 'react-dom'],
+        manualChunks(id) {
+          if (id.includes('node_modules/@opentelemetry')) return 'otel';
+          if (id.includes('node_modules/react') || id.includes('node_modules/scheduler')) return 'react';
+          if (id.includes('node_modules/@tanstack')) return 'router';
+          if (id.includes('node_modules/zustand')) return 'state';
         },
       },
     },

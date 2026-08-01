@@ -162,6 +162,7 @@ provisionRoutes.post('/run', strictRateLimiter, zValidator('json', runProvisionS
           grouped,
           mappings,
           accountMap,
+          tbData,
         }).catch(async (err) => {
           logger.warn({ err }, '[Provision] Eve agent failed, falling back to direct');
           await tx.update(provisionRuns).set({
@@ -776,6 +777,44 @@ function groupTrialBalanceByAccount(tbData: Array<typeof trialBalance.$inferSele
   return grouped;
 }
 
+function detectMissingDepreciationMetadata(args: {
+  grouped: Map<string, number>;
+  mappingMap: Map<string, typeof taxMappings.$inferSelect>;
+  accountMap: Map<string, typeof accounts.$inferSelect>;
+  tbData: Array<typeof trialBalance.$inferSelect>;
+  entityId?: string;
+  period: string;
+}) {
+  const missing: string[] = [];
+  for (const [accountId] of args.grouped) {
+    const mapping = args.mappingMap.get(accountId);
+    if (!mapping || mapping.bookTreatment !== 'temporary') continue;
+    const account = args.accountMap.get(accountId);
+    const tbLine = args.tbData.find((t) => t.accountId === accountId);
+    const computed = computeBookTaxDifferences(
+      [{
+        accountId,
+        entityId: tbLine?.entityId ?? args.entityId ?? 'consolidated',
+        period: args.period,
+        balance: new Decimal(args.grouped.get(accountId) ?? 0),
+        placedInServiceDate: (tbLine?.placedInServiceDate ?? account?.placedInServiceDate) ?? undefined,
+      }],
+      [],
+      new Map([[accountId, {
+        accountId,
+        taxAccountType: mapping.taxAccountType,
+        bookTreatment: mapping.bookTreatment,
+        timingCategory: mapping.timingCategory ?? undefined,
+      } as any]]),
+      args.period
+    )[0];
+    if (computed?.depreciationAgeSource === 'no_metadata' && !missing.includes(accountId)) {
+      missing.push(accountId);
+    }
+  }
+  return missing;
+}
+
 function buildDeterministicCalculationInput(args: {
   period: string;
   entityId?: string;
@@ -798,7 +837,14 @@ function buildDeterministicCalculationInput(args: {
     diffType: 'temporary';
     timingCategory?: string;
   }[] = [];
-  const missingDepreciationMetadata: string[] = [];
+  const missingDepreciationMetadata = detectMissingDepreciationMetadata({
+    grouped: args.grouped,
+    mappingMap: args.mappingMap,
+    accountMap: args.accountMap,
+    tbData: args.tbData,
+    entityId: args.entityId,
+    period: args.period,
+  });
 
   for (const [accountId, balance] of args.grouped) {
     const mapping = args.mappingMap.get(accountId);
@@ -825,10 +871,6 @@ function buildDeterministicCalculationInput(args: {
         args.period
       );
       const computed = computedList[0];
-
-      if (computed?.depreciationAgeSource === 'no_metadata' && !missingDepreciationMetadata.includes(accountId)) {
-        missingDepreciationMetadata.push(accountId);
-      }
 
       temporaryDifferences.push({
         accountId,
@@ -869,6 +911,7 @@ async function buildAgentCalculationInput(tx: any, args: {
   grouped: Map<string, number>;
   mappings: Array<typeof taxMappings.$inferSelect>;
   accountMap: Map<string, typeof accounts.$inferSelect>;
+  tbData: Array<typeof trialBalance.$inferSelect>;
 }) {
   const trialBalanceForAgent = Array.from(args.grouped.entries()).map(([accountId, balance]) => {
     const account = args.accountMap.get(accountId);
@@ -931,7 +974,14 @@ async function buildAgentCalculationInput(tx: any, args: {
       taxCredits: 0,
       estimatedPayments: 0,
       nolUtilization: 0,
-      missingDepreciationMetadata: [],
+      missingDepreciationMetadata: detectMissingDepreciationMetadata({
+        grouped: args.grouped,
+        mappingMap: new Map(args.mappings.map((m) => [m.accountId, m])),
+        accountMap: args.accountMap,
+        tbData: args.tbData,
+        entityId: args.entityId,
+        period: args.period,
+      }),
       entityId: args.entityId ?? 'consolidated',
       period: args.period,
       agentReasoning: agentResult.reasoning,
@@ -1205,13 +1255,6 @@ provisionRoutes.post('/runs/:runId/review-items/:itemId/resolve',
           eq(reviewItems.status, 'open'),
         ));
 
-      if (openItems.length === 0) {
-        await tx.update(provisionRuns).set({
-          approvalStatus: 'approved',
-          updatedAt: new Date(),
-        }).where(eq(provisionRuns.id, runId));
-      }
-
       return c.json({ itemId, status: resolvedStatus, openRemaining: openItems.length });
     });
 });
@@ -1242,11 +1285,6 @@ provisionRoutes.post('/runs/:runId/review-items/bulk-resolve',
           updatedAt: new Date(),
         }).where(eq(reviewItems.id, item.id));
       }
-
-      await tx.update(provisionRuns).set({
-        approvalStatus: resolution === 'approved' ? 'approved' : 'rejected',
-        updatedAt: new Date(),
-      }).where(eq(provisionRuns.id, runId));
 
       await recordProvisionEvent({
         tenantId: user.tenantId,

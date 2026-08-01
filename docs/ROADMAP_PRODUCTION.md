@@ -74,17 +74,17 @@ Launch checklist. Items are ordered; each must be verified by the gates in Phase
 
 ## Phase 8 — Frontend Product Completion
 
-- [ ] Finish TanStack Router migration; remove or archive old `App.tsx`
-- [ ] Pages align with backend: Dashboard, Connections, Mapping, Provision, Review Queue, Run Detail, AI Findings, Audit Events, Export Package
-- [ ] UI states: loading, empty, error, locked, needs review, awaiting partner approval, finalized
-- [ ] Route-level code splitting (fix > 500 kB bundle warning)
-- [ ] Operator workflows only — no marketing pages
+- [x] Finish TanStack Router migration; remove or archive old `App.tsx`
+- [x] Pages align with backend: Dashboard, Connections, Mapping, Provision, Review Queue, Run Detail, AI Findings, Audit Events, Export Package
+- [x] UI states: loading, empty, error, locked, needs review, awaiting partner approval, finalized
+- [x] Route-level code splitting (fix > 500 kB bundle warning)
+- [x] Operator workflows only — no marketing pages
 
 ## Phase 9 — API Integration Tests
 
-- [ ] Extend `test-provision-flow.ts`: login → import TB → mapping → provision → wait AI traces → review items → resolve → submit → partner approval (different user) → lock → mutation 409 → export package → audit events → tenant isolation
-- [ ] Deterministic seed producing at least one review item
-- [ ] Runnable locally with Docker Postgres/Redis
+- [x] Extend `test-provision-flow.ts`: login → import TB → mapping → provision → wait AI traces → review items → resolve → submit → partner approval (different user) → lock → mutation 409 → export package → audit events → tenant isolation
+- [x] Deterministic seed producing at least one review item
+- [x] Runnable locally with Docker Postgres/Redis
 
 ## Phase 10 — Production Deployment
 

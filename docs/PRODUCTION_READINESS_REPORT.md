@@ -4,7 +4,7 @@
 **Date:** 2026-08-01
 **Branch:** master
 **Test Suite:** 330 tests passing (118 tax-engine + 212 API), 0 failures
-**E2E Pipeline:** 8/8 integration steps pass (in-process Hono + live Postgres; subagent calls degrade to fallback when the AI provider is unreachable)
+**E2E Pipeline:** Playwright 4/4 (3 auth + full operator workflow); API integration flow 15/15 (in-process Hono + live Postgres)
 
 ---
 
@@ -15,7 +15,8 @@
 | Lint / typecheck | `npm run lint` | PASS |
 | Unit tests | `npm test` | 330/330 PASS (118 engine + 212 API) |
 | Build | `npm run build` | PASS |
-| Provision integration flow | `npm run test:integration -w @taxpro/api` | 8/8 PASS |
+| Provision integration flow | `npm run test:integration -w @taxpro/api` | 15/15 PASS (reset → provision → review → submit → partner sign-off → lock → 409 → audit → tenant isolation) |
+| Operator workflow E2E | `npx playwright test` (apps/web) | 4/4 PASS (auth x3 + provision → review → partner sign-off → lock → audit → ZIP export) |
 | US EDGAR eval | `OFFLINE=1 npm run eval` | 2 PASS, 4 WARN, 6 SKIPPED (of 12) |
 | UK eval | `npm run eval:uk` | 9/9 PASS, mean ETR delta 1.3 bp |
 
@@ -134,11 +135,13 @@ Production must connect as `taxpro_app` (NOBYPASSRLS). `assertRuntimeDbRole` (`c
 - Compliance exports (CT600/iXBRL/MTD) are structure generators with deterministic, reproducible packages (Phase 6) — **still validation-ready, not filing-ready**. No HMRC/Companies House validator is integrated.
 ### Must fix before major release
 - US EDGAR eval coverage: 6/12 filings skipped; mapping expansion (state tax, valuation allowance, credits, contingencies) in progress.
-- Frontend bundle > 500 kB warning; code-split routes.
 - AI provider unreachable from dev machine; real-mode AI eval currently falls back to dry-run statistics (exit 0).
+
+### Resolved (Phase 8)
+- Frontend bundle > 500 kB warning — heavy pages (Review Queue, Run Detail, AI Findings, Audit Events, Export Package) code-split via `lazyRouteComponent`.
 
 ---
 
 ## 7. Recommendation
 
-**Not yet production-ready.** Remaining order: complete Phase 8–10 checklist in `docs/ROADMAP_PRODUCTION.md`, then external CPA review + security audit before any go-live or "filing-ready" claim.
+**Not yet production-ready.** Remaining order: complete the Phase 10–11 checklist in `docs/ROADMAP_PRODUCTION.md` (deployment hardening + final report), then external CPA review + security audit before any go-live or "filing-ready" claim. Phases 8–9 are complete: operator UI (all 9 pages, code-split), Playwright 4/4, API integration 15/15, deterministic seed producing review items.

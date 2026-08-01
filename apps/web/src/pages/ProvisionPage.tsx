@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from '@tanstack/react-router';
 import { provision as provApi } from '../api/client';
 import { webProvisionRunCounter } from '../observability';
+import { RunStatusBadge } from '../components/RunStatusBadge';
 
 export default function ProvisionPage() {
   const [period, setPeriod] = useState('2024-01-01');
@@ -104,22 +106,35 @@ export default function ProvisionPage() {
 
       {result && (
         <div className="space-y-6">
-          <div className="flex justify-end gap-2">
-            <button
-              onClick={() => handleExport('workpaper')}
-              disabled={exporting !== null}
-              className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-50"
-            >
-              {exporting === 'workpaper' ? 'Exporting...' : 'Export Workpaper (.xlsx)'}
-            </button>
-            <button
-              onClick={() => handleExport('package')}
-              disabled={exporting !== null}
-              className="bg-brand-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
-            >
-              {exporting === 'package' ? 'Exporting...' : 'Export Package (.zip)'}
-            </button>
+          <div className="flex justify-between items-center gap-2">
+            <div className="flex items-center gap-2">
+              {result.status && <RunStatusBadge status={result.status} />}
+              {result.provisionRunId && (
+                <Link to="/runs/$runId" params={{ runId: result.provisionRunId }} className="text-sm text-brand-600 hover:underline font-medium">
+                  Open in Review →
+                </Link>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleExport('workpaper')}
+                disabled={exporting !== null}
+                className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-50"
+              >
+                {exporting === 'workpaper' ? 'Exporting...' : 'Export Workpaper (.xlsx)'}
+              </button>
+              <button
+                onClick={() => handleExport('package')}
+                disabled={exporting !== null}
+                className="bg-brand-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
+              >
+                {exporting === 'package' ? 'Exporting...' : 'Export Package (.zip)'}
+              </button>
+            </div>
           </div>
+          <p className="text-xs text-gray-500">
+            Outputs are validation-ready, not filing-ready — review, partner sign-off and lock are required before final delivery.
+          </p>
 
           {/* Summary Cards */}
           <div className="grid grid-cols-4 gap-4">

@@ -10,6 +10,12 @@
  *   6. POST /api/provision/runs/:id/review-items/bulk-resolve -> Bulk resolution
  *   7. POST /api/provision/runs/:id/finalize -> Provision run finalization
  *   8. GET /api/provision/results/:id/package -> ZIP workpaper & audit log export
+ *   9. POST /api/provision/runs/:id/submit-for-approval -> Partner review submission
+ *  10. POST /api/provision/runs/:id/partner-approve -> Partner sign-off (separate user)
+ *  11. POST /api/provision/runs/:id/lock -> Final lock (immutable)
+ *  12. POST /api/mapping/mappings/:accountId/override -> Post-lock mutation rejected (409)
+ *  13. GET /api/provision/runs/:id/events -> Audit trail contains submit/approve/lock
+ *  14. Cross-tenant isolation -> Foreign tenant cannot read demo run data
  */
 
 import { Hono } from 'hono';
@@ -19,6 +25,11 @@ import { importRoutes } from '../src/modules/import/import.routes.js';
 import { mappingRoutes } from '../src/modules/mapping/mapping.routes.js';
 
 import { errorHandler } from '../src/lib/middleware/error-handler.js';
+import { db } from '../src/config/db.js';
+import { tenants } from '../src/db/schema/tenants.js';
+import { provisionResults } from '../src/db/schema/provision-results.js';
+import { provisionRuns } from '../src/db/schema/provision-runs.js';
+import { eq } from 'drizzle-orm';
 
 // Setup in-process Hono test application
 const app = new Hono();
@@ -61,6 +72,21 @@ async function runStep(name: string, fn: () => Promise<string | void>) {
 
 async function main() {
   console.log('\n🧪 Starting TaxPro End-to-End API Integration Test Suite\n');
+
+  // Step 0: Reset demo tenant state so the suite is repeatable.
+  //   provision_events are append-only (immutable audit) and are NEVER touched.
+  //   Terminal runs (approved/locked) are reset to failed/not_required — TEST-ONLY for the
+  //   demo tenant — because POST /run skips review-item creation when an identical
+  //   approved run exists (dedup guard). Events documenting the prior lifecycle remain.
+  await runStep('0. Reset demo tenant state', async () => {
+    const [tenant] = await db.select().from(tenants).where(eq(tenants.slug, 'acme-demo')).limit(1);
+    assert(!!tenant, 'Demo tenant (acme-demo) not found — run db:seed first');
+    await db.delete(provisionResults).where(eq(provisionResults.tenantId, tenant.id));
+    const reset = await db.update(provisionRuns)
+      .set({ status: 'failed', approvalStatus: 'not_required', updatedAt: new Date() })
+      .where(eq(provisionRuns.tenantId, tenant.id));
+    return `Cleared results + reset ${reset.rowCount ?? 0} run(s) to failed/not_required (events kept — immutable audit)`;
+  });
 
   let authToken = '';
   let provisionRunId = '';
@@ -216,6 +242,125 @@ async function main() {
     // Zip signature PK\x03\x04
     assert(bytes[0] === 0x50 && bytes[1] === 0x4b, 'Invalid ZIP magic header signature');
     return `Exported ${bytes.length.toLocaleString()} byte ZIP package containing workpapers + audit logs`;
+  });
+
+  // Step 9: Submit for Partner Approval
+  await runStep('9. Submit for Approval (POST /runs/:id/submit-for-approval)', async () => {
+    const res = await app.request(`/api/provision/runs/${provisionRunId}/submit-for-approval`, {
+      method: 'POST',
+      headers: authHeaders,
+    });
+
+    assert(res.status === 200, `Expected status 200, got ${res.status}`);
+    const data = await res.json();
+    assert(data.approvalStatus === 'pending_partner_review', `Expected pending_partner_review, got ${data.approvalStatus}`);
+    return `Run ${provisionRunId} submitted for partner review`;
+  });
+
+  // Step 10: Partner Sign-off (separate user to prove reviewer/approver separation)
+  let partnerToken = '';
+  await runStep('10. Partner Sign-off (POST /runs/:id/partner-approve)', async () => {
+    const loginRes = await app.request('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: 'partner@taxpro.ai',
+        password: 'TaxProDemo123!',
+      }),
+    });
+    assert(loginRes.status === 200, `Partner login failed: ${loginRes.status}`);
+    const loginData = await loginRes.json();
+    partnerToken = loginData.token;
+
+    const res = await app.request(`/api/provision/runs/${provisionRunId}/partner-approve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${partnerToken}` },
+    });
+
+    assert(res.status === 200, `Expected status 200, got ${res.status}`);
+    const data = await res.json();
+    assert(data.approvalStatus === 'approved', `Expected approved, got ${data.approvalStatus}`);
+    return `Run approved by partner@taxpro.ai`;
+  });
+
+  // Step 11: Lock Final Provision
+  await runStep('11. Lock Final Provision (POST /runs/:id/lock)', async () => {
+    const res = await app.request(`/api/provision/runs/${provisionRunId}/lock`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${partnerToken}` },
+    });
+
+    assert(res.status === 200, `Expected status 200, got ${res.status}`);
+    const data = await res.json();
+    assert(data.status === 'locked', `Expected status locked, got ${data.status}`);
+    return `Provision run ${provisionRunId} locked (immutable)`;
+  });
+
+  // Step 12: Mutation after lock is rejected with 409
+  await runStep('12. Post-Lock Mutation Rejected (409)', async () => {
+    const mappingsRes = await app.request('/api/mapping/mappings', {
+      headers: { 'Authorization': `Bearer ${authToken}` },
+    });
+    const mappings = await mappingsRes.json();
+    assert(Array.isArray(mappings) && mappings.length > 0, 'No mappings available to attempt override');
+    const accountId = mappings[0].accountId ?? mappings[0].id;
+
+    const res = await app.request(`/api/mapping/mappings/${accountId}/override`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+      body: JSON.stringify({
+        taxAccountType: 'PERM_OTHER',
+        bookTreatment: 'permanent',
+        provisionRunId,
+      }),
+    });
+
+    assert(res.status === 409, `Expected 409 conflict, got ${res.status}: ${await res.text()}`);
+    return 'Mapping override after lock correctly rejected with 409';
+  });
+
+  // Step 13: Audit trail captures the governance lifecycle
+  await runStep('13. Audit Trail (GET /runs/:id/events)', async () => {
+    const res = await app.request(`/api/provision/runs/${provisionRunId}/events`, {
+      headers: { 'Authorization': `Bearer ${authToken}` },
+    });
+
+    assert(res.status === 200, `Expected status 200, got ${res.status}`);
+    const events = await res.json();
+    assert(Array.isArray(events), 'events must be an array');
+    const types = (events as any[]).map((e) => e.eventType);
+    for (const expected of ['submitted_for_approval', 'partner.approved', 'run.locked']) {
+      assert(types.includes(expected), `Missing audit event: ${expected}`);
+    }
+    return `Audit trail contains ${events.length} event(s): ${types.join(', ')}`;
+  });
+
+  // Step 14: Cross-tenant isolation
+  await runStep('14. Tenant Isolation (cross-tenant access blocked)', async () => {
+    const suffix = Date.now().toString(36);
+    const regRes = await app.request('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: `iso-${suffix}@test.local`,
+        password: 'Password123!',
+        tenantName: 'Isolation Test',
+        tenantSlug: `iso-${suffix}`,
+      }),
+    });
+    assert(regRes.status === 201, `Foreign tenant registration failed: ${regRes.status}`);
+    const reg = await regRes.json();
+    const foreignHeaders = { 'Authorization': `Bearer ${reg.token}` };
+
+    const itemsRes = await app.request(`/api/provision/runs/${provisionRunId}/review-items`, { headers: foreignHeaders });
+    assert(itemsRes.status === 200, `Expected 200, got ${itemsRes.status}`);
+    const items = await itemsRes.json();
+    assert(Array.isArray(items) && items.length === 0, 'Foreign tenant must not see demo review items');
+
+    const pkgRes = await app.request(`/api/provision/results/${resultId}/package`, { headers: foreignHeaders });
+    assert(pkgRes.status !== 200, 'Foreign tenant must not access demo export package');
+
+    return `Foreign tenant blocked from demo run data (items: ${items.length}, package export: HTTP ${pkgRes.status})`;
   });
 
   const totalSteps = testResults.length + skippedSteps;

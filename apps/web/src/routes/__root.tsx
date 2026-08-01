@@ -1,34 +1,29 @@
-import { createRootRoute, Outlet } from '@tanstack/react-router';
+import { createRootRoute, Link, Outlet, useLocation } from '@tanstack/react-router';
 import { useStore } from '../stores/provision.store';
 
 function Root() {
   const { isAuthenticated, logout } = useStore();
+  const { pathname } = useLocation();
 
   if (!isAuthenticated) {
     return <Outlet />;
   }
 
-  const navigate = (path: string) => {
-    window.history.pushState({}, '', path);
-    window.dispatchEvent(new PopStateEvent('popstate'));
+  const NavLink = ({ to, children }: { to: string; children: React.ReactNode }) => {
+    const active = pathname === to || (to !== '/' && pathname.startsWith(to));
+    return (
+      <Link
+        to={to}
+        className={`block px-4 py-2 text-sm rounded-lg transition ${
+          active ? 'bg-brand-600 text-white' : 'text-gray-600 hover:bg-gray-100'
+        }`}
+      >
+        {children}
+      </Link>
+    );
   };
 
-  const NavLink = ({ to, children }: { to: string; children: React.ReactNode }) => (
-    <a
-      href={to}
-      onClick={(e) => {
-        e.preventDefault();
-        navigate(to);
-      }}
-      className={`block px-4 py-2 text-sm rounded-lg transition ${
-        window.location.pathname === to
-          ? 'bg-brand-600 text-white'
-          : 'text-gray-600 hover:bg-gray-100'
-      }`}
-    >
-      {children}
-    </a>
-  );
+  const reviewActive = pathname === '/review' || pathname.startsWith('/runs');
 
   return (
     <div className="min-h-screen flex">
@@ -43,7 +38,14 @@ function Root() {
           <NavLink to="/connections">Data Sources</NavLink>
           <NavLink to="/mapping">Tax Mapping</NavLink>
           <NavLink to="/provision">Provision</NavLink>
-          <NavLink to="/review">Review</NavLink>
+          <Link
+            to="/review"
+            className={`block px-4 py-2 text-sm rounded-lg transition ${
+              reviewActive ? 'bg-brand-600 text-white' : 'text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            Review
+          </Link>
         </nav>
 
         <button
