@@ -60,7 +60,10 @@ const runProvisionSchema = z.object({
   entityId: z.string().optional(),
 });
 
-provisionRoutes.post('/run', strictRateLimiter, zValidator('json', runProvisionSchema), async (c) => {
+provisionRoutes.post('/run',
+  strictRateLimiter,
+  requireRole('preparer', 'reviewer', 'partner', 'admin'),
+  zValidator('json', runProvisionSchema), async (c) => {
   const user = c.get('user');
   const { period, endPeriod, entityId } = c.req.valid('json');
   const useDirect = c.req.query('direct') === 'true';

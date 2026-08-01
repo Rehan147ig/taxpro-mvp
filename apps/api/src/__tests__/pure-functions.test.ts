@@ -1,9 +1,12 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { stableHash } from '../eve/hash.js';
 import { canMutate, ensureTenantScoped } from '../lib/middleware/rbac.js';
 import { assertNotLocked, transitionStage } from '../state/tax-provision-state.js';
 import type { TaxProvisionState, PipelineStage } from '../state/tax-provision-state.js';
 import { NotFoundError } from '../lib/errors.js';
+import { resolveJurisdiction } from '../modules/provision/provision-calculator.js';
+import { logger } from '../lib/logger.js';
+import { Jurisdiction } from '@taxpro/tax-engine';
 
 describe('RBAC: canMutate', () => {
 
@@ -49,6 +52,52 @@ describe('RBAC: ensureTenantScoped', () => {
 
   it('throws NotFoundError when resource has null tenant', () => {
     expect(() => ensureTenantScoped('tenant-a', null)).toThrow(NotFoundError);
+  });
+
+});
+
+describe('resolveJurisdiction: exact known values', () => {
+
+  it("maps 'UK_FRS102' to UK_FRS102_S29", () => {
+    expect(resolveJurisdiction('UK_FRS102')).toBe(Jurisdiction.UK_FRS102_S29);
+  });
+
+  it("maps 'UK_FRS102_S29' to UK_FRS102_S29", () => {
+    expect(resolveJurisdiction('UK_FRS102_S29')).toBe(Jurisdiction.UK_FRS102_S29);
+  });
+
+  it("maps 'US-Federal' to US_ASC740", () => {
+    expect(resolveJurisdiction('US-Federal')).toBe(Jurisdiction.US_ASC740);
+  });
+
+  it("maps 'US_ASC740' to US_ASC740", () => {
+    expect(resolveJurisdiction('US_ASC740')).toBe(Jurisdiction.US_ASC740);
+  });
+
+  it('defaults to US_ASC740 for null input', () => {
+    expect(resolveJurisdiction(null)).toBe(Jurisdiction.US_ASC740);
+  });
+
+  it('defaults to US_ASC740 for undefined input', () => {
+    expect(resolveJurisdiction(undefined)).toBe(Jurisdiction.US_ASC740);
+  });
+
+  it('warns and falls back to US_ASC740 for an unrecognized string', () => {
+    const warnSpy = vi.spyOn(logger, 'warn');
+    expect(resolveJurisdiction('UK')).toBe(Jurisdiction.US_ASC740);
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ taxJurisdiction: 'UK' }),
+      expect.stringContaining('Unrecognized taxJurisdiction string'),
+    );
+    warnSpy.mockRestore();
+  });
+
+  it('does not warn for known values', () => {
+    const warnSpy = vi.spyOn(logger, 'warn');
+    resolveJurisdiction('UK_FRS102');
+    resolveJurisdiction('US-Federal');
+    expect(warnSpy).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
   });
 
 });

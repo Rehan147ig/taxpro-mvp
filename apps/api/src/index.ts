@@ -36,10 +36,8 @@ app.use('*', compress({
 }));
 app.onError(errorHandler);
 
-// Rate limiting — only in production
-if (env.NODE_ENV === 'production') {
-  app.use('/api/*', rateLimiter);
-}
+// Rate limiting — universal across all environments
+app.use('/api/*', rateLimiter);
 
 // ── Health ──
 app.route('/api/health', healthRoutes);

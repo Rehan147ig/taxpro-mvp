@@ -1,5 +1,6 @@
 import Decimal from 'decimal.js';
 import { createEngine, Jurisdiction, etrAdjustmentsForMarginalRelief } from '@taxpro/tax-engine';
+import { logger } from '../../lib/logger.js';
 
 export interface ProvisionMathInput {
   bookIncome: number;
@@ -23,11 +24,26 @@ export interface ProvisionMathInput {
   period: string;
 }
 
+/**
+ * Exact set of persisted entity.taxJurisdiction values mapped to the engine
+ * Jurisdiction enum. Values the app itself writes ('US-Federal', 'UK_FRS102')
+ * are known; anything else is unrecognized and warns loudly instead of being
+ * silently guessed.
+ */
+const KNOWN_JURISDICTIONS: Record<string, Jurisdiction> = {
+  UK_FRS102: Jurisdiction.UK_FRS102_S29,
+  UK_FRS102_S29: Jurisdiction.UK_FRS102_S29,
+  US: Jurisdiction.US_ASC740,
+  'US-Federal': Jurisdiction.US_ASC740,
+  US_ASC740: Jurisdiction.US_ASC740,
+};
+
 /** Map a persisted entity.taxJurisdiction string to the engine Jurisdiction enum. */
 export function resolveJurisdiction(taxJurisdiction?: string | null): Jurisdiction {
   if (!taxJurisdiction) return Jurisdiction.US_ASC740;
-  const normalized = taxJurisdiction.trim().toLowerCase();
-  if (normalized.includes('uk') || normalized.includes('frs')) return Jurisdiction.UK_FRS102_S29;
+  const resolved = KNOWN_JURISDICTIONS[taxJurisdiction.trim()];
+  if (resolved) return resolved;
+  logger.warn({ taxJurisdiction }, '[Jurisdiction] Unrecognized taxJurisdiction string, defaulting to US_ASC740');
   return Jurisdiction.US_ASC740;
 }
 

@@ -115,6 +115,38 @@ describe('Phase 4.3 — Provision flow with auth', () => {
     expect(runData.provisionRunId).toBeDefined();
   });
 
+  it('client_readonly gets 403 on POST /run', async () => {
+    const readonlyToken = jwt.sign(
+      { userId: 'ro-user', tenantId: '00000000-0000-0000-0000-000000000000', email: 'ro@test.local', role: 'client_readonly' },
+      env.JWT_SECRET,
+    );
+    const res = await app.request('/api/provision/run?direct=true', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${readonlyToken}`,
+      },
+      body: JSON.stringify({ period: '2026-01-01' }),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it('auditor gets 403 on POST /run', async () => {
+    const auditorToken = jwt.sign(
+      { userId: 'auditor-user', tenantId: '00000000-0000-0000-0000-000000000000', email: 'auditor@test.local', role: 'auditor' },
+      env.JWT_SECRET,
+    );
+    const res = await app.request('/api/provision/run?direct=true', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${auditorToken}`,
+      },
+      body: JSON.stringify({ period: '2026-01-01' }),
+    });
+    expect(res.status).toBe(403);
+  });
+
 });
 
 describe('Phase 4.4 — Import routes security', () => {

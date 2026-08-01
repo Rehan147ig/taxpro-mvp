@@ -1,13 +1,13 @@
 import Decimal from 'decimal.js';
 import { logger } from '../../lib/logger.js';
-import { createEngine, Jurisdiction, etrAdjustmentsForMarginalRelief } from '@taxpro/tax-engine';
-
-const engine = createEngine(Jurisdiction.US_ASC740);
+import { createEngine, etrAdjustmentsForMarginalRelief } from '@taxpro/tax-engine';
+import { resolveJurisdiction } from '../../modules/provision/provision-calculator.js';
 
 const parameters = {
   type: 'object',
   properties: {
     bookIncome: { type: 'number', description: 'Net book income (pretax)' },
+    jurisdiction: { type: 'string', description: 'Tax jurisdiction: US_ASC740 (default) or UK_FRS102_S29' },
     permanentDifferences: {
       type: 'array', items: { type: 'object', properties: { amount: { type: 'number' }, label: { type: 'string' } }, required: ['amount', 'label'] },
       description: 'Permanent book-tax differences',
@@ -31,7 +31,9 @@ const parameters = {
 export const runTaxMath = {
   spec: { description: 'Execute ASC 740 tax provision calculations using the deterministic tax engine. Returns current tax, deferred tax, ETR reconciliation, and journal entries.', parameters },
   execute: async (args: Record<string, any>) => {
-    logger.info({ bookIncome: args.bookIncome }, '[Eve] Running tax math');
+    logger.info({ bookIncome: args.bookIncome, jurisdiction: args.jurisdiction }, '[Eve] Running tax math');
+
+    const engine = createEngine(resolveJurisdiction(args.jurisdiction));
 
     const currentTax = engine.calculateCurrentTax({
       bookIncome: new Decimal(args.bookIncome),
