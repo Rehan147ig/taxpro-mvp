@@ -51,6 +51,7 @@ Launch checklist. Items are ordered; each must be verified by the gates in Phase
 - [x] Never market skipped companies as validated (summary prints VALIDATED = evaluated only + explicit "NOT validated" line)
 - [x] Add more UK Companies House fixtures with provenance metadata (company, year, source doc, note ref, manual adjustments — 9 fixtures; noteRef/manualAdjustments fields added)
 - [x] `docs/PUBLIC_DATA_VALIDATION.md` summarizing evidence honestly
+- [ ] Close EDGAR skip gap (ranked fixes in `docs/EDGAR_SKIP_GAP_REPORT.md`, Step 4 report-only): P1 new-taxonomy `EffectiveIncomeTaxRateReconciliation…Amount` tag collection in `ground-truth.ts`; P1 minority-interest negative bucket in `xbrl-map.ts`; P2 percent-unit path (tie-gated); P2 target rotation for JKHY/WDFC; re-baseline offline eval
 
 ## Phase 6 — Compliance Exports
 
@@ -61,6 +62,7 @@ Launch checklist. Items are ordered; each must be verified by the gates in Phase
 - [x] Export package: calculation summary, assumptions, review items, AI traces, audit events, source hashes, approval trail
 - [x] Test: locked package reproducible from immutable run data (byte-identical across wall-clock gaps — no volatile timestamps)
 - [x] Package manifest: schemaVersion, generatedAt, period, source/mapping/engine provenance, per-file sha256 with self-exclusion, fileCount integrity
+- [x] Step 2 hardening: CT600 rules conformance validator (HMRC-derived: CTM03925 MR formula `3/200 × (U − A)`, box identities, UTR/CH formats, ISO period rules, band/rate alignment FY2022+, straddle handling) wired into `/results/:id/ct600` JSON; iXBRL structural conformance validator (namespaces, schemaRef taxonomy lock, context/unit resolution, decimals, ISO dates, numeric format) carried on every generated document
 
 ## Phase 7 — Security & Governance
 

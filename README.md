@@ -165,10 +165,10 @@ All subagent outputs are **structural-only**: the deterministic engine remains t
 
 ## Compliance Exports
 
-All exports are **structure generators — validation-ready, not filing-ready** (no HMRC/Companies House validator is integrated yet; no filing-ready claim is made).
+All exports are **structure generators — validation-ready, not filing-ready** (no HMRC/Companies House submission validator is integrated; no filing-ready claim is made). Since the Step 2 hardening pass, exports carry a **rules/structure conformance verdict** at build time (CT600 validated against HMRC-derived rules; iXBRL structurally conformant), which is still distinct from HMRC/Companies House filing validation.
 
-- **CT600** (CT600 2016+): main rate, small profits rate, marginal relief (HMRC example), credits, R&D, payments-on-account, loss-year zeroing; payable/balance floored at 0 (no hidden repayment); fixture-tested against HMRC guidance.
-- **iXBRL**: instance + inline docs, well-formed XML, contexts/units/facts, escaping (`& < > " '`), deterministic numeric rendering, `ukgaap-frs102-2023-01-01.xsd` taxonomy reference, `readyStatus: 'validation_ready'`.
+- **CT600** (CT600 2016+): main rate, small profits rate, marginal relief (HMRC example), credits, R&D, payments-on-account, loss-year zeroing; payable/balance floored at 0 (no hidden repayment); fixture-tested against HMRC guidance. Every JSON export is validated against an HMRC-derived ruleset (`validation` in the response): UTR/Companies House number formats, ISO period rules (≤ 18 months), box identities (Box 15 = 12 + 13 − 14 etc.), band selection, and rate alignment per fiscal year — small profits 19% ≤ £50k, marginal relief `3/200 × (£250,000 − profits)` (CTA 2010 s.18D / CTM03925), main rate 25% ≥ £250k, flat 19% for FY2022 and earlier; periods straddling 1 April 2023 are flagged as not rate-verifiable.
+- **iXBRL**: instance + inline docs, well-formed XML, contexts/units/facts, escaping (`& < > " '`), deterministic numeric rendering, `ukgaap-frs102-2023-01-01.xsd` taxonomy reference, `readyStatus: 'validation_ready'`. Each generated document carries a structural conformance verdict (`validation`): root/namespace declarations, schemaRef taxonomy lock, context/unit resolution for every fact, `decimals="2"`, ISO context dates, finite 2-dp numeric facts, Companies House identifier scheme.
 - **CTO XML**: GovTalk-style corporation tax online submission wrapper with box-level mapping and gateway parameters.
 - **MTD readiness**: readiness assessment vs submission separation (`buildMtdReadinessReport` / `assertMtdEligible`), mock HMRC client tests (token success/failure, malformed token, HTTP failure, timeout via AbortSignal).
 - **R&D claim package**: RDEC scheme math, loss-making handling, headcount/PAYE inputs, spend from credit-miner or query params.
@@ -200,7 +200,7 @@ The Tiny Rebel fixture is a genuine marginal-relief case: its ETR reconciliation
 
 ### US ASC 740 (SEC EDGAR public 10-K filings)
 
-`npm run eval` — evaluates filed XBRL footnote data. **Offline (cached) mode currently resolves 2 PASS, 4 WARN, 6 SKIPPED of 12 filings.** Results are classified honestly — evaluated (`pass`/`warn`/`fail`) vs skipped (`skipped/data unavailable` vs `skipped/footnote does not tie`) — and skips are **not** counted as validated. Harness semantics: PASS ≤ 25 bp, WARN ≤ 100 bp. Expanding EDGAR coverage (state tax, valuation allowance, credits, contingencies) is an active workstream (see `docs/ROADMAP_PRODUCTION.md`).
+`npm run eval` — evaluates filed XBRL footnote data. **Offline (cached) mode currently resolves 2 PASS, 4 WARN, 6 SKIPPED of 12 filings.** Results are classified honestly — evaluated (`pass`/`warn`/`fail`) vs skipped (`skipped/data unavailable` vs `skipped/footnote does not tie`) — and skips are **not** counted as validated. Harness semantics: PASS ≤ 25 bp, WARN ≤ 100 bp. The 6 skips are root-caused in `docs/EDGAR_SKIP_GAP_REPORT.md` (new-tag extractor coverage, percentage-only/untagged filer data, and tie-gate rejections); ranked fixes are scoped there (report-only, not yet implemented).
 
 **This is a development harness, not a market claim.** US coverage must grow before any "validated across public filings" statement is made.
 
@@ -413,7 +413,7 @@ npm run db:synthetic -w apps/api               # deterministic synthetic data (i
 - Compliance exports are structure generators — no HMRC/Companies House validator integrated.
 
 **Must fix before major release:**
-- US EDGAR eval coverage: 6/12 filings skipped; mapping expansion (state tax, valuation allowance, credits, contingencies) in progress.
+- US EDGAR eval coverage: 6/12 filings skipped — root causes and ranked fixes in `docs/EDGAR_SKIP_GAP_REPORT.md` (report-only, not yet implemented).
 - Real-mode AI eval depends on provider availability from the dev machine; provider-outage runs degrade to fallback statistics (exit 0, explicitly reported as incomplete).
 
 ---

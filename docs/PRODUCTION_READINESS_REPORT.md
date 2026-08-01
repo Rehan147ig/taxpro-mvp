@@ -120,6 +120,8 @@ Production must connect as `taxpro_app` (NOBYPASSRLS). `assertRuntimeDbRole` (`c
 |---|---|---|
 | CT600 box layout (CT600 2016+) + consistency flags | PASS | main rate, small profits, marginal relief (HMRC example), credits, R&D, POA, loss-year zeroing; payable/balance floored at 0 (no hidden repayment) |
 | CT600 fixtures vs HMRC guidance | PASS | small-profits 19% band, HMRC marginal relief example, RDEC/surrendered-loss boxes |
+| CT600 rules conformance validator | PASS | every CT600 JSON export validated (`validation` in response) against HMRC-derived rules: UTR/CH number formats, ISO period ≤ 18 months, box identities (15 = 12+13−14, 19 = 15−16−17, 22 = 19−20), band selection, rate alignment per regime (19% ≤ £50k; MR `3/200 × (£250k − A)` per CTA 2010 s.18D/CTM03925; 25% ≥ £250k; flat 19% FY2022 & earlier); straddling 1 Apr 2023 periods skipped with reason |
+| iXBRL structural conformance validator | PASS | each instance/inline document carries a build-time `validation` verdict: root + namespace declarations, schemaRef taxonomy lock (`ukgaap-frs102-2023-01-01.xsd`), context/unit resolution for every fact, `decimals="2"`, ISO context dates matching document period, finite 2-dp numeric facts, Companies House identifier scheme |
 | iXBRL instance + inline docs | PASS | well-formed XML, contexts/units/facts, escaping (company names, CH numbers, `& < > " '`), deterministic numeric rendering |
 | iXBRL taxonomy/version metadata | PASS | schemaRef `ukgaap-frs102-2023-01-01.xsd`, `readyStatus: 'validation_ready'` honesty contract |
 | MTD readiness vs submission separation | PASS | `buildMtdReadinessReport`/`assertMtdEligible` gate; sandbox `MtdClient` mock tests (token success/failure, malformed token, HTTP failure, AbortSignal timeout); live channel = CTO GovTalk XML (CT MTD API still private beta) |
@@ -134,10 +136,10 @@ Production must connect as `taxpro_app` (NOBYPASSRLS). `assertRuntimeDbRole` (`c
 ### Would block production go-live
 - External CPA review of engine outputs (required, not yet performed).
 - Formal security audit (required, not yet performed).
-- Compliance exports (CT600/iXBRL/MTD) are structure generators with deterministic, reproducible packages (Phase 6) — **still validation-ready, not filing-ready**. No HMRC/Companies House validator is integrated.
+- Compliance exports (CT600/iXBRL/MTD) are structure generators with deterministic, reproducible packages (Phase 6) — exports are now **validated against HMRC-derived CT600 rules and iXBRL structural conformance checks (Step 2 hardening), but still not filing-ready**: no HMRC/Companies House schema (XSD) validation or submission validator is integrated.
 ### Must fix before major release
-- US EDGAR eval coverage: 6/12 filings skipped; mapping expansion (state tax, valuation allowance, credits, contingencies) in progress.
-- AI provider unreachable from dev machine; real-mode AI eval currently falls back to dry-run statistics (exit 0).
+- US EDGAR eval coverage: 6/12 filings skipped (2 recoverable via extractor coverage, 2 untagged filer data, 2 fail the tie gate by design) — full root-cause breakdown and ranked fixes in `docs/EDGAR_SKIP_GAP_REPORT.md` (Step 4, report-only).
+- Real-mode AI verified via the agent harness with a funded key (16/16 fixtures PASS, 2.1% fallback, Aug 2026). The official mapping eval still cannot run real mode end-to-end: stage-2 `max_tokens: 4096` truncation for multi-account batches and the `eval-tenant` non-UUID in `run-ai-mapping-eval.ts`. A chunked workaround measured fully-correct mapping at 79.2%/75.2% (below the 80% gate) — mapping quality remains a known gap.
 ### Resolved in Phase 9 hardening
 - Integration test now waits for AI subagent traces to terminal states (polling with 120s timeout, 800ms interval). No false success when agent list is empty — the test fails if traces are expected but absent.
 - Import and mapping APIs are now tested end-to-end in the integration flow (POST import, GET export, validation rejection, mapping override, audit events).
