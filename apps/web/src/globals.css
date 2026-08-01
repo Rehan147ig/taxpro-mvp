@@ -1,8 +1,94 @@
+@import "@fontsource/ibm-plex-sans/400.css";
+@import "@fontsource/ibm-plex-sans/500.css";
+@import "@fontsource/ibm-plex-sans/600.css";
+@import "@fontsource/ibm-plex-serif/400.css";
+@import "@fontsource/ibm-plex-serif/500.css";
+@import "@fontsource/ibm-plex-serif/600.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --taxpro-bg: oklch(0.985 0.004 247);
+  --taxpro-surface: oklch(1 0 0);
+  --taxpro-navy: oklch(0.22 0.05 254);
+  --taxpro-text: var(--taxpro-navy);
+  --taxpro-text-muted: oklch(0.48 0.025 254);
+  --taxpro-green: oklch(0.72 0.17 160);
+  --taxpro-green-soft: oklch(0.94 0.04 160);
+  --taxpro-blue: oklch(0.56 0.12 250);
+
+  --font-heading: "IBM Plex Serif", Georgia, serif;
+  --font-body: "IBM Plex Sans", system-ui, sans-serif;
+
+  --radius-button: 6px;
+  --radius-input: 6px;
+  --radius-card: 12px;
+  --border-width: 1px;
+}
+
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--taxpro-bg);
+  color: var(--taxpro-navy);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+p, span, div, td, th, button, input, select, textarea {
+  line-height: 1.5;
+}
+
+code, pre, .font-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+/* Dense, professional enterprise financial table styles */
+.taxpro-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.taxpro-table th {
+  font-family: "IBM Plex Sans", sans-serif;
+  font-weight: 600;
+  color: #0A192F;
+  background-color: #F8F9FA;
+  border-bottom: 1px solid #E5E7EB;
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.taxpro-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid #F3F4F6;
+  color: #0A192F;
+}
+
+.taxpro-card {
+  background-color: #FFFFFF;
+  border: 1px solid #E5E7EB;
+  border-radius: 12px;
+}
+
+.taxpro-btn-primary {
+  background-color: #0A192F;
+  color: #FFFFFF;
+  border-radius: 6px;
+  font-weight: 500;
+  font-family: "IBM Plex Sans", sans-serif;
+  transition: background-color 0.15s ease-in-out;
+}
+
+.taxpro-btn-primary:hover {
+  background-color: #112240;
 }

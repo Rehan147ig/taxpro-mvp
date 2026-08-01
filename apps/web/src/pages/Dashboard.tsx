@@ -57,85 +57,92 @@ export default function Dashboard() {
   }
 
   const cards = [
-    { label: 'NetSuite Connections', value: stats.connections, color: 'bg-blue-500' },
-    { label: 'Accounts Mapped', value: stats.mappings, color: 'bg-green-500' },
-    { label: 'Provision Runs', value: stats.provisions, color: 'bg-purple-500' },
+    { label: 'NetSuite Connections', value: stats.connections, indicator: 'bg-[#3B82F6]' },
+    { label: 'Accounts Mapped', value: stats.mappings, indicator: 'bg-[#10B981]' },
+    { label: 'Provision Runs', value: stats.provisions, indicator: 'bg-[#8B5CF6]' },
   ];
 
   const statusCards = [
-    { label: 'Needs Review', value: runStatus.needsReview, to: '/review', badge: 'bg-yellow-100 text-yellow-700' },
-    { label: 'Awaiting Partner Approval', value: runStatus.awaitingApproval, to: '/review', badge: 'bg-indigo-100 text-indigo-700' },
-    { label: 'Finalized', value: runStatus.finalized, to: '/review', badge: 'bg-green-100 text-green-700' },
-    { label: 'Locked', value: runStatus.locked, to: '/review', badge: 'bg-gray-800 text-gray-100' },
+    { label: 'Needs Review', value: runStatus.needsReview, to: '/review', badge: 'bg-amber-50 text-amber-700 border-amber-200' },
+    { label: 'Awaiting Partner Approval', value: runStatus.awaitingApproval, to: '/review', badge: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
+    { label: 'Finalized', value: runStatus.finalized, to: '/review', badge: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+    { label: 'Locked', value: runStatus.locked, to: '/review', badge: 'bg-slate-100 text-slate-800 border-slate-300' },
   ];
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold">Dashboard</h2>
+    <div className="space-y-6 font-sans">
+      <div className="flex items-center justify-between pb-2 border-b border-gray-200">
+        <div>
+          <h2 className="text-2xl font-serif font-semibold text-[#0A192F] tracking-tight">Executive Dashboard</h2>
+          <p className="text-xs text-gray-500 mt-1 font-sans">Multi-jurisdiction corporate tax provision overview</p>
+        </div>
         <button
           onClick={loadDemoData}
           disabled={seeding}
-          className="px-4 py-2 bg-brand-600 text-white rounded-lg text-sm font-medium hover:bg-brand-700 disabled:opacity-50 transition"
+          className="px-4 py-2 bg-[#0A192F] text-white rounded-button text-sm font-medium hover:bg-[#112240] disabled:opacity-50 transition-colors shadow-sm"
         >
           {seeding ? 'Loading demo data...' : 'Load Demo Data (Greggs plc)'}
         </button>
       </div>
 
       {seedResult && (
-        <div className="bg-green-50 border border-green-200 text-green-700 rounded-xl p-4 mb-6 text-sm">{seedResult}</div>
+        <div className="bg-[#E8F7F0] border border-[#10B981] text-[#0A192F] rounded-card p-4 text-xs font-medium">{seedResult}</div>
       )}
       {seedError && (
-        <div className="bg-yellow-50 border border-yellow-200 text-yellow-700 rounded-xl p-4 mb-6 text-sm">{seedError}</div>
+        <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-card p-4 text-xs font-medium">{seedError}</div>
       )}
       {loadError && (
-        <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-4 mb-6 text-sm">{loadError}</div>
+        <div className="bg-red-50 border border-red-200 text-red-700 rounded-card p-4 text-xs font-medium">{loadError}</div>
       )}
 
-      <div className="grid grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-3 gap-5">
         {cards.map((card) => (
-          <div key={card.label} className="bg-white rounded-xl border border-gray-200 p-6">
-            <div className={`w-3 h-3 rounded-full ${card.color} mb-3`} />
-            <p className="text-2xl font-bold">{loading ? '...' : card.value}</p>
-            <p className="text-sm text-gray-500">{card.label}</p>
+          <div key={card.label} className="bg-white rounded-card border border-gray-200 p-6 shadow-sm">
+            <div className={`w-2.5 h-2.5 rounded-full ${card.indicator} mb-3`} />
+            <p className="text-3xl font-serif font-semibold text-[#0A192F] tracking-tight">{loading ? '...' : card.value}</p>
+            <p className="text-xs font-medium text-gray-500 mt-1">{card.label}</p>
           </div>
         ))}
       </div>
 
-      <div className="grid grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-4 gap-4">
         {statusCards.map((card) => (
           <Link
             key={card.label}
             to={card.to}
-            className="bg-white rounded-xl border border-gray-200 p-4 hover:border-brand-300 transition"
+            className="bg-white rounded-card border border-gray-200 p-4 hover:border-[#0A192F] transition-all shadow-sm block"
           >
-            <p className={`text-lg font-bold ${card.badge.split(' ')[1]}`}>{loading ? '...' : card.value}</p>
-            <p className="text-xs text-gray-500">{card.label}</p>
+            <span className={`inline-block px-2.5 py-1 rounded-button text-xs font-semibold border ${card.badge} mb-2`}>
+              {loading ? '...' : card.value}
+            </span>
+            <p className="text-xs font-medium text-[#0A192F]">{card.label}</p>
           </Link>
         ))}
       </div>
 
       {runStatus.total === 0 && !loading && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6 mb-8 text-center">
-          <p className="text-sm text-gray-500 mb-2">No provision runs yet.</p>
-          <Link to="/provision" className="text-sm text-brand-600 hover:underline font-medium">Run your first provision →</Link>
+        <div className="bg-white rounded-card border border-gray-200 p-8 text-center shadow-sm">
+          <p className="text-sm text-gray-500 mb-3">No provision runs generated yet.</p>
+          <Link to="/provision" className="inline-block px-4 py-2 bg-[#0A192F] text-white rounded-button text-xs font-medium hover:bg-[#112240] transition-colors">
+            Run First Provision →
+          </Link>
         </div>
       )}
 
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <h3 className="font-semibold mb-4">Getting Started</h3>
-        <ol className="list-decimal list-inside text-sm text-gray-600 space-y-2">
-          <li className={stats.connections > 0 ? 'line-through text-green-600' : ''}>
-            Connect your NetSuite account
+      <div className="bg-white rounded-card border border-gray-200 p-6 shadow-sm">
+        <h3 className="text-lg font-serif font-semibold text-[#0A192F] mb-4 tracking-tight">Provision Workflow Checklist</h3>
+        <ol className="list-decimal list-inside text-xs text-gray-600 space-y-2.5">
+          <li className={stats.connections > 0 ? 'line-through text-[#10B981] font-medium' : ''}>
+            Connect NetSuite ERP or upload trial balance CSV
           </li>
-          <li className={stats.mappings > 0 ? 'line-through text-green-600' : ''}>
-            Run AI mapping to classify your accounts
+          <li className={stats.mappings > 0 ? 'line-through text-[#10B981] font-medium' : ''}>
+            Run AI Auto-Mapping and approve precedent classifications
           </li>
-          <li className={stats.provisions > 0 ? 'line-through text-green-600' : ''}>
-            Run provision calculation
+          <li className={stats.provisions > 0 ? 'line-through text-[#10B981] font-medium' : ''}>
+            Execute ASC 740 / FRS 102 tax engine calculation
           </li>
-          <li className={runStatus.locked > 0 ? 'line-through text-green-600' : ''}>
-            Review, approve, lock and export audit-ready workpapers
+          <li className={runStatus.locked > 0 ? 'line-through text-[#10B981] font-medium' : ''}>
+            Partner sign-off, lock provision run, and export Excel workpapers
           </li>
         </ol>
       </div>

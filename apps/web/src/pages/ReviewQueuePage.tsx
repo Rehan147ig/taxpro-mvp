@@ -33,7 +33,7 @@ export default function ReviewQueuePage() {
   useEffect(() => { load(); }, []);
 
   if (loading && queue.length === 0 && allRuns.length === 0) {
-    return <p className="text-gray-500">Loading review queue...</p>;
+    return <p className="text-xs text-gray-500 font-sans">Loading review queue...</p>;
   }
 
   const latestPerPeriod = new Map<string, string>();
@@ -55,45 +55,48 @@ export default function ReviewQueuePage() {
   };
 
   return (
-    <div className="h-[calc(100vh-4rem)] flex flex-col">
-      <div className="flex justify-between items-center mb-4 shrink-0">
-        <h2 className="text-2xl font-bold">Review Queue</h2>
-        <button onClick={load} className="text-sm text-brand-600 hover:text-brand-700">Refresh</button>
+    <div className="space-y-6 font-sans">
+      <div className="flex justify-between items-center pb-2 border-b border-gray-200">
+        <div>
+          <h2 className="text-2xl font-serif font-semibold text-[#0A192F] tracking-tight">CPA Review Queue & Governance</h2>
+          <p className="text-xs text-gray-500 mt-1">Four-eye partner review, approval staging, and immutable run locking</p>
+        </div>
+        <button onClick={load} className="text-xs text-[#0A192F] font-semibold hover:underline bg-white border border-gray-200 px-3 py-1.5 rounded-button shadow-sm">Refresh Queue</button>
       </div>
 
       {loadError && (
-        <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-4 mb-4 text-sm flex justify-between items-center">
+        <div className="bg-red-50 border border-red-200 text-red-700 rounded-card p-4 text-xs flex justify-between items-center font-medium">
           <span>{loadError}</span>
-          <button onClick={load} className="text-red-700 font-medium hover:underline ml-4 whitespace-nowrap">Retry</button>
+          <button onClick={load} className="text-red-800 font-semibold hover:underline ml-4 whitespace-nowrap">Retry</button>
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 overflow-auto">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
-          <h3 className="font-semibold mb-3">Needs Review</h3>
+          <h3 className="text-base font-serif font-semibold text-[#0A192F] mb-3 tracking-tight">Pending Partner Sign-off</h3>
           {queue.length === 0 ? (
-            <div className="bg-white rounded-xl border border-gray-200 p-6 text-center">
-              <p className="text-gray-500 text-sm">No runs awaiting review</p>
+            <div className="bg-white rounded-card border border-gray-200 p-6 text-center shadow-sm">
+              <p className="text-gray-500 text-xs">No provision runs currently awaiting partner review.</p>
             </div>
           ) : (
             <div className="space-y-3">
               {queue.map((q: any) => {
                 const { run, openItems, maxSeverity } = q;
-                const severityLabel = maxSeverity === 0 ? 'High' : maxSeverity === 1 ? 'Medium' : 'Low';
-                const severityColor = maxSeverity === 0 ? 'bg-red-100 text-red-700' : maxSeverity === 1 ? 'bg-yellow-100 text-yellow-700' : 'bg-blue-100 text-blue-700';
+                const severityLabel = maxSeverity === 0 ? 'High Risk' : maxSeverity === 1 ? 'Medium Risk' : 'Low Risk';
+                const severityColor = maxSeverity === 0 ? 'bg-red-50 text-red-700 border-red-200' : maxSeverity === 1 ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-blue-50 text-blue-700 border-blue-200';
                 return (
                   <button
                     key={run.id}
                     onClick={() => navigate({ to: '/runs/$runId', params: { runId: run.id } })}
-                    className="w-full text-left bg-white rounded-xl border border-gray-200 p-4 hover:border-brand-300 transition"
+                    className="w-full text-left bg-white rounded-card border border-gray-200 p-4 hover:border-[#0A192F] transition-all shadow-sm block"
                   >
-                    <div className="flex justify-between items-start mb-2">
-                      <span className="font-medium">{run.period}</span>
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="font-semibold text-sm text-[#0A192F]">{run.period}</span>
                       <RunStatusBadge status={run.status} />
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${severityColor}`}>{severityLabel} Priority</span>
-                      <span className="text-xs text-gray-500">{openItems.length} open item(s)</span>
+                      <span className={`px-2 py-0.5 rounded-button text-[10px] font-semibold border ${severityColor}`}>{severityLabel}</span>
+                      <span className="text-xs text-gray-500 font-medium">{openItems.length} open review item(s)</span>
                     </div>
                   </button>
                 );
@@ -101,37 +104,38 @@ export default function ReviewQueuePage() {
             </div>
           )}
         </div>
+
         <div>
-          <h3 className="font-semibold mb-3">All Runs</h3>
+          <h3 className="text-base font-serif font-semibold text-[#0A192F] mb-3 tracking-tight">Provision Run Audit Trail</h3>
           {allRuns.length === 0 ? (
-            <div className="bg-white rounded-xl border border-gray-200 p-6 text-center">
-              <p className="text-gray-500 text-sm">No provision runs yet — start one on the Provision page.</p>
+            <div className="bg-white rounded-card border border-gray-200 p-6 text-center shadow-sm">
+              <p className="text-gray-500 text-xs">No provision runs yet — start one on the Provision page.</p>
             </div>
           ) : (
-            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 border-b border-gray-200">
+            <div className="bg-white rounded-card border border-gray-200 overflow-hidden shadow-sm">
+              <table className="w-full text-xs">
+                <thead className="bg-[#F8F9FA] border-b border-gray-200">
                   <tr>
-                    <th className="text-left px-3 py-2 font-medium text-gray-500">Period</th>
-                    <th className="text-left px-3 py-2 font-medium text-gray-500">Version</th>
-                    <th className="text-left px-3 py-2 font-medium text-gray-500">Status</th>
-                    <th className="text-left px-3 py-2 font-medium text-gray-500">Approval</th>
-                    <th className="text-left px-3 py-2 font-medium text-gray-500">Created</th>
+                    <th className="text-left px-3 py-2.5 font-semibold text-[#0A192F]">Period</th>
+                    <th className="text-left px-3 py-2.5 font-semibold text-[#0A192F]">Version</th>
+                    <th className="text-left px-3 py-2.5 font-semibold text-[#0A192F]">Status</th>
+                    <th className="text-left px-3 py-2.5 font-semibold text-[#0A192F]">Approval State</th>
+                    <th className="text-left px-3 py-2.5 font-semibold text-[#0A192F]">Created</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-gray-100">
                   {allRuns.map((r: any) => {
                     const isLatest = r.id === latestPerPeriod.get(r.period + '|' + (r.entityId || ''));
                     return (
-                      <tr key={r.id} onClick={() => navigate({ to: '/runs/$runId', params: { runId: r.id } })} className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer">
-                        <td className="px-3 py-2">
+                      <tr key={r.id} onClick={() => navigate({ to: '/runs/$runId', params: { runId: r.id } })} className="hover:bg-[#F8F9FA] cursor-pointer transition-colors">
+                        <td className="px-3 py-2.5 font-medium text-[#0A192F]">
                           <span>{r.period}</span>
-                          {isLatest && <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] font-medium bg-brand-100 text-brand-700">Latest</span>}
+                          {isLatest && <span className="ml-2 px-1.5 py-0.5 rounded-button text-[10px] font-semibold bg-[#E8F7F0] text-[#10B981] border border-[#10B981]/30">Latest</span>}
                         </td>
-                        <td className="px-3 py-2 text-gray-500 text-xs">{versionOf(r)}</td>
-                        <td className="px-3 py-2"><RunStatusBadge status={r.status} /></td>
-                        <td className="px-3 py-2 text-xs text-gray-500">{r.approvalStatus?.replace(/_/g, ' ') ?? '—'}</td>
-                        <td className="px-3 py-2 text-gray-500 text-xs">{new Date(r.createdAt).toLocaleDateString()}</td>
+                        <td className="px-3 py-2.5 text-gray-500 font-mono text-[11px]">{versionOf(r)}</td>
+                        <td className="px-3 py-2.5"><RunStatusBadge status={r.status} /></td>
+                        <td className="px-3 py-2.5 text-gray-600 font-medium">{r.approvalStatus?.replace(/_/g, ' ') ?? '—'}</td>
+                        <td className="px-3 py-2.5 text-gray-500 font-mono text-[11px]">{new Date(r.createdAt).toLocaleDateString()}</td>
                       </tr>
                     );
                   })}

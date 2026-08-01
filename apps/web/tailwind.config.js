@@ -3,15 +3,34 @@ export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
+      fontFamily: {
+        serif: ['"IBM Plex Serif"', 'Georgia', 'serif'],
+        sans: ['"IBM Plex Sans"', 'system-ui', 'sans-serif'],
+        mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
+      },
       colors: {
-        brand: {
-          50: '#eff6ff',
-          100: '#dbeafe',
-          200: '#bfdbfe',
-          500: '#3b82f6',
-          600: '#2563eb',
-          700: '#1d4ed8',
+        taxpro: {
+          bg: '#F8F9FA',
+          surface: '#FFFFFF',
+          navy: '#0A192F',
+          text: '#0A192F',
+          muted: '#596273',
+          green: '#10B981',
+          'green-soft': '#E8F7F0',
+          blue: '#3B82F6',
         },
+        brand: {
+          50: '#F8F9FA',
+          100: '#E8F7F0',
+          500: '#10B981',
+          600: '#0A192F',
+          700: '#060D18',
+        },
+      },
+      borderRadius: {
+        button: '6px',
+        input: '6px',
+        card: '12px',
       },
     },
   },
