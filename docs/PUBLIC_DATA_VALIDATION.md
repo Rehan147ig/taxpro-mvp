@@ -37,19 +37,23 @@ npm run eval:ai-mapping -w @taxpro/api
 Targets are simple, primarily-domestic, consistently profitable companies whose
 tax footnotes are short and clean. Status (last full run, cached filings):
 
-- 2 evaluated/pass, 4 evaluated/warn, 0 evaluated/fail, 6 skipped
-- Mean ETR delta: 46.5bp across 6 evaluated companies
+- 4 evaluated/pass, 3 evaluated/warn, 0 evaluated/fail, 5 skipped
+- Mean ETR delta: 32.7bp across 7 evaluated companies (validated 7/12)
 - Skip reasons observed: no itemized recon tags (percentage-only or untagged
-  filings), footnote does not tie internally
+  filings — CLX), footnote does not tie internally (HSY, BRO, TYL, NUE)
+- Skip-gap fixes landed 2026-08-01 (P1 + P2): new-taxonomy tag collection,
+  minority-interest bucket, percent-unit path, target rotation (JKHY → FAST,
+  WDFC → ITW). See `docs/EDGAR_SKIP_GAP_REPORT.md` for the full breakdown.
 
 Engine inputs are the disclosed recon items; the engine re-derives the ETR.
 Credits use a per-filing sign convention chosen so the footnote ties to the
 disclosed total (filer convention quirk), reported as `[credits sign-flipped]`
 when it applies.
 
-Classified recon buckets: permanent differences, tax credits, state & local
-income taxes, foreign rate differential, valuation allowance, share-based
-compensation, contingencies, prior-year adjustments, other.
+Classified recon buckets: permanent differences, tax credits, deductions
+(FDII/QPAI), minority interest, state & local income taxes, foreign rate
+differential, valuation allowance, share-based compensation, contingencies,
+prior-year adjustments, other.
 
 ## UK — Companies House (9 fixture sets)
 
