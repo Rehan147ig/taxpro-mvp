@@ -69,6 +69,13 @@ describe('buildIxbrlInstance', () => {
     expect(doc.content).not.toContain('<Co>');
     expect(doc.content).toContain('A&amp;B&lt;Co&gt;');
   });
+
+  it('renders numeric facts deterministically with fixed decimals (incl. negative values)', () => {
+    const doc = buildIxbrlInstance({ ...INPUT, figures: { profitBeforeTax: -480000, taxOnProfitOrLoss: -120000.5 } });
+    expect(doc.content).toContain('>-480000.00</ukgaap:ProfitLossBeforeTax>');
+    expect(doc.content).toContain('>-120000.50</ukgaap:TaxOnProfitOrLoss>');
+    expect(doc.facts).toHaveLength(2);
+  });
 });
 
 describe('buildInlineIxbrl', () => {
@@ -81,6 +88,20 @@ describe('buildInlineIxbrl', () => {
     expect(doc.content).toContain('<ix:context');
     expect(doc.content).toContain('<ix:nonFraction name="ukgaap:Revenue"');
     expect(doc.content).toContain('ixt:numdotdecimal');
+  });
+
+  it('escapes company name and CH number in the inline document', () => {
+    const doc = buildInlineIxbrl({ ...INPUT, companyName: 'D&B "Sons" <Holdings> & Co', companiesHouseNumber: 'A&B<Co>' });
+    assertWellFormed(doc.content);
+    expect(doc.content).toContain('D&amp;B &quot;Sons&quot; &lt;Holdings&gt; &amp; Co');
+    expect(doc.content).toContain('A&amp;B&lt;Co&gt;');
+  });
+
+  it('carries the validation-ready honesty contract', () => {
+    const doc = buildInlineIxbrl(INPUT);
+    expect(doc.readyStatus).toBe('validation_ready');
+    expect(doc.schemaRef).toContain('ukgaap-frs102-2023-01-01.xsd');
+    expect(doc.content).toContain('validated against the Companies House iXBRL validation service before filing');
   });
 });
 

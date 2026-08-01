@@ -1092,6 +1092,9 @@ provisionRoutes.get('/results/:id/package', async (c) => {
         finalizedAt: run?.finalizedAt ? run.finalizedAt.toISOString() : null,
       },
       sourceHash: run?.inputDataHash ?? null,
+      mappingVersionHash: run?.mappingVersionHash ?? null,
+      engineVersion: run?.engineVersion ?? null,
+      mode: run?.mode ?? null,
     });
 
     packageExportCounter.add(1, { outcome: 'success' });

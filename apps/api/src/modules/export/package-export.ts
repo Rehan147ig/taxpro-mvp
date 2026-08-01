@@ -4,6 +4,8 @@ import { Readable } from 'stream';
 import { generateProvisionWorkbook } from './excel-generator.js';
 import type { AuditTrailEntry } from './audit-log.js';
 
+export const PACKAGE_SCHEMA_VERSION = '1.0.0';
+
 export interface PackageReviewItem {
   itemType: string;
   title: string;
@@ -44,6 +46,9 @@ export interface WorkpaperPackageInput {
   aiTraces?: PackageAiTrace[];
   approvalTrail?: PackageApprovalTrail;
   sourceHash?: string | null;
+  mappingVersionHash?: string | null;
+  engineVersion?: string | null;
+  mode?: string | null;
   assumptions?: Record<string, unknown>;
 }
 
@@ -84,21 +89,27 @@ export async function generateWorkpaperPackage(input: WorkpaperPackageInput): Pr
     period: input.period,
     ...(input.approvalTrail ?? { approvalStatus: 'unknown', submittedAt: null, finalizedAt: null }),
     sourceHash: input.sourceHash ?? null,
+    mappingVersionHash: input.mappingVersionHash ?? null,
   }, null, 2), 'utf-8') });
 
   // 6. Assumptions JSON
   files.push({ name: 'assumptions.json', content: Buffer.from(JSON.stringify({
     statutoryRate: input.statutoryRate,
     valuationAllowance: input.valuationAllowance,
+    engineVersion: input.engineVersion ?? null,
+    mode: input.mode ?? null,
     missingDepreciationMetadataItems: (input.reviewItems ?? []).filter(i => i.itemType === 'missing_depreciation_metadata').length,
     ...(input.assumptions ?? {}),
   }, null, 2), 'utf-8') });
 
-  // 7. Manifest with per-file SHA-256 (reproducibility + integrity)
-  files.push({ name: 'manifest.json', content: Buffer.from(buildPackageManifest(input.createdAt, input.sourceHash, files), 'utf-8') });
+  // 7. Summary text (content file hashed by the manifest below)
+  files.push({ name: 'package-summary.txt', content: Buffer.from(buildSummaryText(input, files.length + 2), 'utf-8') });
 
-  // 8. Summary text
-  files.push({ name: 'package-summary.txt', content: Buffer.from(buildSummaryText(input, files.length), 'utf-8') });
+  // 8. Manifest: hashes every content file EXCEPT itself (a manifest cannot
+  //    hash its own bytes without a chicken-and-egg problem). Its own integrity
+  //    is carried by the package-level digest at the delivery layer, and the
+  //    archive structure itself is reproducible. fileCount counts content files.
+  files.push({ name: 'manifest.json', content: Buffer.from(buildPackageManifest(input, files), 'utf-8') });
 
   // Deterministic zip: fixed entry dates so a locked run reproduces byte-identical bytes.
   const archive = new ZipArchive({ zlib: { level: 9 } });
@@ -115,11 +126,19 @@ function sha256(buf: Buffer): string {
   return createHash('sha256').update(buf).digest('hex');
 }
 
-export function buildPackageManifest(createdAt: string, sourceHash: string | null | undefined, files: PackageFile[]): string {
+export function buildPackageManifest(input: Pick<WorkpaperPackageInput, 'createdAt' | 'sourceHash' | 'mappingVersionHash' | 'engineVersion' | 'mode' | 'period'>, files: PackageFile[]): string {
+  const contentFiles = files.filter(f => f.name !== 'manifest.json');
   return JSON.stringify({
-    generatedAt: createdAt,
-    sourceHash: sourceHash ?? null,
-    files: files.map(f => ({ name: f.name, sha256: sha256(f.content) })),
+    schemaVersion: PACKAGE_SCHEMA_VERSION,
+    generatedAt: input.createdAt,
+    period: input.period,
+    sourceHash: input.sourceHash ?? null,
+    mappingVersionHash: input.mappingVersionHash ?? null,
+    engineVersion: input.engineVersion ?? null,
+    mode: input.mode ?? null,
+    fileCount: contentFiles.length,
+    files: contentFiles.map(f => ({ name: f.name, sha256: sha256(f.content) })),
+    note: 'manifest.json excludes itself from its own file list (self-hashing is impossible); verify package integrity end-to-end at the delivery layer.',
   }, null, 2);
 }
 
@@ -168,7 +187,7 @@ export function buildSummaryText(input: WorkpaperPackageInput, fileCount: number
     `Source Hash:      ${input.sourceHash ?? 'n/a'}`,
     '',
     '--- Files ---',
-    `provision-${input.period}.xlsx    - 4-tab Excel workpaper`,
+    `provision-${input.period}.xlsx    - Excel workpaper (summary, current/deferred tax, ETR, journal entries, line items)`,
     `audit-trail-${input.period}.csv   - Full audit trail`,
     'review-items.csv                  - Review queue snapshot',
     'ai-traces.csv                     - AI subagent traces',

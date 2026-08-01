@@ -8,9 +8,13 @@ import Decimal from 'decimal.js';
  * (CT600 2016+). The output is both human-checkable JSON and a CSV that can be
  * pasted/imported into agent filing software (IRIS, Digita, TaxCalc).
  *
- * Honesty note: this builds the *figures* and validates their internal
- * consistency. HMRC submission itself remains with agent software (or the
- * MTD-CT adapter once HMRC opens the Corporation Tax API — see modules/mtd).
+ * Honesty note: this produces CT600-ready FIGURE OUTPUT, not an HMRC-submitted
+ * return. HMRC submission itself remains with agent software (or the MTD-CT
+ * adapter once HMRC opens the Corporation Tax API — see modules/mtd), and
+ * filing must only happen after a real HMRC/gateway submission validation
+ * pass. Box 15 (total tax charge), 19 (payable) and 22 (balance) are floored
+ * at zero — credits or payments on account in excess of the charge are never
+ * represented as an automatic repayment.
  */
 
 export interface Ct600CompanyInfo {

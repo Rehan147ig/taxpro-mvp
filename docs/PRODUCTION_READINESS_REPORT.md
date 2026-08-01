@@ -3,7 +3,7 @@
 **Status:** In development — build verified, benchmark harnesses green, NOT filing-ready.
 **Date:** 2026-08-01
 **Branch:** master
-**Test Suite:** 316 tests passing (118 tax-engine + 198 API), 0 failures
+**Test Suite:** 330 tests passing (118 tax-engine + 212 API), 0 failures
 **E2E Pipeline:** 8/8 integration steps pass (in-process Hono + live Postgres; subagent calls degrade to fallback when the AI provider is unreachable)
 
 ---
@@ -13,7 +13,7 @@
 | Gate | Command | Result |
 |---|---|---|
 | Lint / typecheck | `npm run lint` | PASS |
-| Unit tests | `npm test` | 316/316 PASS (118 engine + 198 API) |
+| Unit tests | `npm test` | 330/330 PASS (118 engine + 212 API) |
 | Build | `npm run build` | PASS |
 | Provision integration flow | `npm run test:integration -w @taxpro/api` | 8/8 PASS |
 | US EDGAR eval | `OFFLINE=1 npm run eval` | 2 PASS, 4 WARN, 6 SKIPPED (of 12) |
@@ -115,13 +115,14 @@ Production must connect as `taxpro_app` (NOBYPASSRLS). `assertRuntimeDbRole` (`c
 
 | Check | Status | Details |
 |---|---|---|
-| CT600 box layout (CT600 2016+) + consistency flags | PASS | main rate, small profits, marginal relief (HMRC example), credits, R&D, POA, loss-year zeroing |
+| CT600 box layout (CT600 2016+) + consistency flags | PASS | main rate, small profits, marginal relief (HMRC example), credits, R&D, POA, loss-year zeroing; payable/balance floored at 0 (no hidden repayment) |
 | CT600 fixtures vs HMRC guidance | PASS | small-profits 19% band, HMRC marginal relief example, RDEC/surrendered-loss boxes |
-| iXBRL instance + inline docs | PASS | well-formed XML, contexts/units/facts, escaping |
+| iXBRL instance + inline docs | PASS | well-formed XML, contexts/units/facts, escaping (company names, CH numbers, `& < > " '`), deterministic numeric rendering |
 | iXBRL taxonomy/version metadata | PASS | schemaRef `ukgaap-frs102-2023-01-01.xsd`, `readyStatus: 'validation_ready'` honesty contract |
-| MTD readiness vs submission separation | PASS | `buildMtdReadinessReport`/`assertMtdEligible` gate; sandbox `MtdClient` mock tests; live channel = CTO GovTalk XML (CT MTD API still private beta) |
+| MTD readiness vs submission separation | PASS | `buildMtdReadinessReport`/`assertMtdEligible` gate; sandbox `MtdClient` mock tests (token success/failure, malformed token, HTTP failure, AbortSignal timeout); live channel = CTO GovTalk XML (CT MTD API still private beta) |
 | Export package contents | PASS | xlsx + audit CSV + review-items CSV + AI-traces CSV + approval-trail JSON + assumptions JSON + manifest.json (SHA-256 per file) + summary |
-| Locked-run reproducibility | PASS | byte-deterministic ZIP (fixed entry dates), identical inputs → identical bytes |
+| Locked-run reproducibility | PASS | byte-deterministic ZIP (fixed entry dates + no volatile xlsx timestamps); byte-identical across wall-clock gaps; tests generate twice with a delay gap and assert equality |
+| Package manifest integrity | PASS | schemaVersion, generatedAt, period, source/mapping/engine provenance, per-file SHA-256 verified against actual entry bytes, manifest excludes itself, fileCount matches archive |
 
 ---
 
@@ -131,7 +132,6 @@ Production must connect as `taxpro_app` (NOBYPASSRLS). `assertRuntimeDbRole` (`c
 - External CPA review of engine outputs (required, not yet performed).
 - Formal security audit (required, not yet performed).
 - Compliance exports (CT600/iXBRL/MTD) are structure generators with deterministic, reproducible packages (Phase 6) — **still validation-ready, not filing-ready**. No HMRC/Companies House validator is integrated.
-
 ### Must fix before major release
 - US EDGAR eval coverage: 6/12 filings skipped; mapping expansion (state tax, valuation allowance, credits, contingencies) in progress.
 - Frontend bundle > 500 kB warning; code-split routes.

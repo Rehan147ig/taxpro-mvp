@@ -101,6 +101,67 @@ describe('buildCt600Return', () => {
     expect(r.consistency.issues.some(i => i.includes('Negative tax charge'))).toBe(true);
   });
 
+  it('credits exceeding the charge zero the payable — never negative (no hidden repayment)', () => {
+    const r = buildCt600Return(COMPANY, PERIOD, {
+      profitsChargeableToCT: 20000,
+      taxableTotalProfits: 20000,
+      taxAtMainRate: 5000,
+      taxAtSmallProfitsRate: 0,
+      marginalRelief: 0,
+      taxCredits: 8000,
+      taxDeductedAtSource: 1000,
+      paymentsOnAccount: 0,
+      rdSurrender: 0,
+      rdec: 0,
+    });
+    expect(r.computed.totalTaxCharge).toBe(5000);
+    expect(r.computed.taxPayable).toBe(0); // 5000 - 8000 - 1000 < 0 -> floored at 0
+    expect(r.computed.balanceDue).toBe(0);
+    expect(r.computed.taxPayable).toBeGreaterThanOrEqual(0);
+    expect(r.consistency.ok).toBe(true);
+  });
+
+  it('payments on account exceeding payable zero the balance — never negative', () => {
+    const r = buildCt600Return(COMPANY, PERIOD, {
+      profitsChargeableToCT: 20000,
+      taxableTotalProfits: 20000,
+      taxAtMainRate: 5000,
+      taxAtSmallProfitsRate: 0,
+      marginalRelief: 0,
+      taxCredits: 0,
+      taxDeductedAtSource: 0,
+      paymentsOnAccount: 10000,
+      rdSurrender: 0,
+      rdec: 0,
+    });
+    expect(r.computed.taxPayable).toBe(5000);
+    expect(r.computed.balanceDue).toBe(0);
+    expect(r.computed.balanceDue).toBeGreaterThanOrEqual(0);
+    expect(r.consistency.ok).toBe(true);
+  });
+
+  it('box values are internally consistent (charge = main + small - relief; balance = payable - POA)', () => {
+    const r = buildCt600Return(COMPANY, PERIOD, {
+      profitsChargeableToCT: 125000,
+      taxableTotalProfits: 125000,
+      taxAtMainRate: 31250,
+      taxAtSmallProfitsRate: 0,
+      marginalRelief: 1875,
+      taxCredits: 2000,
+      taxDeductedAtSource: 500,
+      paymentsOnAccount: 10000,
+      rdSurrender: 0,
+      rdec: 0,
+    });
+    const box = (n: number) => Number(r.boxes.find(b => b.box === n)?.value ?? 0);
+    expect(box(15)).toBe(r.computed.totalTaxCharge);
+    expect(box(19)).toBe(r.computed.taxPayable);
+    expect(box(22)).toBe(r.computed.balanceDue);
+    expect(r.computed.totalTaxCharge).toBe(29375);
+    expect(r.computed.taxPayable).toBe(26875);
+    expect(r.computed.balanceDue).toBe(16875);
+  });
+
   it('deducts R&D credits and payments on account', () => {
     const r = buildCt600Return(COMPANY, PERIOD, {
       profitsChargeableToCT: 100000,

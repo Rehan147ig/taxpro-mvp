@@ -58,6 +58,29 @@ describe('MtdClient (sandbox adapter)', () => {
     await expect(client.submitReturn(buildMtdCtSubmission(CT600))).rejects.toThrow(/400 invalid_client/);
   });
 
+  it('throws on malformed token response (no access_token) without contacting the return endpoint', async () => {
+    (fetch as any).mockResolvedValue({ ok: true, json: async () => ({ error: 'invalid_grant' }) });
+    const client = new MtdClient({ clientId: 'cid', clientSecret: 'sec', privateKeyPem: KEY_PEM });
+    await expect(client.submitReturn(buildMtdCtSubmission(CT600))).rejects.toThrow(/malformed: no access_token/);
+    expect((fetch as any).mock.calls).toHaveLength(1);
+  });
+
+  it('throws on HTTP failure of the return submission', async () => {
+    (fetch as any)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ access_token: 'hmrc-token' }) })
+      .mockResolvedValueOnce({ ok: false, status: 422, text: async () => 'schema_violation' });
+    const client = new MtdClient({ clientId: 'cid', clientSecret: 'sec', privateKeyPem: KEY_PEM });
+    await expect(client.submitReturn(buildMtdCtSubmission(CT600))).rejects.toThrow(/422 schema_violation/);
+  });
+
+  it('aborts hung requests via AbortSignal timeout', async () => {
+    (fetch as any).mockImplementation((_url: string, opts: { signal?: AbortSignal }) => new Promise((_resolve, reject) => {
+      opts.signal?.addEventListener('abort', () => reject(new DOMException('The operation was aborted.', 'AbortError')));
+    }));
+    const client = new MtdClient({ clientId: 'cid', clientSecret: 'sec', privateKeyPem: KEY_PEM, fetchTimeoutMs: 5 });
+    await expect(client.submitReturn(buildMtdCtSubmission(CT600))).rejects.toThrow(/aborted/i);
+  });
+
   it('separates the readiness gate from submission: ineligible report blocks submission with no network call', async () => {
     const report = buildMtdReadinessReport({
       utr: '1234567890',

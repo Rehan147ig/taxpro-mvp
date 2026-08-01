@@ -39,6 +39,8 @@ export interface MtdConfig {
   clientSecret: string;
   privateKeyPem: string;
   baseUrl?: string;
+  /** Per-request timeout in ms (default 10s). */
+  fetchTimeoutMs?: number;
 }
 
 export interface MtdCtSubmission {
@@ -110,9 +112,13 @@ export class MtdClient {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/vnd.hmrc.2.0+json' },
       body,
+      signal: this.signal(),
     });
     if (!res.ok) throw new Error(`HMRC token failed: ${res.status} ${await res.text()}`);
-    const json = (await res.json()) as { access_token: string };
+    const json = (await res.json()) as { access_token?: string };
+    if (typeof json.access_token !== 'string' || json.access_token.length === 0) {
+      throw new Error('HMRC token response malformed: no access_token');
+    }
     return json.access_token;
   }
 
@@ -137,6 +143,7 @@ export class MtdClient {
         Accept: 'application/vnd.hmrc.2.0+json',
       },
       body: JSON.stringify(body),
+      signal: this.signal(),
     });
     if (!res.ok) throw new Error(`HMRC return submission failed: ${res.status} ${await res.text()}`);
     return { submissionId: `stub-${Date.now()}`, status: 'sandbox-accepted' };
@@ -161,6 +168,10 @@ export class MtdClient {
 
   private base(): string {
     return this.config.baseUrl ?? MTD.TEST_BASE_URL;
+  }
+
+  private signal(): AbortSignal {
+    return AbortSignal.timeout(this.config.fetchTimeoutMs ?? 10_000);
   }
 }
 

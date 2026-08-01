@@ -91,7 +91,12 @@ const HEADER_FONT = { bold: true, color: { argb: 'FFFFFFFF' } };
 export async function generateProvisionWorkbook(data: ProvisionExportData): Promise<Buffer> {
   const wb = new Excel.Workbook();
   wb.creator = 'TaxPro';
-  wb.created = new Date();
+  // Deterministic metadata: derive from the immutable run's createdAt so the
+  // same input always produces the same bytes (byte-reproducible packages).
+  const created = new Date(data.createdAt);
+  const fixedTs = Number.isNaN(created.getTime()) ? new Date(0) : created;
+  wb.created = fixedTs;
+  wb.modified = fixedTs;
 
   addSummaryTab(wb, data);
   addCurrentTaxTab(wb, data);
