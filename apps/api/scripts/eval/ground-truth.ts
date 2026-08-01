@@ -92,6 +92,10 @@ export function extractTaxFootnote(companyFacts: any): TaxFootnote {
     'EffectiveIncomeTaxRateReconciliationIncomeTaxExpenseBenefitAtFederalStatutoryIncomeTaxRate',
     'EffectiveIncomeTaxRateReconciliationIncomeTaxExpenseBenefit',
     'EffectiveIncomeTaxRateReconciliationEffectiveIncomeTaxRateContinuingOperations',
+    // Percent-form statutory rate line (units.pure) — the statutory line,
+    // not a recon item. Picked up by the percent fallback if not excluded.
+    'EffectiveIncomeTaxRateReconciliationAtFederalStatutoryIncomeTaxRate',
+    'EffectiveIncomeTaxRateReconciliationAtFederalStatutoryIncomeTaxRatePercent',
   ]);
 
   /**
@@ -124,7 +128,37 @@ export function extractTaxFootnote(companyFacts: any): TaxFootnote {
     const suffix = tag.replace(/^EffectiveIncomeTaxRateReconciliation/, 'IncomeTaxReconciliation');
     if (seen.has(suffix)) continue;
     seen.add(suffix);
-    reconItems.push({ tag, label: entry?.label ?? tag, amount: fact.val });
+    reconItems.push({ tag, label: entry?.label ?? tag, amount: fact.val, source: 'usd' });
+  }
+
+  // P2 percent-path fallback: some filers (e.g. CLX) disclose their annual
+  // ETR recon in percentage form only (units.pure), with no USD amounts.
+  // When NO USD recon items exist, read the percentage items aligned to the
+  // fiscal year and convert to dollar impacts (percent × pretax income).
+  // The mapper still applies the tie gate, so percent-derived items only
+  // count as validated when they internally reconcile to the disclosed ETR.
+  //
+  // NOTE: filers are inconsistent — some tag pure-unit values under a
+  // `*Percent` tag, others under the plain tag (same name as the USD form).
+  // So this fallback scans any `EffectiveIncomeTaxRateReconciliation*` tag
+  // whose annual value lives in units.pure, excluding the SKIP subtotals.
+  if (reconItems.length === 0) {
+    for (const [tag, entry] of Object.entries<any>(gaap)) {
+      if (!tag.startsWith('EffectiveIncomeTaxRateReconciliation')) continue;
+      if (SKIP.has(tag)) continue;
+      const pure = entry?.units?.pure;
+      if (!pure || pure.length === 0) continue;
+      const annual = pure.filter(f => f.form === '10-K' && f.start);
+      if (annual.length === 0) continue;
+      annual.sort((a, b) => b.end.localeCompare(a.end) || (b.filed ?? '').localeCompare(a.filed ?? ''));
+      const fact = annual[0];
+      if (fact.end !== totalTax.end) continue; // align to same fiscal year
+      const suffix = tag.replace(/^EffectiveIncomeTaxRateReconciliation/, '').replace(/Percent$/, '');
+      if (seen.has(suffix)) continue;
+      seen.add(suffix);
+      // percent × pretax income → dollar tax impact (source: percent flags it)
+      reconItems.push({ tag, label: entry?.label ?? tag, amount: fact.val * pretax.val, source: 'percent' });
+    }
   }
 
   return {

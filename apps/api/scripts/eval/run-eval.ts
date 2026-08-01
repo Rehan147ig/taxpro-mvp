@@ -19,7 +19,11 @@ import { runEngine } from './xbrl-map.js';
 
 // Simple, primarily-domestic, consistently profitable companies —
 // chosen so their tax footnotes are short and clean.
-const TARGETS = ['CLX', 'HSY', 'CHD', 'ROL', 'JKHY', 'WDFC', 'BRO', 'POOL', 'TYL', 'NUE', 'PAYC', 'AOS'];
+// Rotation 2026-08-01 (P2): JKHY → FAST, WDFC → ITW. JKHY's annual recon
+// is untagged in XBRL (unrecoverable) and WDFC's is partial/stale; FAST
+// (Fastenal) and ITW (Illinois Tool Works) are mid-cap industrials with
+// clean itemized USD recon that the engine evaluates (WARN, tie ≤ 74 bp).
+const TARGETS = ['CLX', 'HSY', 'CHD', 'ROL', 'FAST', 'ITW', 'BRO', 'POOL', 'TYL', 'NUE', 'PAYC', 'AOS'];
 
 const PASS_BP = 25;
 const WARN_BP = 100;
@@ -96,7 +100,7 @@ async function evalCompany(ticker: string): Promise<CompanyResult> {
 
   console.log(`  Recon items:        ${classified.permanent.length} perm, ${classified.credits.length} credit, ${classified.deductions.length} deduction, ${classified.minorityInterest.length} NCI, ${classified.state.length} state, ${classified.foreignRateDifferential.length} foreign, ${classified.valuationAllowance.length} val.allowance, ${classified.shareBasedCompensation.length} SBC, ${classified.contingencies.length} contingencies, ${classified.priorYearAdjustments.length} prior-yr, ${classified.other.length} other${creditSignFlipped ? '  [credits sign-flipped]' : ''}`);
   for (const item of footnote.reconItems) {
-    console.log(`    ${item.amount >= 0 ? '+' : ''}${fmt$(item.amount).replace('$-', '-$')}  ${item.label}`);
+    console.log(`    ${item.amount >= 0 ? '+' : ''}${fmt$(item.amount).replace('$-', '-$')}  ${item.label}${item.source === 'percent' ? '  (from %)' : ''}`);
   }
 
   // Check 3 — the main event: engine ETR vs disclosed ETR

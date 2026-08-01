@@ -92,6 +92,11 @@ const VALUATION_ALLOWANCE_TAGS = new Set([
   'IncomeTaxReconciliationChangeInValuationAllowance',
   'ChangeInValuationAllowance',
   'IncomeTaxReconciliationValuationAllowanceBenefit',
+  // GWW's long-form variant — a positive "change in DTA valuation allowance"
+  // is a release/benefit that REDUCES tax; keep it in the VA bucket so the
+  // engine treats it as a direct impact rather than an unclassified addback.
+  'IncomeTaxReconciliationChangeInDeferredTaxAssetsValuationAllowance',
+  'EffectiveIncomeTaxRateReconciliationChangeInDeferredTaxAssetsValuationAllowance',
 ]);
 
 const SBC_TAGS = new Set([
@@ -138,7 +143,8 @@ export interface EngineRun {
 function suffixOf(tag: string): string {
   return tag
     .replace(/^EffectiveIncomeTaxRateReconciliation/, '')
-    .replace(/^IncomeTaxReconciliation/, '');
+    .replace(/^IncomeTaxReconciliation/, '')
+    .replace(/Percent$/, '');
 }
 
 const CREDIT_SUFFIXES = new Set([...CREDIT_TAGS].map(suffixOf));
@@ -213,7 +219,7 @@ function consistencyBp(footnote: TaxFootnote, creditsFlipped: boolean): number {
  */
 function effectiveAmount(item: ReconItem, creditsFlipped: boolean): number {
   if (isDeduction(item.tag) || isNci(item.tag)) return -item.amount;
-  if (CREDIT_TAGS.has(item.tag) && creditsFlipped) return -item.amount;
+  if (isCredit(item.tag) && creditsFlipped) return -item.amount;
   return item.amount;
 }
 

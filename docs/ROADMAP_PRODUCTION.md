@@ -51,7 +51,7 @@ Launch checklist. Items are ordered; each must be verified by the gates in Phase
 - [x] Never market skipped companies as validated (summary prints VALIDATED = evaluated only + explicit "NOT validated" line)
 - [x] Add more UK Companies House fixtures with provenance metadata (company, year, source doc, note ref, manual adjustments — 9 fixtures; noteRef/manualAdjustments fields added)
 - [x] `docs/PUBLIC_DATA_VALIDATION.md` summarizing evidence honestly
-- [~] Close EDGAR skip gap (ranked fixes in `docs/EDGAR_SKIP_GAP_REPORT.md`): P1 new-taxonomy `EffectiveIncomeTaxRateReconciliation…Amount` tag collection + P1 minority-interest negative bucket **implemented 2026-08-01** (CHD/ROL/POOL → PASS, HSY 268→122 bp, NUE 663→118 bp, mean 46.5→17.4 bp); P2 percent-unit path (tie-gated) + P2 target rotation for JKHY/WDFC + re-baseline still open
+- [x] Close EDGAR skip gap (ranked fixes in `docs/EDGAR_SKIP_GAP_REPORT.md`): P1 new-taxonomy `EffectiveIncomeTaxRateReconciliation…Amount` tag collection + P1 minority-interest negative bucket + P2 percent-unit path (tie-gated) + P2 target rotation (JKHY→FAST, WDFC→ITW) **all implemented 2026-08-01** — validated 2/12 → 7/12 (4 PASS + 3 WARN), HSY 268→122 bp, NUE 663→118 bp, CLX attempted via percent path (stays SKIP by tie gate)
 
 ## Phase 6 — Compliance Exports
 
