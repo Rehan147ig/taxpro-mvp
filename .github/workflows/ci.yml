@@ -73,8 +73,8 @@ jobs:
       - name: Lint (TypeScript compile check)
         run: npm run lint
 
-      - name: Run tests with coverage
-        run: npm test -- --coverage
+      - name: Run tests (all workspaces)
+        run: npm test
         env:
           DATABASE_URL: postgres://taxpro:taxpro@localhost:5432/taxpro
           REDIS_URL: redis://localhost:6379
@@ -83,7 +83,7 @@ jobs:
           NODE_ENV: test
 
       - name: Build API
-        run: npm run build -w packages/tax-engine && npm run build -w apps/api
+        run: npm run build -w packages/tax-engine && npm run build -w packages/tax-engine-enterprise && npm run build -w apps/api
         env:
           DATABASE_URL: postgres://taxpro:taxpro@localhost:5432/taxpro
           REDIS_URL: redis://localhost:6379
