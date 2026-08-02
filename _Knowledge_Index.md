@@ -4,6 +4,7 @@
 - [[README]] — Product overview, YC thesis, quick start, architecture
 - [[TAXPRO_KT]] — Comprehensive knowledge transfer for AI engineers
 - [[ARCHITECTURE]] — Mermaid architecture diagram (frontend → API → engine → infra)
+- Official website: https://taxpro.ploy.build/ (product, benchmark evidence, pilot)
 
 ## Production Readiness
 - [[docs/PRODUCTION_READINESS_REPORT]] — P1/P2 audit trail, infrastructure, test results

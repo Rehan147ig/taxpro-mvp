@@ -8,6 +8,8 @@ TaxPro is an **Outcome-as-a-Service (OaaS)**, not an AI SaaS dashboard:
 
 > **AI drafts and explains, deterministic math calculates, human CPAs approve and lock.**
 
+**Official website:** [taxpro.ploy.build](https://taxpro.ploy.build/) — product overview, benchmark evidence (7/12 US, 9/9 UK, AI mapping), governance model, and pilot request. Open-source repository: this repo.
+
 ---
 
 ## Table of Contents
