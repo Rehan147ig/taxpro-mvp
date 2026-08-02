@@ -1,0 +1,49 @@
+# ── CodeQL — GitHub-native semantic code analysis (free for private repos) ──
+# Results appear in the Security > Code scanning tab and on PRs.
+# Runs on every push/PR to main + weekly schedule.
+
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 3 * * 1'
+
+permissions:
+  actions: read
+  contents: read
+  security-events: write
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ['javascript-typescript']
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          # security-extended adds cross-site scripting, path traversal, SSRF,
+          # unsafe code execution, and other query families on top of defaults.
+          queries: security-extended
+          # JS/TS analysis does not require a build; build-mode none analyzes
+          # source directly (works reliably with npm workspace monorepos).
+          build-mode: none
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          build-mode: none

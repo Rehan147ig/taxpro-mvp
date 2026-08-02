@@ -1,0 +1,40 @@
+# ── Dependency Vulnerability Gate — lockfile-level, free, fail-closed ──
+# osv-scanner (Google, OSS) checks package-lock.json against OSV database.
+# npm audit is run as an advisory (continue-on-error) because it is the
+# noisiest tool; osv-scanner is the hard gate.
+
+name: Dependency Scan
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 4 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  deps:
+    name: Dependency Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run OSV Scanner (fail-closed gate)
+        uses: google/osv-scanner-action@v1
+        with:
+          scan-args: '-r .'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: npm audit (advisory — reports high/critical)
+        run: npm audit --audit-level=high
+        continue-on-error: true

@@ -1,0 +1,28 @@
+# ── Dependabot — automatic PRs for outdated/vulnerable dependencies ──
+# Free on GitHub for both public and private repositories.
+
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    groups:
+      all:
+        patterns:
+          - "*"
+
+  - package-ecosystem: "docker"
+    directories:
+      - "/apps/api"
+      - "/apps/web"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 3
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 3

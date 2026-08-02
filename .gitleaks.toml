@@ -1,0 +1,10 @@
+# Gitleaks configuration — TaxPro
+# Base: default rules; only additions are known false positives.
+
+[allowlist]
+description = "Known false positives (verified, not live secrets)"
+regexes = [
+  # Truncated placeholder token in a docs example file (deleted from HEAD,
+  # only present in history): sl_public_... was never a real key.
+  '''sl_public_\.\.\.''',
+]
