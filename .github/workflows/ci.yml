@@ -87,6 +87,9 @@ jobs:
 
       - name: Run DB migrations (CI Postgres starts empty)
         run: npm run db:migrate -w @taxpro/api
+        env:
+          DATABASE_URL_MIGRATIONS: postgres://taxpro:taxpro@localhost:5432/taxpro
+          NODE_ENV: test
 
       - name: Seed DB (api-security tests log in as demo@taxpro.ai)
         run: npm run db:seed -w @taxpro/api
