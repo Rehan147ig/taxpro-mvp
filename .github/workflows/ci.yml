@@ -70,6 +70,16 @@ jobs:
       - name: Install dependencies
         run: npm ci --include=dev
 
+      - name: Create test .env (mirrors local dev — env.ts loads ../../.env)
+        run: |
+          cat > .env <<'EOF'
+          DATABASE_URL=postgres://taxpro:taxpro@localhost:5432/taxpro
+          REDIS_URL=redis://localhost:6379
+          JWT_SECRET=ci-test-secret-key-not-for-production-use
+          DATA_ENCRYPTION_KEY=test-data-encryption-key-min-32-chars!!
+          NODE_ENV=test
+          EOF
+
       - name: Lint (TypeScript compile check)
         run: npm run lint
 
