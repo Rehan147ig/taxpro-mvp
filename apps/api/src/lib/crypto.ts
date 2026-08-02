@@ -33,7 +33,7 @@ export function decryptSecret(value: string) {
   if (!value || !value.startsWith(`${PREFIX}:`)) return value;
 
   const [, , ivRaw, tagRaw, encryptedRaw] = value.split(':');
-  const decipher = crypto.createDecipheriv('aes-256-gcm', getKey(), Buffer.from(ivRaw, 'base64url'));
+  const decipher = crypto.createDecipheriv('aes-256-gcm', getKey(), Buffer.from(ivRaw, 'base64url'), { authTagLength: 16 });
   decipher.setAuthTag(Buffer.from(tagRaw, 'base64url'));
 
   return Buffer.concat([

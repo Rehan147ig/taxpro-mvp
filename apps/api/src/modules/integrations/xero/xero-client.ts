@@ -215,15 +215,23 @@ export function round2(n: number) {
 // AES-256-GCM with an env-derived key. For production, inject TOKEN_ENCRYPTION_KEY
 // and rotate it via KMS; the format prefix allows future migration.
 
-const TOKEN_KEY = process.env.TOKEN_ENCRYPTION_KEY ?? 'dev-only-key-do-not-use-in-prod';
+const TOKEN_KEY = getTokenKey();
 
-function tokenKey(): Buffer {
-  return createHash('sha256').update(TOKEN_KEY).digest();
+function getTokenKey(): Buffer {
+  if (process.env.TOKEN_ENCRYPTION_KEY) {
+    return createHash('sha256').update(process.env.TOKEN_ENCRYPTION_KEY).digest();
+  }
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      'TOKEN_ENCRYPTION_KEY is not set. Refusing to start in production with a known fallback key.'
+    );
+  }
+  return createHash('sha256').update('dev-only-key-do-not-use-in-prod').digest();
 }
 
 export function encryptToken(plain: string): string {
   const iv = randomBytes(12);
-  const cipher = createCipheriv('aes-256-gcm', tokenKey(), iv);
+  const cipher = createCipheriv('aes-256-gcm', getTokenKey(), iv);
   const enc = Buffer.concat([cipher.update(plain, 'utf8'), cipher.final()]);
   const tag = cipher.getAuthTag();
   return `v1:${iv.toString('base64url')}:${tag.toString('base64url')}:${enc.toString('base64url')}`;
@@ -232,7 +240,7 @@ export function encryptToken(plain: string): string {
 export function decryptToken(payload: string): string {
   const [ver, ivB64, tagB64, dataB64] = payload.split(':');
   if (ver !== 'v1') throw new Error('Unsupported token format');
-  const decipher = createDecipheriv('aes-256-gcm', tokenKey(), Buffer.from(ivB64, 'base64url'));
+  const decipher = createDecipheriv('aes-256-gcm', getTokenKey(), Buffer.from(ivB64, 'base64url'), { authTagLength: 16 });
   decipher.setAuthTag(Buffer.from(tagB64, 'base64url'));
   return Buffer.concat([decipher.update(Buffer.from(dataB64, 'base64url')), decipher.final()]).toString('utf8');
 }
