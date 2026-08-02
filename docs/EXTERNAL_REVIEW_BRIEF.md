@@ -5,7 +5,7 @@ tells a CPA/tax specialist and a security auditor exactly what to verify, where
 the evidence lives, and what the project explicitly does NOT claim. It is the
 gate before any go-live or "filing-ready" statement (roadmap hard constraints 1–2).
 
-**Status date:** 2026-08-01. Branch `master` @ `6fb1f04`.
+**Status date:** 2026-08-03. Branch `master` @ `2a4ddde`.
 
 ---
 
@@ -47,7 +47,8 @@ The review should focus on: (a) correctness of the tax math and rate application
 - UK FRS 102 S29 module (`src/uk-frs102-s29/`) — small profits rate, marginal
   relief, main rate; fixture-verified.
 - Determinism: `Decimal.js` config frozen, jurisdiction factory isolation,
-  `stableHash`, byte-identical package regeneration (368 tests cover these).
+  `stableHash`, byte-identical package regeneration (412 tests cover these:
+  118 engine + 250 API + 44 isolated enterprise).
 
 ### 2.2 Compliance export rules (Phase 6)
 
@@ -104,8 +105,21 @@ The review should focus on: (a) correctness of the tax math and rate application
 
 - Dev/test environments use the postgres superuser (documented limitation,
   readiness report §2) — production must use `taxpro_app` NOBYPASSRLS.
-- gitleaks/trufflehog run in CI (gitleaks continue-on-error; trufflehog
-  only-verified) — auditor should confirm no secrets in history.
+- Free OSS scanning gates run on every push/PR (all green on master):
+  Semgrep `p/security-audit` (0 findings), GitHub CodeQL (security +
+  extended), OSV-Scanner dependency gate (0 advisories; `npm audit` also 0
+  via esbuild/uuid overrides), Trivy HIGH/CRITICAL on the API/Web images,
+  Gitleaks (advisory, `continue-on-error`) + Trufflehog (`--only-verified`),
+  and Dependabot (npm / Actions / Docker, grouped weekly). Auditor should
+  confirm no secrets in history.
+- Prod fail-fast extended to encryption keys: `TOKEN_ENCRYPTION_KEY` is
+  mandatory in production (refuses to start with the dev/test fallback key),
+  and GCM decryption enforces a 16-byte auth tag (`lib/crypto.ts`,
+  `xero-client.ts`).
+- CI runs the 412-test suite against a brand-new Postgres every push
+  (bootstrap roles → migrate → seed), which caught real schema drift in
+  2026-08: `provision_runs.approved_by_user_id` was in the TS schema but
+  never migrated — fixed by `0012_provision_runs_approval` (idempotent).
 
 ---
 
@@ -113,13 +127,14 @@ The review should focus on: (a) correctness of the tax math and rate application
 
 | Concern | File | Command |
 |---|---|---|
-| Engine math | `packages/tax-engine/src/` | `npm test` (118 engine tests) |
+| Engine math | `packages/tax-engine/src/` | `npm test` (412 tests: 118 engine + 250 API + 44 enterprise) |
 | RLS/tenant isolation | `apps/api/src/config/db.ts`, migrations | `npm run test:integration -w @taxpro/api` (27/27) |
 | CT600 rules | `apps/api/src/modules/export/ct600-validation.ts` | `npm test` (16 validator tests) |
 | iXBRL conformance | `apps/api/src/modules/export/ixbrl-validation.ts` | `npm test` (9 validator tests) |
 | US benchmark | `apps/api/scripts/eval/` | `OFFLINE=1 npm run eval -w @taxpro/api` |
 | UK benchmark | `apps/api/scripts/eval/uk-fixtures.ts` | `npm run eval:uk -w @taxpro/api` |
 | Security posture | `docs/PRODUCTION_READINESS_REPORT.md` §2–3 | — |
+| CI security gates | `.github/workflows/` (ci/codeql/semgrep/deps) | green on master (SAST/CodeQL/OSV/Trivy/Dependabot) |
 | Skip honesty | `docs/EDGAR_SKIP_GAP_REPORT.md` | — |
 | Go-live gates | `docs/ROADMAP_PRODUCTION.md` | all Phases 1–11 ticked |
 

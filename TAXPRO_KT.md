@@ -26,8 +26,8 @@ taxpro/
 │   │   │   ├── run-provision-tests.ts# Automated 12-scenario provision test suite
 │   │   │   ├── test-rls-governance.ts# PostgreSQL RLS isolation & fail-closed tests
 │   │   │   └── eval/                 # Dual US & UK Benchmark Evaluation Harnesses
-│   │   │       ├── run-sec-eval.ts   # US SEC EDGAR 10-K benchmark runner (46.5 bp mean variance)
-│   │   │       └── run-uk-eval.ts    # UK FRS 102 Companies House benchmark runner (5.5 bp mean variance)
+│   │   │       ├── run-sec-eval.ts   # US SEC EDGAR 10-K benchmark runner (32.7 bp mean delta, 7/12 evaluated)
+│   │   │       └── run-uk-eval.ts    # UK FRS 102 Companies House benchmark runner (9/9 PASS, 1.3 bp mean delta)
 │   │   ├── src/
 │   │   │   ├── agent/                # Unified Subagent Architecture
 │   │   │   │   ├── parser/           # Trial balance CSV/PDF extraction agent
@@ -53,14 +53,39 @@ taxpro/
 │           └── components/
 │               └── AiFindingsPanel.tsx # Render audit memos, citations & tax credits
 └── packages/
-    └── tax-engine/                   # Pure Tax Engine (Zero HTTP/DB deps)
-        └── src/
-            ├── index.ts              # calculateJurisdiction() router
-            ├── current-tax.ts        # ASC 740-10 Taxable Income & Current Tax
-            ├── deferred-tax.ts       # ASC 740 Deferred Tax Assets/Liabilities
-            ├── etr-reconciliation.ts # Effective Tax Rate Walk
-            └── uk-frs102-s29/        # UK FRS 102 S29 Deferred Tax Rules (25% Rate, No Discounting, Note 14)
+    ├── tax-engine/                   # Pure Tax Engine (Zero HTTP/DB deps)
+    │   └── src/
+    │       ├── index.ts              # calculateJurisdiction() router
+    │       ├── current-tax.ts        # ASC 740-10 Taxable Income & Current Tax
+    │       ├── deferred-tax.ts       # ASC 740 Deferred Tax Assets/Liabilities
+    │       ├── etr-reconciliation.ts # Effective Tax Rate Walk
+    │       └── uk-frs102-s29/        # UK FRS 102 S29 Deferred Tax Rules (25% Rate, No Discounting, Note 14)
+    └── tax-engine-enterprise/        # Isolated exploratory group/multi-entity/GL-ELT package
+                                      #   (44 tests, UNVALIDATED, not wired into any app)
 ```
+
+---
+
+## 2.5 CI & Security Scanning (2026-08-03)
+
+Four GitHub Actions workflows run on every push/PR to `master` (all green):
+
+- `ci.yml` — Security Scan (Gitleaks advisory + Trufflehog verified secrets),
+  Lint & Test against a **fresh Postgres 16 + Redis 7** (bootstrap roles →
+  `db:migrate` → `db:seed` → 412 tests → build), Docker Build & Scan (API/Web
+  images + Trivy HIGH/CRITICAL SARIF).
+- `codeql.yml` — GitHub CodeQL (security + extended).
+- `semgrep.yml` — Semgrep `p/security-audit` + `p/typescript` + `p/javascript`
+  (0 blocking findings).
+- `deps.yml` — OSV-Scanner dependency gate (`osv-scanner-action@v2.3.8`);
+  Dependabot enabled for npm / Actions / Docker.
+
+The fresh-DB pipeline caught real bugs in 2026-08-02/03: schema drift
+(`provision_runs.approved_by_user_id` was in the TS schema but never migrated —
+fixed by idempotent `0012_provision_runs_approval`) and non-byte-reproducible
+locked-run packages (zip DOS timestamps now normalized from the run's
+`createdAt` in UTC). Prod fail-fast now also covers `TOKEN_ENCRYPTION_KEY`
+(mandatory in production), and GCM decryption enforces a 16-byte auth tag.
 
 ---
 
@@ -76,5 +101,5 @@ taxpro/
    - Monetary values across US ASC 740 and UK FRS 102 calculation paths use `Decimal.js` to eliminate IEEE 754 floating-point drift.
 4. **Empirical Ground-Truth Benchmarking**:
    - Engine accuracy is continuously validated against live audited corporate filings:
-     - **US SEC EDGAR 10-K Suite:** 46.5 bp mean ETR variance across public 10-Ks.
-     - **UK Companies House Suite:** 5.5 bp mean ETR variance & 0.0 bp closing deferred variance across Greggs plc & BT plc.
+     - **US SEC EDGAR 10-K Suite:** mean 32.7 bp ETR delta (7/12 filings evaluated; skips are filer-data/tie-gate, never counted as validated).
+     - **UK Companies House Suite:** 9/9 PASS, mean 1.3 bp ETR variance & 0.0 bp closing deferred variance.

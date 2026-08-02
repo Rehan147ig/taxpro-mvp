@@ -159,3 +159,9 @@ graph TB
   linkStyle 37,38,39 stroke:#4b5563,stroke-width:1
   linkStyle 40 stroke:#0891b2,stroke-width:1
 ```
+
+## Packages & CI (2026-08-03)
+
+- **`packages/tax-engine-enterprise`** — isolated exploratory package (multi-entity model, UK group relief, US apportionment skeleton, GL-ELT): deliberately not imported by `apps/api`, `apps/web`, or `tax-engine`; 44 unit tests; **UNVALIDATED** (see its `ASSUMPTIONS.md`).
+- **CI (GitHub Actions, `.github/workflows/`, green on master):** 4 workflows per push/PR —
+  `ci.yml` (Security Scan: Gitleaks advisory + Trufflehog; Lint & Test on a fresh Postgres 16 + Redis 7: bootstrap roles → migrate → seed → 412 tests; Docker Build & Scan: API/Web + Trivy HIGH/CRITICAL), `codeql.yml` (CodeQL security + extended), `semgrep.yml` (p/security-audit + TS/JS, 0 findings), `deps.yml` (OSV dependency gate). Dependabot enabled for npm / Actions / Docker.

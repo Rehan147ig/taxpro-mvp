@@ -27,6 +27,7 @@ TaxPro is an **Outcome-as-a-Service (OaaS)**, not an AI SaaS dashboard:
 - [Quick Start](#quick-start)
 - [Environment Variables](#environment-variables)
 - [Verification Commands](#verification-commands)
+- [CI/CD & Security Scanning](#cicd--security-scanning)
 - [Rate Limiting](#rate-limiting)
 - [Production Readiness Status](#production-readiness-status)
 - [Known Gaps](#known-gaps)
@@ -172,7 +173,7 @@ All exports are **structure generators — validation-ready, not filing-ready** 
 - **CTO XML**: GovTalk-style corporation tax online submission wrapper with box-level mapping and gateway parameters.
 - **MTD readiness**: readiness assessment vs submission separation (`buildMtdReadinessReport` / `assertMtdEligible`), mock HMRC client tests (token success/failure, malformed token, HTTP failure, timeout via AbortSignal).
 - **R&D claim package**: RDEC scheme math, loss-making handling, headcount/PAYE inputs, spend from credit-miner or query params.
-- **Locked-run ZIP package**: xlsx + audit CSV + review-items CSV + AI-traces CSV + approval-trail JSON + assumptions JSON + **manifest.json** (schemaVersion, generatedAt, period, source/mapping/engine provenance, per-file SHA-256 with self-exclusion, fileCount integrity) — **byte-deterministic** across wall-clock gaps (fixed entry dates, no volatile timestamps; tested twice with a delay and asserted equal).
+- **Locked-run ZIP package**: xlsx + audit CSV + review-items CSV + AI-traces CSV + approval-trail JSON + assumptions JSON + **manifest.json** (schemaVersion, generatedAt, period, source/mapping/engine provenance, per-file SHA-256 with self-exclusion, fileCount integrity) — **byte-deterministic** across wall-clock gaps (workbook metadata and zip DOS timestamps are both derived from the run's immutable `createdAt` in UTC — no wall-clock data; tested across a 3s gap and asserted equal).
 
 ---
 
@@ -256,8 +257,10 @@ taxpro/
 │       │                      #   Run Detail, AI Findings, Audit Events, Export Package
 │       └── e2e/               # Playwright operator-workflow + auth tests
 └── packages/
-    └── tax-engine/            # pure ASC 740 & FRS 102 S29 engine (Decimal.js exact math,
-                               #   118 unit tests, eval golden datasets)
+    ├── tax-engine/            # pure ASC 740 & FRS 102 S29 engine (Decimal.js exact math,
+    │                          #   118 unit tests, eval golden datasets)
+    └── tax-engine-enterprise/ # isolated exploratory group/multi-entity/GL-ELT package
+                               #   (44 unit tests, UNVALIDATED — not wired into any app)
 ```
 
 ---
@@ -325,6 +328,7 @@ Demo credentials: `demo@taxpro.ai` / `TaxProDemo123!` (admin role; seed also cre
 | `REDIS_URL` | yes | `redis://localhost:6379` | BullMQ queues |
 | `JWT_SECRET` | yes | `change-me-in-production` | signing (rejected in prod if default) |
 | `DATA_ENCRYPTION_KEY` | yes | `change-me-to-a-32-character-secret` | 32-char secret |
+| `TOKEN_ENCRYPTION_KEY` | prod | dev/test fallback only | encrypts OAuth connection tokens (GCM, 16-byte auth tag); **production refuses to start without it** |
 | `CORS_ORIGIN` | no | `http://localhost:5173` | allowed origin |
 | `AI_PROVIDER` | no | `openai` | `openai` / `nvidia` / `interfaze` / `custom` |
 | `AI_BASE_URL` | no | empty | OpenAI-compatible endpoint |
@@ -352,7 +356,7 @@ Demo credentials: `demo@taxpro.ai` / `TaxProDemo123!` (admin role; seed also cre
 
 ```bash
 npm run lint                                   # typecheck all workspaces (tsc --noEmit)
-npm test                                       # 368 unit tests (118 engine + 250 API)
+npm test                                       # 412 unit tests (118 engine + 250 API + 44 enterprise)
 npm run build                                  # full turbo build (engine → api → web)
 npm run test:integration -w @taxpro/api        # 27/27 provision lifecycle (needs Docker Postgres/Redis)
 npm run test:e2e                               # Playwright 4/4 operator workflow + auth (needs running stack)
@@ -366,18 +370,37 @@ npm run db:seed -w apps/api                    # demo/partner users + demo tenan
 npm run db:synthetic -w apps/api               # deterministic synthetic data (integration-test friendly)
 ```
 
-### Current verification state (2026-08-01)
+### Current verification state (2026-08-03)
 
 | Gate | Command | Result |
 |---|---|---|
 | Lint / typecheck | `npm run lint` | PASS |
-| Unit tests | `npm test` | 368/368 PASS (118 engine + 250 API) |
+| Unit tests | `npm test` | 412/412 PASS (118 engine + 250 API + 44 enterprise) |
 | Build | `npm run build` | PASS |
 | Provision integration flow | `npm run test:integration -w @taxpro/api` | 27/27 PASS (import → mapping → provision → AI trace polling → review → finalize → submit → partner sign-off → lock → 409 → package → audit → tenant isolation across 6 resources) |
 | Operator workflow E2E | `npx playwright test` (apps/web) | 4/4 PASS |
 | AI subagent harness | `npm run harness` (mocked) | PASS — 16/16 mapping, 16/16 audit, 15/16 credit (deliberate regression fixture), fallback 2.1% |
 | US EDGAR eval | `OFFLINE=1 npm run eval` | 4 PASS, 3 WARN, 5 SKIPPED (of 12), mean ETR delta 32.7 bp — validated 7/12 |
 | UK eval | `npm run eval:uk` | 9/9 PASS, mean ETR delta 1.3 bp |
+| CI (GitHub Actions, `master`) | all 4 workflows | PASS — CI/Semgrep/CodeQL/OSV green: lint, 412 tests on a fresh Postgres (bootstrap roles → migrate → seed), Docker build + Trivy scans |
+
+---
+
+## CI/CD & Security Scanning
+
+Every push/PR to `master` runs four GitHub Actions workflows (`.github/workflows/`):
+
+| Workflow | What it runs | Status |
+|---|---|---|
+| `ci.yml` | 3 jobs: **Security Scan** (Gitleaks advisory + Trufflehog verified secrets), **Lint & Test** (fresh Postgres 16 + Redis 7 services: bootstrap roles → migrate → seed → 412 tests → build), **Docker Build & Scan** (API + Web images, Trivy HIGH/CRITICAL, SARIF uploaded) | green on master |
+| `codeql.yml` | GitHub CodeQL (security + extended analysis), SARIF upload | green |
+| `semgrep.yml` | Semgrep `p/security-audit` + `p/typescript` + `p/javascript` (0 blocking findings) | green |
+| `deps.yml` | OSV-Scanner dependency gate (`google/osv-scanner-action/osv-scanner-action@v2.3.8`) — blocks on vulnerabilities | green |
+
+- **Dependabot** is enabled for npm, GitHub Actions, and Docker (grouped weekly updates).
+- `npm audit` is clean: overrides pin `esbuild >= 0.25.12` and `uuid >= 11.1.1` (transitive via esbuild-kit, drizzle-kit, esbuild-register, @tanstack/router-plugin).
+- CI runs the suite against a **brand-new database**, which proved the fresh-clone path: it surfaced and fixed real bugs (schema drift — a column in the TS schema with no migration; and zip-entry timestamps that broke byte-reproducibility).
+- Secrets hardening: GCM decryption enforces a 16-byte auth tag; `TOKEN_ENCRYPTION_KEY` is mandatory in production; the JWT default secret and a superuser `DATABASE_URL` refuse to start in prod.
 
 ---
 

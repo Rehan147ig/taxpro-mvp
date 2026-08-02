@@ -118,6 +118,8 @@ Run and record: `npm run lint` · `npm test` · `npm run build` · `npm run test
 Final report: files changed, tests run, pass/fail, remaining risks, go-to-market readiness rating, required accountant/legal/security review.
 
 > Re-verified 2026-08-02 after adding the isolated exploratory package `packages/tax-engine-enterprise` (44 new tests, zero modifications to existing code; not wired into any app). All gates green.
+>
+> Re-verified 2026-08-03 after the free OSS security sweep: all four CI workflows green on master — CI (lint + 412 tests on a fresh Postgres: bootstrap roles → migrate → seed; Docker build + Trivy HIGH/CRITICAL scans), Semgrep SAST (0 findings), CodeQL, OSV dependency gate; Dependabot enabled. Shipped in the sweep: GCM auth-tag enforcement, `TOKEN_ENCRYPTION_KEY` prod fail-fast, schema-drift migration `0012_provision_runs_approval`, and byte-reproducible locked-run packages (zip timestamps normalized from run `createdAt`).
 
 ---
 

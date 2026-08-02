@@ -1,7 +1,7 @@
 # TaxPro — Production Readiness Report
 
 **Status:** Verification complete — build verified, benchmark harnesses green, integration E2E green, deployment hardening verified. NOT filing-ready.
-**Date:** 2026-08-01 (re-verified 2026-08-02)
+**Date:** 2026-08-01 (re-verified 2026-08-02 and 2026-08-03)
 **Branch:** master
 **Test Suite:** 412 tests passing (118 tax-engine + 250 API + 44 tax-engine-enterprise), 0 failures
 **E2E Pipeline:** Playwright 4/4 (3 auth + full operator workflow with review items, AI findings, ZIP content verification, export language check); API integration flow 27/27 (in-process Hono + live Postgres, covers import → mapping → provision → AI trace polling → review → pre-lock export → submit → partner sign-off → lock → 409 → post-lock comprehensive package → audit → mapping audit → tenant isolation across 6 resources)
@@ -21,6 +21,7 @@
 | UK eval | `npm run eval:uk` | 9/9 PASS, mean ETR delta 1.3 bp, deferred closing 0 bp |
 | AI mapping eval | `AI_EVAL_MODE=dry-run npm run eval:ai-mapping -w @taxpro/api` | dry-run PASS (202 golden entries; expected distribution 55 temp / 17 perm / 130 no_diff printed) |
 | Agent harness (mocked) | `AI_EVAL_MODE=mocked npm run harness -w @taxpro/api` | PASS (16 fixtures, 0% fallback mocked; real 2.1% fallback Aug 2026) |
+| CI workflows (GitHub Actions, master) | all 4 workflows (`ci.yml`, `codeql.yml`, `semgrep.yml`, `deps.yml`) | PASS — CI (lint + 412 tests on a fresh Postgres: bootstrap roles → migrate → seed + Docker build with Trivy HIGH/CRITICAL scans), Semgrep SAST 0 findings, CodeQL, OSV dependency gate — all green on master |
 | Docker compose E2E | `docker compose -p taxpro-gate up -d --build` | 5/5 containers healthy: api (migrations + seed + RLS validation PASS), worker (all 4 workers, RLS PASS), web (nginx SPA + API proxy), postgres, redis |
 | Graceful shutdown | SIGTERM → worker | PASS — `[Worker] Shutdown signal received` → `Workers closed` → exit 0 |
 | Prod env fail-fast | `NODE_ENV=production` + weak JWT secret | PASS — refuses to start |
@@ -55,6 +56,13 @@ Expansion of EDGAR coverage (state tax, valuation allowance, credits, contingenc
 
 `packages/tax-engine-enterprise` (multi-entity model, UK group relief, US state apportionment skeleton, GL ingestion ELT) is a new, deliberately isolated workspace package: lint PASS, 44/44 unit tests PASS, build PASS, zero modifications to any existing file, and no existing code imports it. It is **UNVALIDATED** — built from public reference material only, not reviewed by a CPA/attorney and not validated against a real ERP export; it must not be wired into production until reviewed. Every assumption is catalogued in `packages/tax-engine-enterprise/ASSUMPTIONS.md`.
 
+### 1.4 Fresh-DB CI pipeline (2026-08-03)
+
+CI now runs the suite against a brand-new Postgres (bootstrap roles → `db:migrate` → `db:seed` → tests), which surfaced two real bugs now fixed and regression-guarded by the pipeline:
+
+- **Schema drift:** `provision_runs.approved_by_user_id` existed in the TypeScript schema but no migration ever created the column — dev DBs had drifted via manual ALTERs while fresh DBs (CI/prod) were broken. Fixed by idempotent migration `0012_provision_runs_approval` (`ADD COLUMN IF NOT EXISTS`).
+- **Byte-reproducibility:** exceljs' internal JSZip stamped every zip entry with wall-clock time at 2s DOS granularity, so locked-run packages were not byte-reproducible across wall-clock gaps. Fixed in `excel-generator.ts` by normalizing all zip DOS timestamps from the run's immutable `createdAt` (UTC) — verified 0-byte diff across a 3s gap.
+
 ---
 
 ## 2. Security
@@ -70,6 +78,12 @@ Expansion of EDGAR coverage (state tax, valuation allowance, credits, contingenc
 | Startup env validation (zod) | PASS | `env.ts` |
 | Production JWT secret guard | PASS | `env.ts` rejects default secret in production |
 | Secrets in source | PASS | Zero found in `src/` |
+| Semgrep SAST (security-audit + TS/JS) | PASS | 0 findings (106 rules, 284 files) — incl. GCM decrypt now enforcing `authTagLength: 16` (`lib/crypto.ts`, `xero-client.ts`) |
+| GitHub CodeQL | PASS | security + extended analysis, SARIF uploaded, green on master |
+| OSV-Scanner dependency gate | PASS | 0 vulnerabilities (npm audit also 0; overrides pin esbuild ≥ 0.25.12, uuid ≥ 11.1.1) |
+| Trivy container scan | PASS | API + Web images, HIGH/CRITICAL only, SARIF uploaded |
+| Gitleaks / Trufflehog | PASS | gitleaks advisory (`continue-on-error`) + trufflehog `--only-verified`; Dependabot enabled (npm/Actions/Docker) |
+| `TOKEN_ENCRYPTION_KEY` fail-fast | PASS | production refuses to start with the dev/test fallback key (encrypts OAuth connection tokens, GCM) |
 
 ### Runtime role guard (implemented, Phase 7)
 
@@ -137,7 +151,7 @@ Production must connect as `taxpro_app` (NOBYPASSRLS). `assertRuntimeDbRole` (`c
 | iXBRL taxonomy/version metadata | PASS | schemaRef `ukgaap-frs102-2023-01-01.xsd`, `readyStatus: 'validation_ready'` honesty contract |
 | MTD readiness vs submission separation | PASS | `buildMtdReadinessReport`/`assertMtdEligible` gate; sandbox `MtdClient` mock tests (token success/failure, malformed token, HTTP failure, AbortSignal timeout); live channel = CTO GovTalk XML (CT MTD API still private beta) |
 | Export package contents | PASS | xlsx + audit CSV + review-items CSV + AI-traces CSV + approval-trail JSON + assumptions JSON + manifest.json (SHA-256 per file) + summary |
-| Locked-run reproducibility | PASS | byte-deterministic ZIP (fixed entry dates + no volatile xlsx timestamps); byte-identical across wall-clock gaps; tests generate twice with a delay gap and assert equality |
+| Locked-run reproducibility | PASS | byte-deterministic ZIP (workbook metadata + all zip DOS timestamps normalized from the run's immutable `createdAt` in UTC — no wall-clock data); byte-identical across a 3s wall-clock gap; tests generate twice with a delay gap and assert equality |
 | Package manifest integrity | PASS | schemaVersion, generatedAt, period, source/mapping/engine provenance, per-file SHA-256 verified against actual entry bytes, manifest excludes itself, fileCount matches archive |
 
 ---
@@ -166,4 +180,4 @@ Production must connect as `taxpro_app` (NOBYPASSRLS). `assertRuntimeDbRole` (`c
 
 ## 7. Recommendation
 
-**Not yet production-ready — launch checklist complete, external review pending.** All Phase 10–11 gates verified (2026-08-01, re-verified 2026-08-02): lint (4/4), 412 unit tests (368 existing + 44 isolated enterprise), build (4/4), 27/27 API integration flow, 4/4 Playwright, US EDGAR offline eval (4 PASS / 3 WARN / 5 SKIP — 7/12 validated after P1+P2 fixes, skip reasons documented, engine not at fault), UK eval 9/9 (mean 1.3 bp), AI mapping eval dry-run + real-mode blockers fixed (smoke test PASS), agent harness (mocked), docker-compose E2E 5/5 healthy, graceful worker shutdown exit 0, prod env fail-fast (weak JWT secret + superuser role both refused), health checks green (db/redis/rls). The exploratory `packages/tax-engine-enterprise` (44 tests) is isolated and UNVALIDATED — not wired into any app, pending CPA/attorney review per its ASSUMPTIONS.md. Remaining order: external CPA review + security audit before any go-live or "filing-ready" claim. Remaining EDGAR skips are filer-data/tie-gate by design (see `docs/EDGAR_SKIP_GAP_REPORT.md` §4); the real-mode mapping eval is unblocked for a full re-run (chunking + UUID tenant fixed).
+**Not yet production-ready — launch checklist complete, external review pending.** All Phase 10–11 gates verified (2026-08-01, re-verified 2026-08-02): lint (4/4), 412 unit tests (368 existing + 44 isolated enterprise), build (4/4), 27/27 API integration flow, 4/4 Playwright, US EDGAR offline eval (4 PASS / 3 WARN / 5 SKIP — 7/12 validated after P1+P2 fixes, skip reasons documented, engine not at fault), UK eval 9/9 (mean 1.3 bp), AI mapping eval dry-run + real-mode blockers fixed (smoke test PASS), agent harness (mocked), docker-compose E2E 5/5 healthy, graceful worker shutdown exit 0, prod env fail-fast (weak JWT secret + superuser role both refused), health checks green (db/redis/rls). Re-verified 2026-08-03 after the free OSS security sweep: all four CI workflows green on master (CI job with the fresh-Postgres bootstrap→migrate→seed pipeline + Trivy container scans; Semgrep SAST 0 findings; CodeQL; OSV dependency gate; Dependabot active), prod fail-fast extended to `TOKEN_ENCRYPTION_KEY`, GCM auth tag enforced, schema-drift migration `0012_provision_runs_approval` landed, and locked-run packages are byte-reproducible across wall-clock gaps (zip timestamps normalized). The exploratory `packages/tax-engine-enterprise` (44 tests) is isolated and UNVALIDATED — not wired into any app, pending CPA/attorney review per its ASSUMPTIONS.md. Remaining order: external CPA review + security audit before any go-live or "filing-ready" claim. Remaining EDGAR skips are filer-data/tie-gate by design (see `docs/EDGAR_SKIP_GAP_REPORT.md` §4); the real-mode mapping eval is unblocked for a full re-run (chunking + UUID tenant fixed).
