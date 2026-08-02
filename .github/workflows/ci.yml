@@ -80,6 +80,24 @@ jobs:
           NODE_ENV=test
           EOF
 
+      - name: Bootstrap DB roles (taxpro_app, taxpro_migrations)
+        run: psql -h localhost -U taxpro -d taxpro -v ON_ERROR_STOP=1 -f apps/api/scripts/bootstrap-roles.sql
+        env:
+          PGPASSWORD: taxpro
+
+      - name: Run DB migrations (CI Postgres starts empty)
+        run: npm run db:migrate -w @taxpro/api
+
+      - name: Seed DB (api-security tests log in as demo@taxpro.ai)
+        run: npm run db:seed -w @taxpro/api
+        env:
+          DATABASE_URL: postgres://taxpro:taxpro@localhost:5432/taxpro
+          DATABASE_URL_MIGRATIONS: postgres://taxpro:taxpro@localhost:5432/taxpro
+          REDIS_URL: redis://localhost:6379
+          JWT_SECRET: ci-test-secret-key-not-for-production-use
+          DATA_ENCRYPTION_KEY: test-data-encryption-key-min-32-chars!!
+          NODE_ENV: test
+
       - name: Lint (TypeScript compile check)
         run: npm run lint
 

@@ -106,7 +106,33 @@ export async function generateProvisionWorkbook(data: ProvisionExportData): Prom
   addLineItemsTab(wb, data);
 
   const buf = await wb.xlsx.writeBuffer();
-  return Buffer.from(buf);
+  return normalizeZipTimestamps(Buffer.from(buf), fixedTs);
+}
+
+// exceljs' internal JSZip stamps every zip entry with Date.now() (2s DOS
+// granularity), which breaks byte-reproducibility for locked runs even though
+// the workbook metadata is pinned. Rewrite the DOS time/date fields in every
+// local file header and central directory entry from the immutable run's
+// createdAt (UTC), so identical input always produces identical bytes —
+// regardless of wall clock or machine timezone.
+function normalizeZipTimestamps(buf: Buffer, ts: Date): Buffer {
+  const dos = toDosTime(ts);
+  const writeStamp = (off: number) => {
+    buf.writeUInt16LE(dos.time, off);
+    buf.writeUInt16LE(dos.date, off + 2);
+  };
+  for (let i = 0; i + 4 <= buf.length; i++) {
+    if (buf.readUInt32LE(i) === 0x04034b50) writeStamp(i + 10); // local file header
+    else if (buf.readUInt32LE(i) === 0x02014b50) writeStamp(i + 12); // central directory entry
+  }
+  return buf;
+}
+
+function toDosTime(d: Date): { time: number; date: number } {
+  const year = Math.max(d.getUTCFullYear(), 1980);
+  const time = (d.getUTCHours() << 11) | (d.getUTCMinutes() << 5) | Math.floor(d.getUTCSeconds() / 2);
+  const date = ((year - 1980) << 9) | ((d.getUTCMonth() + 1) << 5) | d.getUTCDate();
+  return { time, date };
 }
 
 function styleHeaderRow(ws: Excel.Worksheet) {
