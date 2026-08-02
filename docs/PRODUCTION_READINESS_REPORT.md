@@ -1,9 +1,9 @@
 # TaxPro — Production Readiness Report
 
 **Status:** Verification complete — build verified, benchmark harnesses green, integration E2E green, deployment hardening verified. NOT filing-ready.
-**Date:** 2026-08-01
+**Date:** 2026-08-01 (re-verified 2026-08-02)
 **Branch:** master
-**Test Suite:** 368 tests passing (118 tax-engine + 250 API), 0 failures
+**Test Suite:** 412 tests passing (118 tax-engine + 250 API + 44 tax-engine-enterprise), 0 failures
 **E2E Pipeline:** Playwright 4/4 (3 auth + full operator workflow with review items, AI findings, ZIP content verification, export language check); API integration flow 27/27 (in-process Hono + live Postgres, covers import → mapping → provision → AI trace polling → review → pre-lock export → submit → partner sign-off → lock → 409 → post-lock comprehensive package → audit → mapping audit → tenant isolation across 6 resources)
 
 ---
@@ -12,9 +12,9 @@
 
 | Gate | Command | Result |
 |---|---|---|
-| Lint / typecheck | `npm run lint` | PASS |
-| Unit tests | `npm test` | 368/368 PASS (118 engine + 250 API) |
-| Build | `npm run build` | PASS (3/3 workspaces, turbo) |
+| Lint / typecheck | `npm run lint` | PASS (4/4 workspaces) |
+| Unit tests | `npm test` | 412/412 PASS (118 engine + 250 API + 44 tax-engine-enterprise) |
+| Build | `npm run build` | PASS (4/4 workspaces, turbo) |
 | Provision integration flow | `npm run test:integration -w @taxpro/api` | 27/27 PASS (reset → import → import export → import validation → mappings → override → provision → run-scoped mapping override → AI trace polling → review → depreciation metadata check → single resolve → bulk resolve → finalize → pre-lock export → submit → partner sign-off → lock → verification → post-lock 409 → post-lock comprehensive package → audit lifecycle → mapping+export audit events → create foreign tenant → tenant isolation across 6 resources → verify no pending agents) |
 | Operator workflow E2E | `npx playwright test` (apps/web) | 4/4 PASS (auth x3 + provision → review items display → AI findings page → partner sign-off → lock → 409 → audit → ZIP content verification → export language check → dashboard status) |
 | US EDGAR eval | `OFFLINE=1 npm run eval` | 4 PASS, 3 WARN, 5 SKIPPED (of 12), mean ETR delta 32.7 bp |
@@ -50,6 +50,10 @@ The Tiny Rebel fixture exercises a genuine marginal-relief disclosure ("Tax at m
 12 targeted 10-K filers. Harness semantics: PASS ≤ 25 bp, WARN ≤ 100 bp, SKIP = footnote data inadequate to test the engine (no itemized recon, or footnote does not tie internally). **SKIP is not validation.** Offline mode currently resolves 4 PASS / 3 WARN / 5 SKIPPED (mean ETR delta 32.7 bp). P1 + P2 fixes implemented 2026-08-01: new-taxonomy dollar-tag collection + minority-interest bucket (CHD/ROL/POOL → PASS, HSY 268→122 bp, NUE 663→118 bp), percent-unit path (CLX attempted, stays SKIP by tie gate), and target rotation (JKHY → FAST, WDFC → ITW — both WARN). Validated improved from 2/12 → 7/12.
 
 Expansion of EDGAR coverage (state tax, valuation allowance, credits, contingencies mapping) is an active workstream — see `docs/ROADMAP_PRODUCTION.md` and `docs/PUBLIC_DATA_VALIDATION.md`.
+
+### 1.3 Isolated exploratory package (added 2026-08-02)
+
+`packages/tax-engine-enterprise` (multi-entity model, UK group relief, US state apportionment skeleton, GL ingestion ELT) is a new, deliberately isolated workspace package: lint PASS, 44/44 unit tests PASS, build PASS, zero modifications to any existing file, and no existing code imports it. It is **UNVALIDATED** — built from public reference material only, not reviewed by a CPA/attorney and not validated against a real ERP export; it must not be wired into production until reviewed. Every assumption is catalogued in `packages/tax-engine-enterprise/ASSUMPTIONS.md`.
 
 ---
 
@@ -145,7 +149,7 @@ Production must connect as `taxpro_app` (NOBYPASSRLS). `assertRuntimeDbRole` (`c
 - Formal security audit (required, not yet performed).
 - Compliance exports (CT600/iXBRL/MTD) are structure generators with deterministic, reproducible packages (Phase 6) — exports are now **validated against HMRC-derived CT600 rules and iXBRL structural conformance checks (Step 2 hardening), but still not filing-ready**: no HMRC/Companies House schema (XSD) validation or submission validator is integrated.
 ### Must fix before major release
-- US EDGAR eval coverage: 6/12 filings skipped (2 recoverable via extractor coverage, 2 untagged filer data, 2 fail the tie gate by design) — full root-cause breakdown and ranked fixes in `docs/EDGAR_SKIP_GAP_REPORT.md` (Step 4, report-only).
+- US EDGAR eval coverage: 5/12 filings skipped (CLX/HSY percent or new-taxonomy-dollar tie-gated, BRO/TYL/NUE footnote items do not tie to disclosed totals — all filer-data issues, engine not at fault; full root-cause breakdown in `docs/EDGAR_SKIP_GAP_REPORT.md`, report-only).
 - Real-mode AI verified via the agent harness with a funded key (16/16 fixtures PASS, 2.1% fallback, Aug 2026). The official mapping eval now runs real mode end-to-end: the stage-2 `max_tokens: 4096` truncation blocker is fixed (eval chunks at 50 accounts/batch mirroring the production auto-mapper + stage-2 `maxTokens: 8192`) and the `eval-tenant` non-UUID is fixed (eval now generates a real UUID). Real-mode smoke test against interfaze/gpt-4o-mini passed (6 accounts, 2 batches, 6/6 mappings). The chunked workaround previously measured fully-correct mapping at 79.2%/75.2% (below the 80% gate) — mapping quality remains a known gap pending a full real-mode re-run.
 ### Resolved in Phase 9 hardening
 - Integration test now waits for AI subagent traces to terminal states (polling with 120s timeout, 800ms interval). No false success when agent list is empty — the test fails if traces are expected but absent.
@@ -162,4 +166,4 @@ Production must connect as `taxpro_app` (NOBYPASSRLS). `assertRuntimeDbRole` (`c
 
 ## 7. Recommendation
 
-**Not yet production-ready — launch checklist complete, external review pending.** All Phase 10–11 gates verified (2026-08-01): lint, 368 unit tests, build, 27/27 API integration flow, 4/4 Playwright, US EDGAR offline eval (4 PASS / 3 WARN / 5 SKIP — 7/12 validated after P1+P2 fixes, skip reasons documented, engine not at fault), UK eval 9/9 (mean 1.3 bp), AI mapping eval dry-run + real-mode blockers fixed (smoke test PASS), agent harness (mocked), docker-compose E2E 5/5 healthy, graceful worker shutdown exit 0, prod env fail-fast (weak JWT secret + superuser role both refused), health checks green (db/redis/rls). Remaining order: external CPA review + security audit before any go-live or "filing-ready" claim. Remaining EDGAR skips are filer-data/tie-gate by design (see `docs/EDGAR_SKIP_GAP_REPORT.md` §4); the real-mode mapping eval is unblocked for a full re-run (chunking + UUID tenant fixed).
+**Not yet production-ready — launch checklist complete, external review pending.** All Phase 10–11 gates verified (2026-08-01, re-verified 2026-08-02): lint (4/4), 412 unit tests (368 existing + 44 isolated enterprise), build (4/4), 27/27 API integration flow, 4/4 Playwright, US EDGAR offline eval (4 PASS / 3 WARN / 5 SKIP — 7/12 validated after P1+P2 fixes, skip reasons documented, engine not at fault), UK eval 9/9 (mean 1.3 bp), AI mapping eval dry-run + real-mode blockers fixed (smoke test PASS), agent harness (mocked), docker-compose E2E 5/5 healthy, graceful worker shutdown exit 0, prod env fail-fast (weak JWT secret + superuser role both refused), health checks green (db/redis/rls). The exploratory `packages/tax-engine-enterprise` (44 tests) is isolated and UNVALIDATED — not wired into any app, pending CPA/attorney review per its ASSUMPTIONS.md. Remaining order: external CPA review + security audit before any go-live or "filing-ready" claim. Remaining EDGAR skips are filer-data/tie-gate by design (see `docs/EDGAR_SKIP_GAP_REPORT.md` §4); the real-mode mapping eval is unblocked for a full re-run (chunking + UUID tenant fixed).

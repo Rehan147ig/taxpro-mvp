@@ -107,15 +107,17 @@ Launch checklist. Items are ordered; each must be verified by the gates in Phase
 
 Run and record: `npm run lint` · `npm test` · `npm run build` · `npm run test:integration -w @taxpro/api` · `OFFLINE=1 npm run eval` · `npm run eval:uk` · `npm run eval:ai-mapping -w @taxpro/api` (dry-run or mocked)
 
-- [x] `npm run lint` — PASS
-- [x] `npm test` — 368/368 PASS (118 engine + 250 API)
-- [x] `npm run build` — PASS (3/3 workspaces)
+- [x] `npm run lint` — PASS (4/4 workspaces)
+- [x] `npm test` — 412/412 PASS (118 engine + 250 API + 44 tax-engine-enterprise)
+- [x] `npm run build` — PASS (4/4 workspaces)
 - [x] `npm run test:integration -w @taxpro/api` — 27/27 PASS (full lifecycle + tenant isolation + package hash verification)
-- [x] `OFFLINE=1 npm run eval` — 2 PASS / 4 WARN / 6 SKIP (of 12), mean ETR delta 46.5 bp
+- [x] `OFFLINE=1 npm run eval` — 4 PASS / 3 WARN / 5 SKIP (of 12), mean ETR delta 32.7 bp
 - [x] `npm run eval:uk` — 9/9 PASS, mean ETR delta 1.3 bp, deferred 0 bp
 - [x] `npm run eval:ai-mapping -w @taxpro/api` (dry-run) — PASS, 202 golden entries, expected distribution printed
 
 Final report: files changed, tests run, pass/fail, remaining risks, go-to-market readiness rating, required accountant/legal/security review.
+
+> Re-verified 2026-08-02 after adding the isolated exploratory package `packages/tax-engine-enterprise` (44 new tests, zero modifications to existing code; not wired into any app). All gates green.
 
 ---
 

@@ -1,0 +1,34 @@
+{
+  "name": "@taxpro/tax-engine-enterprise",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "UNVALIDATED — built from public reference material only, not reviewed by a CPA, tax attorney, or real ERP export. Every heuristic and assumption below is a guess to be corrected by a domain expert or real data, not a claim of correctness.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./*": {
+      "import": "./dist/*.js",
+      "types": "./dist/*.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "tsc --noEmit -p tsconfig.lint.json"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.0"
+  },
+  "dependencies": {
+    "@taxpro/tax-engine": "*",
+    "decimal.js": "^10.6.0",
+    "drizzle-orm": "^0.45.2"
+  }
+}
