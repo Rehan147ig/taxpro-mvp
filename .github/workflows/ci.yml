@@ -9,6 +9,10 @@ on:
   pull_request:
     branches: [master]
 
+permissions:
+  contents: read
+  security-events: write
+
 jobs:
   # ── 0. Security Scan ──
   security:
@@ -163,6 +167,8 @@ jobs:
           context: .
           file: apps/api/Dockerfile
           push: false
+          load: true
+          tags: taxpro-api:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -172,6 +178,8 @@ jobs:
           context: .
           file: apps/web/Dockerfile
           push: false
+          load: true
+          tags: taxpro-web:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
