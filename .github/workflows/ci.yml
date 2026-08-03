@@ -149,7 +149,7 @@ jobs:
           NODE_ENV: test
 
       - name: US EDGAR eval (live fetch — benchmark + skip reasons surfaced per company)
-        run: npm run eval -w @taxpro/api || echo "warn: US eval incomplete (EDGAR network issue)"
+        run: 'npm run eval -w @taxpro/api || echo "warn: US eval incomplete (EDGAR network issue)"'
         env:
           EDGAR_USER_AGENT: TaxPro CI taxpro@taxpro.ai
 
