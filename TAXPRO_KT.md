@@ -72,7 +72,7 @@ Four GitHub Actions workflows run on every push/PR to `master` (all green):
 
 - `ci.yml` — Security Scan (Gitleaks advisory + Trufflehog verified secrets),
   Lint & Test against a **fresh Postgres 16 + Redis 7** (bootstrap roles →
-  `db:migrate` → `db:seed` → 412 tests → build), Docker Build & Scan (API/Web
+  `db:migrate` → `db:seed` → 479 tests → build), Docker Build & Scan (API/Web
   images + Trivy HIGH/CRITICAL SARIF).
 - `codeql.yml` — GitHub CodeQL (security + extended).
 - `semgrep.yml` — Semgrep `p/security-audit` + `p/typescript` + `p/javascript`

@@ -47,8 +47,8 @@ The review should focus on: (a) correctness of the tax math and rate application
 - UK FRS 102 S29 module (`src/uk-frs102-s29/`) — small profits rate, marginal
   relief, main rate; fixture-verified.
 - Determinism: `Decimal.js` config frozen, jurisdiction factory isolation,
-  `stableHash`, byte-identical package regeneration (412 tests cover these:
-  118 engine + 250 API + 44 isolated enterprise).
+  `stableHash`, byte-identical package regeneration (479 tests cover these:
+  118 engine + 272 API + 89 isolated enterprise).
 
 ### 2.2 Compliance export rules (Phase 6)
 
@@ -116,7 +116,7 @@ The review should focus on: (a) correctness of the tax math and rate application
   mandatory in production (refuses to start with the dev/test fallback key),
   and GCM decryption enforces a 16-byte auth tag (`lib/crypto.ts`,
   `xero-client.ts`).
-- CI runs the 412-test suite against a brand-new Postgres every push
+- CI runs the 479-test suite against a brand-new Postgres every push
   (bootstrap roles → migrate → seed), which caught real schema drift in
   2026-08: `provision_runs.approved_by_user_id` was in the TS schema but
   never migrated — fixed by `0012_provision_runs_approval` (idempotent).
@@ -127,11 +127,12 @@ The review should focus on: (a) correctness of the tax math and rate application
 
 | Concern | File | Command |
 |---|---|---|
-| Engine math | `packages/tax-engine/src/` | `npm test` (412 tests: 118 engine + 250 API + 44 enterprise) |
+| Engine math | `packages/tax-engine/src/` | `npm test` (479 tests: 118 engine + 272 API + 89 enterprise) |
 | RLS/tenant isolation | `apps/api/src/config/db.ts`, migrations | `npm run test:integration -w @taxpro/api` (27/27) |
 | CT600 rules | `apps/api/src/modules/export/ct600-validation.ts` | `npm test` (16 validator tests) |
 | iXBRL conformance | `apps/api/src/modules/export/ixbrl-validation.ts` | `npm test` (9 validator tests) |
 | US benchmark | `apps/api/scripts/eval/` | `OFFLINE=1 npm run eval -w @taxpro/api` |
+| US state rules | `packages/tax-engine-enterprise/src/us/` | `npm run verify:us-rates -w @taxpro/tax-engine-enterprise` — 51/51 rates + 51/51 apportionment weights exact vs dated Tax Foundation 2026 snapshots; rule-refresh spec in `docs/STATE_RULE_REFRESH.md` |
 | UK benchmark | `apps/api/scripts/eval/uk-fixtures.ts` | `npm run eval:uk -w @taxpro/api` |
 | Security posture | `docs/PRODUCTION_READINESS_REPORT.md` §2–3 | — |
 | CI security gates | `.github/workflows/` (ci/codeql/semgrep/deps) | green on master (SAST/CodeQL/OSV/Trivy/Dependabot) |

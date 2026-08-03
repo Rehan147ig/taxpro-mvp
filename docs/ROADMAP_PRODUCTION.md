@@ -108,7 +108,7 @@ Launch checklist. Items are ordered; each must be verified by the gates in Phase
 Run and record: `npm run lint` · `npm test` · `npm run build` · `npm run test:integration -w @taxpro/api` · `OFFLINE=1 npm run eval` · `npm run eval:uk` · `npm run eval:ai-mapping -w @taxpro/api` (dry-run or mocked)
 
 - [x] `npm run lint` — PASS (4/4 workspaces)
-- [x] `npm test` — 412/412 PASS (118 engine + 250 API + 44 tax-engine-enterprise)
+- [x] `npm test` — 479/479 PASS (118 engine + 272 API + 89 tax-engine-enterprise)
 - [x] `npm run build` — PASS (4/4 workspaces)
 - [x] `npm run test:integration -w @taxpro/api` — 27/27 PASS (full lifecycle + tenant isolation + package hash verification)
 - [x] `OFFLINE=1 npm run eval` — 12 PASS / 3 WARN / 5 SKIP (of 20), mean ETR delta 17.5 bp — validated 15/20, 0 FAIL (also runs live in CI)
@@ -119,7 +119,9 @@ Final report: files changed, tests run, pass/fail, remaining risks, go-to-market
 
 > Re-verified 2026-08-02 after adding the isolated exploratory package `packages/tax-engine-enterprise` (44 new tests, zero modifications to existing code; not wired into any app). All gates green.
 >
-> Re-verified 2026-08-03 after the free OSS security sweep: all four CI workflows green on master — CI (lint + 412 tests on a fresh Postgres: bootstrap roles → migrate → seed; Docker build + Trivy HIGH/CRITICAL scans), Semgrep SAST (0 findings), CodeQL, OSV dependency gate; Dependabot enabled. Shipped in the sweep: GCM auth-tag enforcement, `TOKEN_ENCRYPTION_KEY` prod fail-fast, schema-drift migration `0012_provision_runs_approval`, and byte-reproducible locked-run packages (zip timestamps normalized from run `createdAt`).
+> Re-verified 2026-08-03 after the free OSS security sweep: all four CI workflows green on master — CI (lint + 479 tests on a fresh Postgres: bootstrap roles → migrate → seed; Docker build + Trivy HIGH/CRITICAL scans), Semgrep SAST (0 findings), CodeQL, OSV dependency gate; Dependabot enabled. Shipped in the sweep: GCM auth-tag enforcement, `TOKEN_ENCRYPTION_KEY` prod fail-fast, schema-drift migration `0012_provision_runs_approval`, and byte-reproducible locked-run packages (zip timestamps normalized from run `createdAt`).
+>
+> Re-verified 2026-08-03 (final) after the US state tax workstream: suite at 479 tests (89 in `tax-engine-enterprise`); `npm run verify:us-rates` green — 51/51 rates + 51/51 apportionment weights exact vs dated Tax Foundation 2026 snapshots; agentic rule-refresh loop (source → capture → extract → verify → diff → human approve → atomic apply → CI gate, spec in `docs/STATE_RULE_REFRESH.md`) shipped with the proposal contract consumed by the API rule-update agent. Remaining open items are data-fill/CPA items, not code: bracketed states' top-tier-only schedules, CT 10% surtax, NJ entire-net-income, KS/OK single-sales effective dates.
 
 ---
 

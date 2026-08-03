@@ -238,6 +238,7 @@ taxpro/
 │   ├── AI_EVAL.md             # eval modes + multi-agent harness contract
 │   ├── PRODUCTION_READINESS_REPORT.md   # current gates, numbers, gaps
 │   ├── PUBLIC_DATA_VALIDATION.md        # benchmark methodology (honesty contract)
+│   ├── STATE_RULE_REFRESH.md  # agentic US state rule-refresh loop (source → capture → extract → verify → diff → approve → apply → CI gate)
 │   └── ROADMAP_PRODUCTION.md  # launch checklist (Phases 1–11)
 ├── apps/
 │   ├── api/                   # Hono.js REST API + background workers
@@ -360,7 +361,7 @@ Demo credentials: `demo@taxpro.ai` / `TaxProDemo123!` (admin role; seed also cre
 
 ```bash
 npm run lint                                   # typecheck all workspaces (tsc --noEmit)
-npm test                                       # 412 unit tests (118 engine + 250 API + 44 enterprise)
+npm test                                       # 479 unit tests (118 engine + 272 API + 89 enterprise)
 npm run build                                  # full turbo build (engine → api → web)
 npm run test:integration -w @taxpro/api        # 27/27 provision lifecycle (needs Docker Postgres/Redis)
 npm run test:e2e                               # Playwright 4/4 operator workflow + auth (needs running stack)
@@ -369,6 +370,7 @@ npm run harness:real -w @taxpro/api            # AI subagent harness against liv
 OFFLINE=1 npm run eval                         # US EDGAR harness (offline cached mode)
 npm run eval:uk                                # UK FRS 102 harness — 9/9 PASS
 npm run eval:ai-mapping -w @taxpro/api         # AI mapping eval (dry-run/mocked/real modes)
+npm run verify:us-rates -w @taxpro/tax-engine-enterprise   # state rule engine vs Tax Foundation 2026 snapshots (51/51 rates + 51/51 apportionment weights)
 npm run db:migrate -w apps/api                 # run migrations
 npm run db:seed -w apps/api                    # demo/partner users + demo tenant
 npm run db:synthetic -w apps/api               # deterministic synthetic data (integration-test friendly)
@@ -379,14 +381,15 @@ npm run db:synthetic -w apps/api               # deterministic synthetic data (i
 | Gate | Command | Result |
 |---|---|---|
 | Lint / typecheck | `npm run lint` | PASS |
-| Unit tests | `npm test` | 412/412 PASS (118 engine + 250 API + 44 enterprise) |
+| Unit tests | `npm test` | 479/479 PASS (118 engine + 272 API + 89 enterprise) |
 | Build | `npm run build` | PASS |
 | Provision integration flow | `npm run test:integration -w @taxpro/api` | 27/27 PASS (import → mapping → provision → AI trace polling → review → finalize → submit → partner sign-off → lock → 409 → package → audit → tenant isolation across 6 resources) |
 | Operator workflow E2E | `npx playwright test` (apps/web) | 4/4 PASS |
 | AI subagent harness | `npm run harness` (mocked) | PASS — 16/16 mapping, 16/16 audit, 15/16 credit (deliberate regression fixture), fallback 2.1% |
 | US EDGAR eval | `OFFLINE=1 npm run eval` | 12 PASS, 3 WARN, 5 SKIPPED (of 20), mean ETR delta 17.5 bp — validated 15/20, 0 FAIL; also runs live in CI (non-fatal) |
 | UK eval | `npm run eval:uk` | 9/9 PASS, mean ETR delta 1.3 bp |
-| CI (GitHub Actions, `master`) | all 4 workflows | PASS — CI/Semgrep/CodeQL/OSV green: lint, 412 tests on a fresh Postgres (bootstrap roles → migrate → seed), Docker build + Trivy scans |
+| US state rules vs live sources | `npm run verify:us-rates -w @taxpro/tax-engine-enterprise` | PASS — 51/51 rates + 51/51 apportionment weights exact vs Tax Foundation 2026 (see `docs/STATE_RULE_REFRESH.md`) |
+| CI (GitHub Actions, `master`) | all 4 workflows | PASS — CI/Semgrep/CodeQL/OSV green: lint, 479 tests on a fresh Postgres (bootstrap roles → migrate → seed), Docker build + Trivy scans |
 
 ---
 
@@ -396,7 +399,7 @@ Every push/PR to `master` runs four GitHub Actions workflows (`.github/workflows
 
 | Workflow | What it runs | Status |
 |---|---|---|
-| `ci.yml` | 3 jobs: **Security Scan** (Gitleaks advisory + Trufflehog verified secrets), **Lint & Test** (fresh Postgres 16 + Redis 7 services: bootstrap roles → migrate → seed → 412 tests → build), **Docker Build & Scan** (API + Web images, Trivy HIGH/CRITICAL, SARIF uploaded) | green on master |
+| `ci.yml` | 3 jobs: **Security Scan** (Gitleaks advisory + Trufflehog verified secrets), **Lint & Test** (fresh Postgres 16 + Redis 7 services: bootstrap roles → migrate → seed → 479 tests → build), **Docker Build & Scan** (API + Web images, Trivy HIGH/CRITICAL, SARIF uploaded) | green on master |
 | `codeql.yml` | GitHub CodeQL (security + extended analysis), SARIF upload | green |
 | `semgrep.yml` | Semgrep `p/security-audit` + `p/typescript` + `p/javascript` (0 blocking findings) | green |
 | `deps.yml` | OSV-Scanner dependency gate (`google/osv-scanner-action/osv-scanner-action@v2.3.8`) — blocks on vulnerabilities | green |

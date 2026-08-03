@@ -30,6 +30,9 @@ npm run eval:uk -w @taxpro/api
 
 # AI mapping eval (dry-run / mocked / real — threshold only in real mode)
 npm run eval:ai-mapping -w @taxpro/api
+
+# US state tax rule engine vs dated Tax Foundation 2026 snapshots
+npm run verify:us-rates -w @taxpro/tax-engine-enterprise
 ```
 
 ## US — SEC EDGAR (20 target companies)
@@ -86,6 +89,28 @@ Status (last full run): 9/9 PASS, mean ETR delta 1.3bp, deferred tax 0bp.
   exit 1 below.
 
 Any material quoting accuracy must use real-mode numbers only.
+
+## US state tax rule engine — live-source snapshot validation (2026-08-03)
+
+The 51-jurisdiction state tax rule engine (`packages/tax-engine-enterprise/src/us/`)
+is validated against **dated** snapshots from public sources, so a re-run at any
+later date proves *what the law was on the capture date* and flags what has
+churned since (`npm run verify:us-rates -w @taxpro/tax-engine-enterprise`):
+
+- Rates: 51/51 jurisdictions exact vs `TF_2026_RATES` (Tax Foundation 2026,
+  published 2026-01-05, updated 2026-04-02, captured 2026-04-02). The initial
+  snapshot had 25/51 stale rates; all corrected and locked by the verifier.
+- Apportionment weights: 51/51 exact vs `TF_2026_APPORTIONMENT` (Tax Foundation
+  TaxEDU "State Primary Apportionment Factors for Tax Year 2026", captured
+  2026-08-03). 8/51 rows were wrong initially (DE/MT wrongly three-factor;
+  KS/ND/NM/OK are actually three-factor; FL/VA double-weighted sales) — all
+  corrected.
+
+**What snapshot equality does not certify:** the top-tier-only bracketed
+schedules, CT's 10% surtax, NJ's entire-net-income regime, and KS/OK
+single-sales-factor effective dates remain flagged for CPA sign-off; the
+rule-refresh loop's human-approval step is the gate (see
+`docs/STATE_RULE_REFRESH.md`).
 
 ## Validation vs filing-ready
 
