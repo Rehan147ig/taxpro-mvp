@@ -625,6 +625,84 @@ provisionRoutes.get('/results/:id/ct600', async (c) => {
   });
 });
 
+provisionRoutes.get('/results/:id/us-1120', async (c) => {
+  const user = getUser(c);
+  const format = c.req.query('format') === 'csv' ? 'csv' : 'json';
+  return withTenantContext(user.tenantId, async (tx) => {
+    const [result] = await tx.select().from(provisionResults)
+      .where(and(
+        eq(provisionResults.id, c.req.param('id')),
+        eq(provisionResults.tenantId, user.tenantId),
+      )).limit(1);
+
+    if (!result) throw new BadRequestError('Provision result not found');
+
+    const [run] = await tx.select({ id: provisionRuns.id, entityId: provisionRuns.entityId, endPeriod: provisionRuns.endPeriod, status: provisionRuns.status, approvalStatus: provisionRuns.approvalStatus }).from(provisionRuns)
+      .where(and(eq(provisionRuns.tenantId, user.tenantId), eq(provisionRuns.resultId, result.id))).limit(1);
+
+    if (!canMutate(user.role) && run) {
+      if (run.approvalStatus !== 'approved' && run.status !== 'locked') {
+        throw new ForbiddenError('Read-only roles may only export approved or locked provision results');
+      }
+    }
+
+    let company = { companyName: 'Unknown company', ein: '000000000' } as { companyName: string; ein: string; state?: string };
+    if (run?.entityId) {
+      const [entity] = await tx.select({ name: entities.name, externalId: entities.externalId })
+        .from(entities).where(and(eq(entities.tenantId, user.tenantId), eq(entities.id, run.entityId))).limit(1);
+      if (entity) {
+        const einQuery = c.req.query('ein');
+        const ein = einQuery?.replace(/-/g, '').match(/^\d{9}$/)?.[0]
+          ?? entity.externalId?.replace(/-/g, '').match(/^\d{9}$/)?.[0]
+          ?? '000000000';
+        company = { companyName: entity.name, ein, state: c.req.query('state') ?? undefined };
+      }
+    }
+
+    const detail = (result.detail ?? null) as import('../export/excel-generator.js').ProvisionExportDetail | null;
+    const us1120 = await (async () => {
+      const { us1120FromProvisionDetail } = await import('../export/us-1120.js');
+      return us1120FromProvisionDetail(company, { start: result.period, end: String(run?.endPeriod ?? result.period) }, {
+        currentTax: {
+          bookIncome: Number(result.bookIncome ?? 0),
+          totalPermanentAdjustments: 0,
+          taxableIncome: detail?.currentTax?.taxableIncome ?? Number(result.bookIncome ?? 0),
+          federalTax: Number(result.currentTaxExpense ?? 0),
+          taxCredits: detail?.currentTax?.taxCredits ?? 0,
+          taxPayable: Number(result.taxPayable ?? 0),
+          estimatedPayments: detail?.currentTax?.estimatedPayments ?? 0,
+          totalTaxAfterCredits: Number(result.taxPayable ?? 0),
+        },
+      }, {
+        federalRate: c.req.query('rate') ? Number(c.req.query('rate')) : undefined,
+        nolDeduction: c.req.query('nol') ? Number(c.req.query('nol')) : undefined,
+        overpaymentsApplied: c.req.query('overpayment') ? Number(c.req.query('overpayment')) : undefined,
+      });
+    })();
+
+    if (run) {
+      await recordProvisionEvent({
+        tenantId: user.tenantId,
+        provisionRunId: run.id,
+        eventType: EVENT_TYPES.EXPORT_WORKPAPER,
+        actorType: 'user',
+        actorUserId: user.userId,
+        reason: `US 1120 export for period ${result.period}`,
+        metadata: { resultId: result.id, format },
+      }, tx);
+    }
+
+    if (format === 'csv') {
+      const { us1120ToCsv } = await import('../export/us-1120.js');
+      c.header('Content-Type', 'text/csv');
+      c.header('Content-Disposition', `attachment; filename="taxpro-us1120-${result.period}.csv"`);
+      return c.body(us1120ToCsv(us1120));
+    }
+    const { validateUs1120Return } = await import('../export/us-1120-validation.js');
+    return c.json({ ...us1120, validation: validateUs1120Return(us1120) });
+  });
+});
+
 provisionRoutes.get('/results/:id/rd-claim', async (c) => {
   const user = getUser(c);
   return withTenantContext(user.tenantId, async (tx) => {
