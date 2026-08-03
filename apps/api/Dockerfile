@@ -10,6 +10,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 COPY apps/api/package.json apps/api/package.json
 COPY packages/tax-engine/package.json packages/tax-engine/package.json
+COPY packages/tax-engine-enterprise/package.json packages/tax-engine-enterprise/package.json
 COPY apps/web/package.json apps/web/package.json
 RUN npm ci --include=dev
 
@@ -17,9 +18,11 @@ RUN npm ci --include=dev
 COPY tsconfig.base.json ./
 COPY apps/api apps/api
 COPY packages/tax-engine packages/tax-engine
+COPY packages/tax-engine-enterprise packages/tax-engine-enterprise
 
-# Build tax-engine first (dependency), then API
+# Build tax-engine and enterprise first (dependencies), then API
 RUN npm run build -w packages/tax-engine
+RUN npm run build -w packages/tax-engine-enterprise
 RUN npm run build -w apps/api
 
 # ── Stage 2: Production runtime ──
@@ -31,6 +34,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 COPY apps/api/package.json apps/api/package.json
 COPY packages/tax-engine/package.json packages/tax-engine/package.json
+COPY packages/tax-engine-enterprise/package.json packages/tax-engine-enterprise/package.json
 
 # Install only production dependencies
 RUN npm ci --omit=dev --ignore-scripts
@@ -39,6 +43,8 @@ RUN npm ci --omit=dev --ignore-scripts
 COPY --from=builder /app/apps/api/dist /app/apps/api/dist
 COPY --from=builder /app/packages/tax-engine/dist /app/packages/tax-engine/dist
 COPY --from=builder /app/packages/tax-engine/package.json /app/packages/tax-engine/package.json
+COPY --from=builder /app/packages/tax-engine-enterprise/dist /app/packages/tax-engine-enterprise/dist
+COPY --from=builder /app/packages/tax-engine-enterprise/package.json /app/packages/tax-engine-enterprise/package.json
 
 # Copy drizzle config + migrations
 COPY apps/api/drizzle.config.ts apps/api/drizzle.config.ts
