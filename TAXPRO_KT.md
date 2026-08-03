@@ -61,7 +61,7 @@ taxpro/
     │       ├── etr-reconciliation.ts # Effective Tax Rate Walk
     │       └── uk-frs102-s29/        # UK FRS 102 S29 Deferred Tax Rules (25% Rate, No Discounting, Note 14)
     └── tax-engine-enterprise/        # Isolated exploratory group/multi-entity/GL-ELT package
-                                      #   (44 tests, UNVALIDATED, not wired into any app)
+                                       #   (89 tests, UNVALIDATED; only the API rule-update agent imports its proposal contract)
 ```
 
 ---

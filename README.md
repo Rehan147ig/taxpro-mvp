@@ -261,8 +261,10 @@ taxpro/
 └── packages/
     ├── tax-engine/            # pure ASC 740 & FRS 102 S29 engine (Decimal.js exact math,
     │                          #   118 unit tests, eval golden datasets)
-    └── tax-engine-enterprise/ # isolated exploratory group/multi-entity/GL-ELT package
-                               #   (44 unit tests, UNVALIDATED — not wired into any app)
+    └── tax-engine-enterprise/ # isolated exploratory US/UK/GL package (state tax rule
+                               #   engine for 51 jurisdictions + live-source verifier,
+                               #   89 unit tests, UNVALIDATED; only the API rule-update
+                               #   agent imports its proposal contract)
 ```
 
 ---

@@ -36,15 +36,21 @@ describe('STATE_RULESET', () => {
     expect(type('PA')).toBe('cit');
   });
 
-  it('encodes single sales as the default weight and equal three-factor for AK/DE/HI/MT', () => {
+  it('encodes single sales as the default weight, equal three-factor for AK/HI/KS/ND/NM/OK, double-weighted sales for FL/VA', () => {
     const weights = (code: string) => stateRuleset(code)?.apportionmentWeights;
     expect(weights('CA')).toEqual({ payroll: 0, property: 0, sales: 1 });
     expect(weights('TX')).toEqual({ payroll: 0, property: 0, sales: 1 });
-    for (const code of ['AK', 'DE', 'HI', 'MT']) {
+    for (const code of ['AK', 'HI', 'KS', 'ND', 'NM', 'OK']) {
       const w = weights(code);
       expect(w?.payroll).toBeCloseTo(1 / 3, 10);
       expect(w?.property).toBeCloseTo(1 / 3, 10);
       expect(w?.sales).toBeCloseTo(1 / 3, 10);
+    }
+    for (const code of ['FL', 'VA']) {
+      const w = weights(code);
+      expect(w?.payroll).toBeCloseTo(0.25, 10);
+      expect(w?.property).toBeCloseTo(0.25, 10);
+      expect(w?.sales).toBeCloseTo(0.5, 10);
     }
   });
 

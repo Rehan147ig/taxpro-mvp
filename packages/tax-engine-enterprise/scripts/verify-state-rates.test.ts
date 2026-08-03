@@ -14,9 +14,9 @@ describe('STATE_RULESET vs dated external snapshots', () => {
 
     const lines: string[] = [];
     for (const r of reports) {
-      lines.push(`=== ${r.sourceName} (${r.taxYear}) — ${r.sourceUrl}`);
-      lines.push(`    published ${r.publishedAt}, captured ${r.fetchedAt}, tax year ${r.taxYear}`);
-      lines.push(`    jurisdictions checked: ${r.jurisdictionsChecked}, exact matches: ${r.matches}, mismatches: ${r.mismatches.length}`);
+      lines.push(`=== ${r.taxYear} rates: ${r.rateSourceName} — ${r.rateSourceUrl}`);
+      lines.push(`    rates published ${r.publishedAt}; weights: ${r.weightSourceName} — ${r.weightSourceUrl}`);
+      lines.push(`    captured ${r.fetchedAt}; jurisdictions checked: ${r.jurisdictionsChecked}, exact matches: ${r.matches}, mismatches: ${r.mismatches.length}`);
       for (const m of r.mismatches) {
         lines.push(`    [${m.stateCode}] ${m.kind}: ${m.detail}`);
       }
@@ -26,7 +26,7 @@ describe('STATE_RULESET vs dated external snapshots', () => {
 
     for (const r of reports) {
       expect(r.clean, [
-        `${r.sourceName} (${r.taxYear}): ${r.mismatches.length} mismatches — ruleset is stale against ${r.sourceUrl}`,
+        `${r.taxYear}: ${r.mismatches.length} mismatches — ruleset is stale against ${r.rateSourceUrl} / ${r.weightSourceUrl}`,
         ...r.mismatches.map(m => `  [${m.stateCode}] ${m.kind}: ${m.detail}`),
       ].join('\n')).toBe(true);
     }

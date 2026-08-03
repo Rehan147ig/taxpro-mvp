@@ -34,6 +34,9 @@ export * from './us/state-rules.js';
 // US state tax computation engine (executes the rulesets)
 export * from './us/state-tax-engine.js';
 
+// Rule-update proposals (machine-checkable agent output contract)
+export * from './us/proposals.js';
+
 // GL ingestion ELT
 export * from './elt/adapters.js';
 export * from './elt/heuristics.js';

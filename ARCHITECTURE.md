@@ -162,6 +162,6 @@ graph TB
 
 ## Packages & CI (2026-08-03)
 
-- **`packages/tax-engine-enterprise`** — isolated exploratory package (multi-entity model, UK group relief, US apportionment skeleton, GL-ELT): deliberately not imported by `apps/api`, `apps/web`, or `tax-engine`; 44 unit tests; **UNVALIDATED** (see its `ASSUMPTIONS.md`).
+- **`packages/tax-engine-enterprise`** — isolated exploratory package (multi-entity model, UK group relief, US state tax rule engine — rates/weights/rulesets for all 51 jurisdictions + live-source verifier, valuation-allowance scheduler, quarterly ASC 740-270 mechanics, GL-ELT): 89 unit tests; **UNVALIDATED** (see its `ASSUMPTIONS.md`). The only production-side consumer is the API's `rule-update-agent` subagent, which imports the machine-checkable proposal contract (`us/proposals.ts`) to feed the agentic rule-refresh loop — it does not execute state tax computations for any app.
 - **CI (GitHub Actions, `.github/workflows/`, green on master):** 4 workflows per push/PR —
   `ci.yml` (Security Scan: Gitleaks advisory + Trufflehog; Lint & Test on a fresh Postgres 16 + Redis 7: bootstrap roles → migrate → seed → 412 tests; Docker Build & Scan: API/Web + Trivy HIGH/CRITICAL), `codeql.yml` (CodeQL security + extended), `semgrep.yml` (p/security-audit + TS/JS, 0 findings), `deps.yml` (OSV dependency gate). Dependabot enabled for npm / Actions / Docker.

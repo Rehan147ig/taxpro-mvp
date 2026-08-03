@@ -16,9 +16,11 @@
 //     state's tax is tiered — only the TOP tier rate is stored here, and the
 //     engine warns that applying it to the full base may overstate tax at
 //     lower incomes until bracket detail is validated.
-//   - weights: apportionment factor weights. Default single sales factor
-//     (0/0/1) — the dominant modern formula; EQUAL three-factor for AK, DE,
-//     HI, MT as commonly cited. Verify every weight.
+//   - weights: apportionment factor weights per Tax Foundation TaxEDU
+//     "State Primary Apportionment Factors for Tax Year 2026" (captured
+//     2026-08-03): default single sales factor (0/0/1) — the dominant modern
+//     formula; EQUAL three-factor for AK, HI, KS, ND, NM, OK; double-weighted
+//     sales (0.25/0.25/0.5) for FL, VA. Verify every weight.
 //
 // Rates are taken from `STATE_TAX_REFERENCE.topRate` (single source of truth
 // — change a rate in ONE place).
@@ -57,6 +59,7 @@ export interface StateRuleset {
 
 const EQUAL: StateApportionmentWeights = { payroll: 1 / 3, property: 1 / 3, sales: 1 / 3 };
 const SINGLE_SALES: StateApportionmentWeights = { payroll: 0, property: 0, sales: 1 };
+const DOUBLE_SALES: StateApportionmentWeights = { payroll: 0.25, property: 0.25, sales: 0.5 };
 
 const VERIFY_ALL = 'rate, filing type and apportionment weight verified against current statute';
 const VERIFY_WEIGHTS = 'apportionment weights verified against current statute';
@@ -78,15 +81,15 @@ const CONFIG: Record<string, StateRuleConfig> = {
   CA: { scheduleKind: 'flat', verify: [VERIFY_ALL], notModeled: ['franchise tax on some capital-based entities (S-corps/LLCs) not modeled'] },
   CO: { scheduleKind: 'flat', verify: [VERIFY_ALL], notModeled: ['franchise fee (as applicable) not modeled'] },
   CT: { scheduleKind: 'bracketed', verify: [VERIFY_ALL, '10% surcharge (when in effect) not modeled; brackets not modeled'], notModeled: ['capital base tax as applicable not modeled'] },
-  DE: { scheduleKind: 'flat', weights: EQUAL, verify: [VERIFY_ALL], notModeled: ['gross receipts licensing tax not modeled'] },
-  FL: { scheduleKind: 'flat', verify: [VERIFY_ALL] },
+  DE: { scheduleKind: 'flat', verify: [VERIFY_ALL], notModeled: ['gross receipts licensing tax not modeled'] },
+  FL: { scheduleKind: 'flat', weights: DOUBLE_SALES, verify: [VERIFY_ALL] },
   GA: { scheduleKind: 'flat', verify: [VERIFY_ALL] },
   HI: { scheduleKind: 'bracketed', weights: EQUAL, verify: [VERIFY_ALL, 'brackets not modeled — top tier applied to full base'] },
   ID: { scheduleKind: 'flat', verify: [VERIFY_ALL] },
   IL: { scheduleKind: 'flat', verify: [VERIFY_ALL], notModeled: ['replacement surcharge structure (7% + 2.5%) modeled as a single 9.5% rate'] },
   IN: { scheduleKind: 'flat', verify: [VERIFY_ALL], notModeled: ['phase-down of the rate not modeled'] },
   IA: { scheduleKind: 'bracketed', verify: [VERIFY_ALL, 'brackets not modeled — top tier applied to full base'] },
-  KS: { scheduleKind: 'bracketed', verify: [VERIFY_ALL, 'brackets (4% up to $50,000, 7% above) not modeled — top tier applied to full base'] },
+  KS: { scheduleKind: 'bracketed', weights: EQUAL, verify: [VERIFY_ALL, 'brackets (4% up to $50,000, 7% above) not modeled — top tier applied to full base', 'apportionment: three-factor per TaxEDU 2026, but SSF enacted 2024 — confirm effective date'] },
   KY: { scheduleKind: 'flat', verify: [VERIFY_ALL] },
   LA: { scheduleKind: 'bracketed', verify: [VERIFY_ALL, 'brackets not modeled — top tier applied to full base'] },
   ME: { scheduleKind: 'bracketed', verify: [VERIFY_ALL, 'brackets not modeled — top tier applied to full base'] },
@@ -96,17 +99,17 @@ const CONFIG: Record<string, StateRuleConfig> = {
   MN: { scheduleKind: 'flat', verify: [VERIFY_ALL] },
   MS: { scheduleKind: 'bracketed', verify: [VERIFY_ALL, 'brackets not modeled — top tier applied to full base'] },
   MO: { scheduleKind: 'flat', verify: [VERIFY_ALL] },
-  MT: { scheduleKind: 'flat', weights: EQUAL, verify: [VERIFY_ALL] },
+  MT: { scheduleKind: 'flat', verify: [VERIFY_ALL] },
   NE: { scheduleKind: 'flat', verify: [VERIFY_ALL] },
   NV: { scheduleKind: 'flat', filingType: 'grossReceipts', verify: [VERIFY_ALL], notModeled: ['commerce tax is gross-revenue based — income-tax computation not applicable'] },
   NH: { scheduleKind: 'flat', verify: [VERIFY_ALL], notModeled: ['BPT apportionment uses a different numerator set than the CIT factors; verify'] },
   NJ: { scheduleKind: 'bracketed', verify: [VERIFY_ALL, 'brackets not modeled — top tier applied to full base'], notModeled: ['franchise/alternative minimum tax as applicable not modeled'] },
-  NM: { scheduleKind: 'flat', verify: [VERIFY_ALL] },
+  NM: { scheduleKind: 'flat', weights: EQUAL, verify: [VERIFY_ALL] },
   NY: { scheduleKind: 'bracketed', verify: [VERIFY_ALL, 'brackets not modeled — top tier applied to full base'], notModeled: ['MTA surcharge (as applicable) not modeled'] },
   NC: { scheduleKind: 'flat', verify: [VERIFY_ALL] },
-  ND: { scheduleKind: 'bracketed', verify: [VERIFY_ALL, 'brackets not modeled — top tier applied to full base'] },
+  ND: { scheduleKind: 'bracketed', weights: EQUAL, verify: [VERIFY_ALL, 'brackets not modeled — top tier applied to full base'] },
   OH: { scheduleKind: 'flat', filingType: 'grossReceipts', verify: [VERIFY_ALL], notModeled: ['commercial activity tax is gross-receipts based — income-tax computation not applicable'] },
-  OK: { scheduleKind: 'flat', verify: [VERIFY_ALL] },
+  OK: { scheduleKind: 'flat', weights: EQUAL, verify: [VERIFY_ALL, 'single-sales factor election available — default is three-factor'] },
   OR: { scheduleKind: 'bracketed', verify: [VERIFY_ALL, 'brackets not modeled — top tier applied to full base'] },
   PA: { scheduleKind: 'flat', verify: [VERIFY_ALL] },
   RI: { scheduleKind: 'flat', verify: [VERIFY_ALL] },
@@ -116,7 +119,7 @@ const CONFIG: Record<string, StateRuleConfig> = {
   TX: { scheduleKind: 'flat', filingType: 'grossReceipts', verify: [VERIFY_ALL], notModeled: ['margin tax is gross-margin based — income-tax computation not applicable'] },
   UT: { scheduleKind: 'flat', verify: [VERIFY_ALL] },
   VT: { scheduleKind: 'bracketed', verify: [VERIFY_ALL, 'brackets not modeled — top tier applied to full base'] },
-  VA: { scheduleKind: 'flat', verify: [VERIFY_ALL] },
+  VA: { scheduleKind: 'flat', weights: DOUBLE_SALES, verify: [VERIFY_ALL] },
   WA: { scheduleKind: 'flat', filingType: 'grossReceipts', verify: [VERIFY_ALL], notModeled: ['B&O tax is gross-receipts based — income-tax computation not applicable'] },
   WV: { scheduleKind: 'flat', verify: [VERIFY_ALL] },
   WI: { scheduleKind: 'flat', verify: [VERIFY_ALL] },
