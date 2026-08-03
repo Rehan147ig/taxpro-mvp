@@ -19,6 +19,15 @@ export * from './uk/group-relief.js';
 // US multi-state apportionment skeleton
 export * from './us/apportionment.js';
 
+// US valuation allowance scheduler (ASC 740-30 mechanics)
+export * from './us/valuation-allowance.js';
+
+// US quarterly interim provision (ASC 740-270 mechanics)
+export * from './us/quarterly.js';
+
+// US 50-state tax reference data (UNVALIDATED snapshot)
+export * from './us/state-rates.js';
+
 // GL ingestion ELT
 export * from './elt/adapters.js';
 export * from './elt/heuristics.js';

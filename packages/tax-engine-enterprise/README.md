@@ -21,6 +21,9 @@ not wired into any route, UI, agent, engine factory, or jurisdiction resolver.
 | `src/model/gl-transactions.ts` | Drizzle schema: `general_ledger_transactions` staging table |
 | `src/uk/group-relief.ts` | Pure UK group relief calculator (CTA 2010 Part 5) with elimination trail and explicit non-handled gaps (consortium relief, non-coterminous periods, carried-forward losses) |
 | `src/us/apportionment.ts` | US multi-state apportionment skeleton (payroll/property/sales factors, weighted fraction) — NO state rates, per-state TODO markers instead |
+| `src/us/valuation-allowance.ts` | ASC 740-30 valuation allowance scheduler (gross DTA → allowance allocation → net DTA; expiry/reversal scheduling warnings) |
+| `src/us/quarterly.ts` | ASC 740-270 quarterly interim provision mechanics (estimated AETR method, annualized-income variant, discrete items) |
+| `src/us/state-rates.ts` | 50-state + DC corporate tax reference snapshot (rate structure, apportionment formula, citation pointer) — VERIFY against current law |
 | `src/elt/heuristics.ts` | Deterministic regex flagging of GL narration → findings; every pattern marked as a guessed pattern |
 | `src/elt/adapters.ts` | Interface shapes only for NetSuite / Xero / QuickBooks exports + pure normalizers; no live API code |
 | `src/elt/pipeline.ts` | Chunked ELT pipeline (default 5,000 rows/chunk) with skip/report, heuristics, optional load sink |
