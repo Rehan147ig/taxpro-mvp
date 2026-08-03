@@ -58,6 +58,7 @@ would confirm or break that assumption.
 | 3A.6 | Gross-receipts/margin states are excluded from the income-tax total; their taxes need a separate basis not implemented here | The caller routes OH/TX/WA/NV to a gross-receipts/margin computation elsewhere | The caller treats the exclusion as a complete answer for those states |
 | 3A.7 | Not modeled (flagged per state, never silent): throwback, combined/unitary reporting, property averaging, franchise/surtax add-ons (DE, NJ, NY, CT, MA, IL…), bracket detail, nexus thresholds | A reviewer confirms each flagged gap is out of scope for the use case | Any flagged gap becomes material — the engine must grow the rule |
 | 3A.8 | All rates/weights/filing types are UNVALIDATED snapshot data with per-row `verify` checklists; the engine is only as good as the data | The verify checklists are cleared against current statutes (the confirmation is a data-fill task, not a code task) | Any rate/weight is used in production before verification |
+| 3A.9 | Ruleset freshness is enforced by the verifier (`npm run verify:us-rates`): `STATE_RULESET` must match the latest dated external snapshot in `external-snapshots.ts` (Tax Foundation 2026, captured 2026-04-02 — 51/51 rows exact); a state changing rates/structure fails CI until the snapshot is re-fetched AND the ruleset updated | The snapshot is re-fetched on every legislative change | The snapshot is edited to match the ruleset instead of vice versa, or a stale snapshot passes unnoticed |
 
 ## 4. GL heuristics (`src/elt/heuristics.ts`)
 

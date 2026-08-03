@@ -52,8 +52,8 @@ describe('computeStateTaxes', () => {
     // (0.25 + 0.10 + 0.50) / 3
     expect(ak.apportionmentFraction!.toFixed(6)).toBe('0.283333');
     expect(ak.stateTaxableIncome!.toNumber()).toBeCloseTo(283_333.33, 2);
-    expect(ak.rateApplied!.toNumber()).toBe(0.09);
-    expect(ak.stateTax!.toNumber()).toBeCloseTo(25_500, 6);
+    expect(ak.rateApplied!.toNumber()).toBe(0.094);
+    expect(ak.stateTax!.toNumber()).toBeCloseTo(26_633.33, 2);
     expect(ak.warnings.some(w => /top tier/.test(w))).toBe(true); // bracketed warning
   });
 
@@ -64,7 +64,7 @@ describe('computeStateTaxes', () => {
     });
     expect(r.states).toHaveLength(2);
     expect(r.statesIncluded).toBe(2);
-    expect(r.totalMultistateTax.toNumber()).toBeCloseTo(44_200 + 25_500, 6);
+    expect(r.totalMultistateTax.toNumber()).toBeCloseTo(44_200 + 26_633.33, 2);
   });
 
   it('excludes no-CIT jurisdictions with zero tax', () => {
