@@ -13,8 +13,8 @@ gate before any go-live or "filing-ready" statement (roadmap hard constraints 1�
 
 This is NOT a request for a rubber stamp. The honest position:
 
-- **The tax engine is validated against audited filings** (US SEC EDGAR 7/12
-  evaluated, mean ETR delta 32.7bp; UK Companies House 9/9, mean 1.3bp) — but
+- **The tax engine is validated against audited filings** (US SEC EDGAR 15/20
+  evaluated, mean ETR delta 17.5bp; UK Companies House 9/9, mean 1.3bp) — but
   "validated" means the engine reproduces disclosed ETRs from disclosed recon
   items within the stated bands. It is not a certification that the outputs are
   correct for any specific taxpayer.
@@ -66,7 +66,7 @@ The review should focus on: (a) correctness of the tax math and rate application
 ### 2.3 Benchmark evidence
 
 - US: `OFFLINE=1 npm run eval -w @taxpro/api` (cached SEC filings),
-  `docs/EDGAR_SKIP_GAP_REPORT.md` (skip root causes, all P1/P2 fixes landed).
+  `docs/EDGAR_SKIP_GAP_REPORT.md` (skip root causes, all P1–P3 fixes landed).
 - UK: `npm run eval:uk -w @taxpro/api`, fixtures with provenance in
   `apps/api/scripts/eval/uk-fixtures.ts`.
 - AI mapping: `npm run eval:ai-mapping -w @taxpro/api` (real mode now unblocked).

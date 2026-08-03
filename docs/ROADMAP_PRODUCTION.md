@@ -51,7 +51,7 @@ Launch checklist. Items are ordered; each must be verified by the gates in Phase
 - [x] Never market skipped companies as validated (summary prints VALIDATED = evaluated only + explicit "NOT validated" line)
 - [x] Add more UK Companies House fixtures with provenance metadata (company, year, source doc, note ref, manual adjustments — 9 fixtures; noteRef/manualAdjustments fields added)
 - [x] `docs/PUBLIC_DATA_VALIDATION.md` summarizing evidence honestly
-- [x] Close EDGAR skip gap (ranked fixes in `docs/EDGAR_SKIP_GAP_REPORT.md`): P1 new-taxonomy `EffectiveIncomeTaxRateReconciliation…Amount` tag collection + P1 minority-interest negative bucket + P2 percent-unit path (tie-gated) + P2 target rotation (JKHY→FAST, WDFC→ITW) **all implemented 2026-08-01** — validated 2/12 → 7/12 (4 PASS + 3 WARN), HSY 268→122 bp, NUE 663→118 bp, CLX attempted via percent path (stays SKIP by tie gate)
+- [x] Close EDGAR skip gap (ranked fixes in `docs/EDGAR_SKIP_GAP_REPORT.md`): P1 new-taxonomy `EffectiveIncomeTaxRateReconciliation…Amount` tag collection + P1 minority-interest negative bucket + P2 percent-unit path (tie-gated) + P2 target rotation (JKHY→FAST, WDFC→ITW) **implemented 2026-08-01** + P3 target expansion to 20 (GGG/IEX/BRC/SSD/MSM/CSL/AWI/UFPI; NDSN/FELE rejected on tie gate) + P3 additive-convention credit mapping fix (UFPI 179 bp FAIL → 19 bp PASS) + live US eval step in CI **implemented 2026-08-03** — validated 2/12 → **15/20** (12 PASS + 3 WARN, mean 17.5 bp), HSY 268→122 bp (residual ≈$14.8M is untagged XBRL lines — not recoverable by code), NUE 663→118 bp, CLX attempted via percent path (stays SKIP by tie gate)
 
 ## Phase 6 — Compliance Exports
 
@@ -111,7 +111,7 @@ Run and record: `npm run lint` · `npm test` · `npm run build` · `npm run test
 - [x] `npm test` — 412/412 PASS (118 engine + 250 API + 44 tax-engine-enterprise)
 - [x] `npm run build` — PASS (4/4 workspaces)
 - [x] `npm run test:integration -w @taxpro/api` — 27/27 PASS (full lifecycle + tenant isolation + package hash verification)
-- [x] `OFFLINE=1 npm run eval` — 4 PASS / 3 WARN / 5 SKIP (of 12), mean ETR delta 32.7 bp
+- [x] `OFFLINE=1 npm run eval` — 12 PASS / 3 WARN / 5 SKIP (of 20), mean ETR delta 17.5 bp — validated 15/20, 0 FAIL (also runs live in CI)
 - [x] `npm run eval:uk` — 9/9 PASS, mean ETR delta 1.3 bp, deferred 0 bp
 - [x] `npm run eval:ai-mapping -w @taxpro/api` (dry-run) — PASS, 202 golden entries, expected distribution printed
 

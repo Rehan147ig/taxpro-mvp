@@ -8,7 +8,7 @@ TaxPro is an **Outcome-as-a-Service (OaaS)**, not an AI SaaS dashboard:
 
 > **AI drafts and explains, deterministic math calculates, human CPAs approve and lock.**
 
-**Official website:** [taxpro.ploy.build](https://taxpro.ploy.build/) — product overview, benchmark evidence (7/12 US, 9/9 UK, AI mapping), governance model, and pilot request. Open-source repository: this repo.
+**Official website:** [taxpro.ploy.build](https://taxpro.ploy.build/) — product overview, benchmark evidence (15/20 US, 9/9 UK, AI mapping), governance model, and pilot request. Open-source repository: this repo.
 
 ---
 
@@ -203,7 +203,7 @@ The Tiny Rebel fixture is a genuine marginal-relief case: its ETR reconciliation
 
 ### US ASC 740 (SEC EDGAR public 10-K filings)
 
-`npm run eval` — evaluates filed XBRL footnote data. **Offline (cached) mode currently resolves 2 PASS, 4 WARN, 6 SKIPPED of 12 filings.** Results are classified honestly — evaluated (`pass`/`warn`/`fail`) vs skipped (`skipped/data unavailable` vs `skipped/footnote does not tie`) — and skips are **not** counted as validated. Harness semantics: PASS ≤ 25 bp, WARN ≤ 100 bp. The 6 skips are root-caused in `docs/EDGAR_SKIP_GAP_REPORT.md` (new-tag extractor coverage, percentage-only/untagged filer data, and tie-gate rejections); ranked fixes are scoped there (report-only, not yet implemented).
+`npm run eval` — evaluates filed XBRL footnote data. **Offline (cached) mode currently resolves 12 PASS, 3 WARN, 5 SKIPPED of 20 filings — 15/20 validated, mean ETR delta 17.5 bp.** Results are classified honestly — evaluated (`pass`/`warn`/`fail`) vs skipped (`skipped/data unavailable` vs `skipped/footnote does not tie`) — and skips are **not** counted as validated. Harness semantics: PASS ≤ 25 bp, WARN ≤ 100 bp. The 5 skips (CLX, HSY, BRO, TYL, NUE) are root-caused in `docs/EDGAR_SKIP_GAP_REPORT.md` (percentage-only/untagged filer data and tie-gate rejections — filer presentation, not engine math). The eval also runs live in CI (non-fatal).
 
 **This is a development harness, not a market claim.** US coverage must grow before any "validated across public filings" statement is made.
 
@@ -382,7 +382,7 @@ npm run db:synthetic -w apps/api               # deterministic synthetic data (i
 | Provision integration flow | `npm run test:integration -w @taxpro/api` | 27/27 PASS (import → mapping → provision → AI trace polling → review → finalize → submit → partner sign-off → lock → 409 → package → audit → tenant isolation across 6 resources) |
 | Operator workflow E2E | `npx playwright test` (apps/web) | 4/4 PASS |
 | AI subagent harness | `npm run harness` (mocked) | PASS — 16/16 mapping, 16/16 audit, 15/16 credit (deliberate regression fixture), fallback 2.1% |
-| US EDGAR eval | `OFFLINE=1 npm run eval` | 4 PASS, 3 WARN, 5 SKIPPED (of 12), mean ETR delta 32.7 bp — validated 7/12 |
+| US EDGAR eval | `OFFLINE=1 npm run eval` | 12 PASS, 3 WARN, 5 SKIPPED (of 20), mean ETR delta 17.5 bp — validated 15/20, 0 FAIL; also runs live in CI (non-fatal) |
 | UK eval | `npm run eval:uk` | 9/9 PASS, mean ETR delta 1.3 bp |
 | CI (GitHub Actions, `master`) | all 4 workflows | PASS — CI/Semgrep/CodeQL/OSV green: lint, 412 tests on a fresh Postgres (bootstrap roles → migrate → seed), Docker build + Trivy scans |
 
@@ -438,7 +438,7 @@ Every push/PR to `master` runs four GitHub Actions workflows (`.github/workflows
 - Compliance exports are structure generators — no HMRC/Companies House validator integrated.
 
 **Must fix before major release:**
-- US EDGAR eval coverage: 6/12 filings skipped — root causes and ranked fixes in `docs/EDGAR_SKIP_GAP_REPORT.md` (report-only, not yet implemented).
+- US EDGAR eval coverage: 5/20 filings skipped (CLX, HSY, BRO, TYL, NUE) — all tie-gate/filer-data gaps, root-caused in `docs/EDGAR_SKIP_GAP_REPORT.md`; 15/20 validated, 0 FAIL.
 - Real-mode AI eval depends on provider availability from the dev machine; provider-outage runs degrade to fallback statistics (exit 0, explicitly reported as incomplete).
 
 ---

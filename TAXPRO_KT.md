@@ -26,7 +26,7 @@ taxpro/
 │   │   │   ├── run-provision-tests.ts# Automated 12-scenario provision test suite
 │   │   │   ├── test-rls-governance.ts# PostgreSQL RLS isolation & fail-closed tests
 │   │   │   └── eval/                 # Dual US & UK Benchmark Evaluation Harnesses
-│   │   │       ├── run-sec-eval.ts   # US SEC EDGAR 10-K benchmark runner (32.7 bp mean delta, 7/12 evaluated)
+│   │   │       ├── run-sec-eval.ts   # US SEC EDGAR 10-K benchmark runner (17.5 bp mean delta, 15/20 evaluated)
 │   │   │       └── run-uk-eval.ts    # UK FRS 102 Companies House benchmark runner (9/9 PASS, 1.3 bp mean delta)
 │   │   ├── src/
 │   │   │   ├── agent/                # Unified Subagent Architecture
@@ -101,5 +101,5 @@ locked-run packages (zip DOS timestamps now normalized from the run's
    - Monetary values across US ASC 740 and UK FRS 102 calculation paths use `Decimal.js` to eliminate IEEE 754 floating-point drift.
 4. **Empirical Ground-Truth Benchmarking**:
    - Engine accuracy is continuously validated against live audited corporate filings:
-     - **US SEC EDGAR 10-K Suite:** mean 32.7 bp ETR delta (7/12 filings evaluated; skips are filer-data/tie-gate, never counted as validated).
+     - **US SEC EDGAR 10-K Suite:** mean 17.5 bp ETR delta (15/20 filings evaluated, 0 FAIL; skips are filer-data/tie-gate, never counted as validated).
      - **UK Companies House Suite:** 9/9 PASS, mean 1.3 bp ETR variance & 0.0 bp closing deferred variance.
