@@ -237,14 +237,17 @@ export function runEngine(footnote: TaxFootnote): EngineRun {
     amount: new Decimal(item.amount).div(FED), // back out book amount; engine re-derives the impact
   }));
 
-  const taxCredits = classified.credits
-    .reduce((sum, item) => {
-      // Convention: credits reduce tax. Normalized = absolute value (engine negates it).
-      // If the filer already filed them negative, |x| is still correct after sign resolution.
-      return sum.plus(new Decimal(item.amount).abs());
-    }, new Decimal(0));
+  const taxCredits = creditSignFlipped
+    ? classified.credits
+        .reduce((sum, item) => {
+          // Convention: credits reduce tax. Normalized = absolute value (engine negates it).
+          // If the filer already filed them negative, |x| is still correct after sign resolution.
+          return sum.plus(new Decimal(item.amount).abs());
+        }, new Decimal(0))
+    : new Decimal(0);
 
   const otherAdjustments = [
+    ...(creditSignFlipped ? [] : classified.credits),
     ...classified.deductions,
     ...classified.minorityInterest,
     ...classified.state,
@@ -256,6 +259,9 @@ export function runEngine(footnote: TaxFootnote): EngineRun {
     ...classified.other,
   ].map(item => ({
     label: STATE_TAGS.has(item.tag) ? `${item.label} (as disclosed, net of federal)` : item.label,
+    // Credits with the as-filed (additive) convention flow as direct impacts —
+    // the engine's taxCredits path always reduces tax, which would double-apply
+    // the sign for filers whose footnotes show credits adding to tax.
     // Deductions (FDII/QPAI) and minority-interest income reduce tax → negate.
     // All other buckets flow as-disclosed (state/foreign/etc. are direct impacts).
     amount: new Decimal(isDeduction(item.tag) || isNci(item.tag) ? -item.amount : item.amount),

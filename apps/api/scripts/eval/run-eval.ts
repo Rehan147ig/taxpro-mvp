@@ -23,7 +23,12 @@ import { runEngine } from './xbrl-map.js';
 // is untagged in XBRL (unrecoverable) and WDFC's is partial/stale; FAST
 // (Fastenal) and ITW (Illinois Tool Works) are mid-cap industrials with
 // clean itemized USD recon that the engine evaluates (WARN, tie ≤ 74 bp).
-const TARGETS = ['CLX', 'HSY', 'CHD', 'ROL', 'FAST', 'ITW', 'BRO', 'POOL', 'TYL', 'NUE', 'PAYC', 'AOS'];
+// Expansion 2026-08-03: GGG, IEX, BRC, SSD, MSM, CSL, AWI, UFPI added —
+// all mid-cap industrials/consumer with clean itemized recons.
+const TARGETS = [
+  'CLX', 'HSY', 'CHD', 'ROL', 'FAST', 'ITW', 'BRO', 'POOL', 'TYL', 'NUE', 'PAYC', 'AOS',
+  'GGG', 'IEX', 'BRC', 'SSD', 'MSM', 'CSL', 'AWI', 'UFPI',
+];
 
 const PASS_BP = 25;
 const WARN_BP = 100;
