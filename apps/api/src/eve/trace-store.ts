@@ -31,7 +31,7 @@ export async function startAiRun(
     agentName: context.workflowName,
   }).returning();
 
-  d.insert(provisionEvents).values({
+  await d.insert(provisionEvents).values({
     tenantId: context.tenantId,
     provisionRunId: context.provisionRunId ?? '',
     eventType: 'ai.workflow.started',
@@ -70,7 +70,10 @@ async function updateAiRunStatus(
     workflowName: aiRuns.workflowName,
   }).from(aiRuns).where(eq(aiRuns.id, id)).limit(1);
   if (run && run.provisionRunId) {
-    d.insert(provisionEvents).values({
+    // Awaited (with best-effort semantics preserved): the event must be
+    // visible to callers as soon as the status update is — fire-and-forget
+    // here races the caller's read and loses the event on slow CI.
+    await d.insert(provisionEvents).values({
       tenantId: run.tenantId,
       provisionRunId: run.provisionRunId,
       eventType,
