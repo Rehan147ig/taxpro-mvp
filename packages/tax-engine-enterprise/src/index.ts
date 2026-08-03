@@ -28,6 +28,12 @@ export * from './us/quarterly.js';
 // US 50-state tax reference data (UNVALIDATED snapshot)
 export * from './us/state-rates.js';
 
+// US state tax rule engine (machine-readable rulesets for 50 states + DC)
+export * from './us/state-rules.js';
+
+// US state tax computation engine (executes the rulesets)
+export * from './us/state-tax-engine.js';
+
 // GL ingestion ELT
 export * from './elt/adapters.js';
 export * from './elt/heuristics.js';

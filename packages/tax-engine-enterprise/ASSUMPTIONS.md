@@ -41,10 +41,23 @@ would confirm or break that assumption.
 | 3.2 | Factors = in-state / total with totals supplied by the caller | The caller supplies the state-correct total (state-wide vs US-wide) | Caller supplies a total that does not match the state's definition |
 | 3.3 | Sales factor is destination-based | State sources receipts to destination | State requires origin sourcing or throwback (throwback is a TODO) |
 | 3.4 | Property factor uses a single end-of-period value | State accepts year-end property value | State averages beginning/end property (property averaging is a TODO) |
-| 3.5 | No state tax rates are hardcoded anywhere | Caller owns rate application | Any expectation that this package returns tax payable |
+| 3.5 | The raw apportionment module applies no rates (caller-owned); the state tax ENGINE (`state-tax-engine.ts`) applies rates from `STATE_RULESET` data — every rate is UNVALIDATED snapshot data with a verify flag | The verify checklists are cleared against current statutes | Any rate is used in production before verification |
 | 3.6 | Per-entity apportionment (no combined/unitary reporting) | Group is apportioned separately per entity | Combined/unitary filing applies (TODO marker present) |
 | 3.7 | Zero totals ⇒ `no_activity` status with null factors | No-nexus states are filtered by the caller using this status | Caller expects a zero factor instead of null |
 | 3.8 | Weights must sum to 1 within 1e-9 | Caller passes fractions summing to 1 | Caller passes e.g. percentages (0–100) which would be rejected |
+
+## 3A. State tax rule engine (`src/us/state-rules.ts`, `src/us/state-tax-engine.ts`)
+
+| # | Assumption | Would confirm | Would break |
+|---|------------|---------------|-------------|
+| 3A.1 | Filing-type split: `cit` for income-based taxes (incl. TN excise, NH BPT, PA CIT); `grossReceipts` for OH/TX/WA/NV; `none` for SD/WY | A reviewer confirms each state's tax type on the current statute | A state converts between tax types (e.g. a new income tax in WA) — data update needed |
+| 3A.2 | Apportionment weights: single sales factor (0/0/1) by default; equal three-factor for AK, DE, HI, MT | A reviewer verifies the modern formula per state (many states have moved to single sales) | Any state uses double-weighted sales or a hybrid — weights must be corrected per state |
+| 3A.3 | Rate schedule: `flat` = single rate on the whole base; `bracketed` = TOP TIER applied to the full base (engine warns, may overstate at lower incomes) | Bracket detail is validated and a bracket table added | Any bracketed state's lower-tier exposure is material for the use case (then brackets must be encoded) |
+| 3A.4 | State taxable income = apportionable income × apportionment fraction; factor totals are caller-supplied and state-correct | Caller supplies state-correct numerators/denominators | Caller mixes state-wide and US-wide totals (results wrong per state) |
+| 3A.5 | States without factor data are excluded from the multistate total with a structured reason | Nexus/factor coverage is complete per run | A state with tax liability is silently omitted from factor input |
+| 3A.6 | Gross-receipts/margin states are excluded from the income-tax total; their taxes need a separate basis not implemented here | The caller routes OH/TX/WA/NV to a gross-receipts/margin computation elsewhere | The caller treats the exclusion as a complete answer for those states |
+| 3A.7 | Not modeled (flagged per state, never silent): throwback, combined/unitary reporting, property averaging, franchise/surtax add-ons (DE, NJ, NY, CT, MA, IL…), bracket detail, nexus thresholds | A reviewer confirms each flagged gap is out of scope for the use case | Any flagged gap becomes material — the engine must grow the rule |
+| 3A.8 | All rates/weights/filing types are UNVALIDATED snapshot data with per-row `verify` checklists; the engine is only as good as the data | The verify checklists are cleared against current statutes (the confirmation is a data-fill task, not a code task) | Any rate/weight is used in production before verification |
 
 ## 4. GL heuristics (`src/elt/heuristics.ts`)
 

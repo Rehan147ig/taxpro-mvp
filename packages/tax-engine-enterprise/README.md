@@ -24,6 +24,8 @@ not wired into any route, UI, agent, engine factory, or jurisdiction resolver.
 | `src/us/valuation-allowance.ts` | ASC 740-30 valuation allowance scheduler (gross DTA → allowance allocation → net DTA; expiry/reversal scheduling warnings) |
 | `src/us/quarterly.ts` | ASC 740-270 quarterly interim provision mechanics (estimated AETR method, annualized-income variant, discrete items) |
 | `src/us/state-rates.ts` | 50-state + DC corporate tax reference snapshot (rate structure, apportionment formula, citation pointer) — VERIFY against current law |
+| `src/us/state-rules.ts` | State tax **rule engine**: machine-readable rulesets for all 51 jurisdictions — filing type (`cit` / `grossReceipts` / `none`), rate schedule (flat or bracketed top-tier), apportionment weights, per-row verify checklist and not-modeled gaps |
+| `src/us/state-tax-engine.ts` | Executes the rulesets: apportionment fraction → state taxable income → state tax per jurisdiction; structured results for no-CIT and gross-receipts states; multistate total; rate/weight overrides |
 | `src/elt/heuristics.ts` | Deterministic regex flagging of GL narration → findings; every pattern marked as a guessed pattern |
 | `src/elt/adapters.ts` | Interface shapes only for NetSuite / Xero / QuickBooks exports + pure normalizers; no live API code |
 | `src/elt/pipeline.ts` | Chunked ELT pipeline (default 5,000 rows/chunk) with skip/report, heuristics, optional load sink |
