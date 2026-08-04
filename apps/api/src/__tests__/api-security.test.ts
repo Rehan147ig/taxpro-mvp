@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterAll } from 'vitest';
 import { Hono } from 'hono';
 import jwt from 'jsonwebtoken';
 import { authRoutes } from '../modules/auth/auth.routes.js';
@@ -6,6 +6,8 @@ import { provisionRoutes } from '../modules/provision/provision.routes.js';
 import { importRoutes } from '../modules/import/import.routes.js';
 import { mappingRoutes } from '../modules/mapping/mapping.routes.js';
 import { errorHandler } from '../lib/middleware/error-handler.js';
+import { authMaxAttempts } from '../lib/rate-limiter.js';
+import { apiMaxRequests } from '../lib/middleware/rate-limiter.js';
 import { env } from '../config/env.js';
 
 const app = new Hono();
@@ -177,6 +179,9 @@ describe('Phase 4.4 — Import routes security', () => {
 describe('Phase 4.5 — Rate Limiter (must be last — depletes quota)', () => {
 
   it('6th login attempt within window returns 429', async () => {
+    // Pin a strict budget: the shared .env sets NODE_ENV=development (loaded
+    // with override), which would otherwise grant the dev budget of 60.
+    process.env.AUTH_RATE_LIMIT_MAX = '5';
     const body = JSON.stringify({ email: 'demo@taxpro.ai', password: 'wrong' });
     const headers = { 'Content-Type': 'application/json' };
     let got429 = false;
@@ -191,6 +196,36 @@ describe('Phase 4.5 — Rate Limiter (must be last — depletes quota)', () => {
       expect([400, 401]).toContain(r.status);
     }
     expect(got429).toBe(true);
+  }, 30_000);
+
+  it('production keeps strict rate-limit defaults unless overridden', () => {
+    const savedAuth = process.env.AUTH_RATE_LIMIT_MAX;
+    const savedApi = process.env.API_RATE_LIMIT_MAX;
+    const savedNodeEnv = process.env.NODE_ENV;
+    try {
+      process.env.NODE_ENV = 'production';
+      delete process.env.AUTH_RATE_LIMIT_MAX;
+      delete process.env.API_RATE_LIMIT_MAX;
+      expect(authMaxAttempts()).toBe(5);
+      expect(apiMaxRequests()).toBe(100);
+      // Explicit production overrides are honoured.
+      process.env.AUTH_RATE_LIMIT_MAX = '3';
+      process.env.API_RATE_LIMIT_MAX = '50';
+      expect(authMaxAttempts()).toBe(3);
+      expect(apiMaxRequests()).toBe(50);
+    } finally {
+      process.env.NODE_ENV = savedNodeEnv ?? '';
+      if (savedAuth !== undefined) process.env.AUTH_RATE_LIMIT_MAX = savedAuth;
+      else delete process.env.AUTH_RATE_LIMIT_MAX;
+      if (savedApi !== undefined) process.env.API_RATE_LIMIT_MAX = savedApi;
+      else delete process.env.API_RATE_LIMIT_MAX;
+    }
+  });
+
+  afterAll(() => {
+    // Restore the dev-friendly budget used by the rest of the test suite.
+    process.env.AUTH_RATE_LIMIT_MAX = '100';
+    process.env.API_RATE_LIMIT_MAX = '500';
   });
 
 });

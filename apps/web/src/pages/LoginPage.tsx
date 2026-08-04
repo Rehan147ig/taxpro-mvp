@@ -43,8 +43,9 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div>
-            <label className="block text-xs font-medium text-[#0A192F] mb-1">Email Address</label>
+            <label htmlFor="email" className="block text-xs font-medium text-[#0A192F] mb-1">Email Address</label>
             <input
+              id="email"
               type="email"
               placeholder="name@company.com"
               value={email}
@@ -55,8 +56,9 @@ export default function LoginPage() {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-[#0A192F] mb-1">Password</label>
+            <label htmlFor="password" className="block text-xs font-medium text-[#0A192F] mb-1">Password</label>
             <input
+              id="password"
               type="password"
               placeholder="••••••••"
               value={password}

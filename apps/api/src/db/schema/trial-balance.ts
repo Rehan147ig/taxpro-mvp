@@ -2,6 +2,7 @@ import { pgTable, uuid, varchar, decimal, integer, date, timestamp } from 'drizz
 import { tenants } from './tenants.js';
 import { entities } from './entities.js';
 import { accounts } from './accounts.js';
+import { sourceDocuments } from './source-documents.js';
 
 export const trialBalance = pgTable('trial_balance', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -17,6 +18,7 @@ export const trialBalance = pgTable('trial_balance', {
   credit: decimal('credit', { precision: 18, scale: 2 }).default('0'),
   balance: decimal('balance', { precision: 18, scale: 2 }).default('0'),
   source: varchar('source', { length: 20 }).default('netsuite'),
+  sourceDocumentId: uuid('source_document_id').references(() => sourceDocuments.id, { onDelete: 'set null' }),
   createdAt: timestamp('created_at').defaultNow(),
 }, (table) => ({
   unq: {

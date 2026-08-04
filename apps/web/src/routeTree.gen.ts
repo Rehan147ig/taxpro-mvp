@@ -18,6 +18,7 @@ import { Route as PeriodsRouteImport } from './routes/periods'
 import { Route as ProvisionRouteImport } from './routes/provision'
 import { Route as ReviewRouteImport } from './routes/review'
 import { Route as ReviewItemsRouteImport } from './routes/review-items'
+import { Route as WorkbenchRouteImport } from './routes/workbench'
 import { Route as RunsRunIdRouteImport } from './routes/runs.$runId'
 import { Route as RunsRunIdIndexRouteImport } from './routes/runs.$runId.index'
 import { Route as RunsRunIdAuditRouteImport } from './routes/runs.$runId.audit'
@@ -69,6 +70,11 @@ const ReviewItemsRoute = ReviewItemsRouteImport.update({
   path: '/review-items',
   getParentRoute: () => rootRouteImport,
 } as any)
+const WorkbenchRoute = WorkbenchRouteImport.update({
+  id: '/workbench',
+  path: '/workbench',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RunsRunIdRoute = RunsRunIdRouteImport.update({
   id: '/runs/$runId',
   path: '/runs/$runId',
@@ -105,6 +111,7 @@ export interface FileRoutesByFullPath {
   '/provision': typeof ProvisionRoute
   '/review': typeof ReviewRoute
   '/review-items': typeof ReviewItemsRoute
+  '/workbench': typeof WorkbenchRoute
   '/runs/$runId': typeof RunsRunIdRouteWithChildren
   '/runs/$runId/audit': typeof RunsRunIdAuditRoute
   '/runs/$runId/export': typeof RunsRunIdExportRoute
@@ -121,6 +128,7 @@ export interface FileRoutesByTo {
   '/provision': typeof ProvisionRoute
   '/review': typeof ReviewRoute
   '/review-items': typeof ReviewItemsRoute
+  '/workbench': typeof WorkbenchRoute
   '/runs/$runId/audit': typeof RunsRunIdAuditRoute
   '/runs/$runId/export': typeof RunsRunIdExportRoute
   '/runs/$runId/findings': typeof RunsRunIdFindingsRoute
@@ -137,6 +145,7 @@ export interface FileRoutesById {
   '/provision': typeof ProvisionRoute
   '/review': typeof ReviewRoute
   '/review-items': typeof ReviewItemsRoute
+  '/workbench': typeof WorkbenchRoute
   '/runs/$runId': typeof RunsRunIdRouteWithChildren
   '/runs/$runId/audit': typeof RunsRunIdAuditRoute
   '/runs/$runId/export': typeof RunsRunIdExportRoute
@@ -155,6 +164,7 @@ export interface FileRouteTypes {
     | '/provision'
     | '/review'
     | '/review-items'
+    | '/workbench'
     | '/runs/$runId'
     | '/runs/$runId/audit'
     | '/runs/$runId/export'
@@ -171,6 +181,7 @@ export interface FileRouteTypes {
     | '/provision'
     | '/review'
     | '/review-items'
+    | '/workbench'
     | '/runs/$runId/audit'
     | '/runs/$runId/export'
     | '/runs/$runId/findings'
@@ -186,6 +197,7 @@ export interface FileRouteTypes {
     | '/provision'
     | '/review'
     | '/review-items'
+    | '/workbench'
     | '/runs/$runId'
     | '/runs/$runId/audit'
     | '/runs/$runId/export'
@@ -203,6 +215,7 @@ export interface RootRouteChildren {
   ProvisionRoute: typeof ProvisionRoute
   ReviewRoute: typeof ReviewRoute
   ReviewItemsRoute: typeof ReviewItemsRoute
+  WorkbenchRoute: typeof WorkbenchRoute
   RunsRunIdRoute: typeof RunsRunIdRouteWithChildren
 }
 
@@ -271,6 +284,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ReviewItemsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/workbench': {
+      id: '/workbench'
+      path: '/workbench'
+      fullPath: '/workbench'
+      preLoaderRoute: typeof WorkbenchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/runs/$runId': {
       id: '/runs/$runId'
       path: '/runs/$runId'
@@ -337,6 +357,7 @@ const rootRouteChildren: RootRouteChildren = {
   ProvisionRoute: ProvisionRoute,
   ReviewRoute: ReviewRoute,
   ReviewItemsRoute: ReviewItemsRoute,
+  WorkbenchRoute: WorkbenchRoute,
   RunsRunIdRoute: RunsRunIdRouteWithChildren,
 }
 export const routeTree = rootRouteImport

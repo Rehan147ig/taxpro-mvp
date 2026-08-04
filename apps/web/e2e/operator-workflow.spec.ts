@@ -18,18 +18,39 @@ test('operator workflow: provision -> review -> partner sign-off -> lock -> audi
   const testMonthText = String(testMonth).padStart(2, '0');
   const testPeriod = `${testYear}-${testMonthText}`;
   const testPeriodStart = `${testPeriod}-01`;
+
+  // The provision engine only runs over periods that have trial-balance rows,
+  // so seed a minimal chart for the fresh period via the import API (the
+  // generic import reads the period from the CSV rows; entity + accounts are
+  // upserted per tenant, keeping this rerunnable).
+  const adminToken = await page.evaluate(() => localStorage.getItem('taxpro_token'));
+  const importResp = await adminContext.request.post('/api/import/trial-balance', {
+    headers: { Authorization: `Bearer ${adminToken}` },
+    data: {
+      source: 'e2e',
+      csv: [
+        'entity,entityName,accountNumber,accountName,accountType,period,periodEnd,debit,credit,balance,currency',
+        `ACME-UK,Acme UK Ltd,4000,Sales revenue,Income,${testPeriodStart},${testPeriodStart},0,285000,285000,GBP`,
+        `ACME-UK,Acme UK Ltd,5200,Book depreciation - Fixed Asset,Expense,${testPeriodStart},${testPeriodStart},45000,0,-45000,GBP`,
+        `ACME-UK,Acme UK Ltd,9000,Consultancy fees,Expense,${testPeriodStart},${testPeriodStart},20000,0,-20000,GBP`,
+      ].join('\n'),
+    },
+  });
+  expect([200, 201]).toContain(importResp.status());
+
   const monthInput = page.locator('input[type="month"]').first();
   await monthInput.fill(testPeriod);
   await page.getByRole('button', { name: 'Run Provision' }).click();
-  await expect(page.getByText('Calculating...')).toBeVisible();
+  await expect(page.getByText('Calculating Math...')).toBeVisible();
 
-  await expect(page.getByRole('link', { name: 'Open in Review →' })).toBeVisible({ timeout: 150_000 });
-  const runIdFromUrl = await page.getByRole('link', { name: 'Open in Review →' }).getAttribute('href');
+  await expect(page.getByRole('link', { name: 'Open Audit Workspace →' })).toBeVisible({ timeout: 150_000 });
+  const runIdFromUrl = await page.getByRole('link', { name: 'Open Audit Workspace →' }).getAttribute('href');
   expect(runIdFromUrl).toMatch(/\/runs\//);
 
   // ── Run detail: resolve the deterministic review item ──
-  await page.getByRole('link', { name: 'Open in Review →' }).click();
-  await expect(page.getByRole('heading', { name: /Provision/ })).toBeVisible();
+  await page.getByRole('link', { name: 'Open Audit Workspace →' }).click();
+  await expect(page).toHaveURL(/\/runs\/\w+/);
+  await expect(page.getByRole('heading', { name: /Provision$/ }).first()).toBeVisible();
 
   // ── Verify review items are displayed (should have at least one) ──
   await expect(page.getByText(/missing depreciation metadata|Review AI mapping|Missing tax mapping/i).first()).toBeVisible({ timeout: 15_000 });
@@ -61,7 +82,7 @@ test('operator workflow: provision -> review -> partner sign-off -> lock -> audi
   const pPage = await partnerContext.newPage();
   await login(pPage, PARTNER_EMAIL);
 
-  await pPage.getByRole('link', { name: 'Review', exact: true }).click();
+  await pPage.getByRole('link', { name: 'Review Queue' }).click();
   const runRow = pPage.locator('tbody tr').filter({ hasText: testPeriodStart }).first();
   await runRow.click();
   await expect(pPage.getByRole('button', { name: 'Partner Sign-off' })).toBeVisible();
@@ -81,7 +102,6 @@ test('operator workflow: provision -> review -> partner sign-off -> lock -> audi
   await expect(page.locator('table select')).toHaveCount(0, { timeout: 15_000 });
 
   // ── Mutation after lock is rejected with 409 (API-level proof) ──
-  const adminToken = await page.evaluate(() => localStorage.getItem('taxpro_token'));
   const adminRequest = await adminContext.request;
   const authHeader = { Authorization: `Bearer ${adminToken}` };
   const runId = runIdFromUrl!.replace('/runs/', '');
@@ -108,7 +128,8 @@ test('operator workflow: provision -> review -> partner sign-off -> lock -> audi
 
   // Verify export page shows validation-ready language (not filing-ready)
   const exportPageText = await page.textContent('body');
-  expect(exportPageText).not.toMatch(/filing.ready|filing is ready|submit to HMRC/i);
+  expect(exportPageText).toContain('not filing-ready');
+  expect(exportPageText).not.toMatch(/filing is ready|submit to HMRC/i);
 
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Download Package (.zip)' }).click();
@@ -135,9 +156,9 @@ test('operator workflow: provision -> review -> partner sign-off -> lock -> audi
   expect(fileContent).toContain('review-items.csv');
   expect(fileContent).toContain('approval-trail.json');
 
-  // ── Dashboard shows provision run status ──
+  // ── Dashboard shows the provision workflow checklist ──
   await page.getByRole('link', { name: 'Dashboard' }).click();
-  await expect(page.getByText('2026-01-01').first()).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText('Provision Workflow Checklist')).toBeVisible({ timeout: 10_000 });
 
   await adminContext.close();
 });

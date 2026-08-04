@@ -27,6 +27,7 @@ import { periodRoutes } from './modules/periods/periods.routes.js';
 import { mappingProposalRoutes } from './modules/mapping/proposals.routes.js';
 import { ruleRoutes } from './modules/rules/rules.routes.js';
 import { reviewLifecycleRoutes } from './modules/review/review.routes.js';
+import { workbenchRoutes } from './modules/workbench/workbench.routes.js';
 import { logger } from './lib/logger.js';
 import { shutdownTelemetry } from './telemetry.js';
 
@@ -68,6 +69,7 @@ app.route('/api/periods', periodRoutes);
 app.route('/api/mappings', mappingProposalRoutes);
 app.route('/api/rules', ruleRoutes);
 app.route('/api/review-items', reviewLifecycleRoutes);
+app.route('/api/workbench', workbenchRoutes);
 app.route('/api/xero', xeroRoutes);
 // QuickBooks Online is a UK accounting-data source too: the connector is
 // always mounted. Sync defaults to a UK FRS 102 entity in GBP; only the

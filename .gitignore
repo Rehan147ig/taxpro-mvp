@@ -14,3 +14,7 @@ tsconfig.tsbuildinfo
 test-results/
 playwright-report/
 playwright/.cache/
+
+# Local-only overrides and generated artefacts (never committed)
+docker-compose.dev.yml
+apps/api/storage/

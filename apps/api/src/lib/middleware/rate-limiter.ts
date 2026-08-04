@@ -13,7 +13,13 @@ interface RateLimitEntry {
 }
 
 const WINDOW_MS = 60_000; // 1 minute
-const MAX_REQUESTS = 100;  // 100 requests per minute
+// 100 requests per minute in production. Development/CI runs (E2E suites,
+// seeded demo flows) legitimately exceed that budget, so dev defaults are
+// far higher unless overridden. Resolved lazily so test processes can pin
+// production bounds without reimports.
+export function apiMaxRequests() {
+  return Number(process.env.API_RATE_LIMIT_MAX ?? (process.env.NODE_ENV === 'development' ? 1000 : 100));
+}
 
 const store = new Map<string, RateLimitEntry>();
 
@@ -27,7 +33,7 @@ setInterval(() => {
 }, 300_000).unref();
 
 export async function rateLimiter(c: Context, next: Next) {
-  return createRateLimiter('api', MAX_REQUESTS, WINDOW_MS)(c, next);
+  return createRateLimiter('api', apiMaxRequests(), WINDOW_MS)(c, next);
 }
 
 export function createRateLimiter(scope: string, maxRequests: number, windowMs: number) {

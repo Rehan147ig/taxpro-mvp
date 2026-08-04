@@ -50,6 +50,7 @@ function Root() {
             <NavLink to="/documents">Documents</NavLink>
             <NavLink to="/mapping">Tax Mapping</NavLink>
             <NavLink to="/governance">Proposals & Rules</NavLink>
+            <NavLink to="/workbench">Workbench</NavLink>
             <NavLink to="/provision">Provision</NavLink>
             <Link
               to="/review"

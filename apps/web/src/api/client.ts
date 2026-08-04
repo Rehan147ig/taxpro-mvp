@@ -41,6 +41,24 @@ export async function apiClient<T>(
   return res.json();
 }
 
+// Like apiClient but returns the parsed body on any status (used where a
+// 4xx response is a legitimate result, e.g. gated workbench endpoints).
+export async function apiClientSafe<T>(
+  path: string,
+  options: RequestInit = {},
+): Promise<{ ok: boolean; status: number; body: T }> {
+  const token = getToken();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(options.headers as Record<string, string>),
+  };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const res = await fetch(`${BASE_URL}${path}`, { ...options, headers });
+  const body = await res.json().catch(() => null);
+  return { ok: res.ok, status: res.status, body };
+}
+
 async function textClient(path: string): Promise<string> {
   const token = getToken();
   const headers: Record<string, string> = {};
@@ -244,4 +262,32 @@ export const reviewItems = {
     apiClient<any>(`/review-items/${id}/waive`, { method: 'POST', body: JSON.stringify({ reason }) }),
   reopen: (id: string, reason: string) =>
     apiClient<any>(`/review-items/${id}/reopen`, { method: 'POST', body: JSON.stringify({ reason }) }),
+};
+
+// Phase C: UK tax-close workbench
+export const workbench = {
+  setup: () =>
+    apiClient<{
+      entities: any[];
+      accountingPeriods: any[];
+      taxPeriods: any[];
+      documents: any[];
+      recentRuns: any[];
+    }>('/workbench/setup'),
+  importTrialBalance: (payload: any) =>
+    apiClientSafe<{ jobId: string; replayed: boolean; status: string; result: any; error?: string }>('/workbench/import', {
+      method: 'POST', body: JSON.stringify(payload),
+    }),
+  run: (payload: any) =>
+    apiClientSafe<{ jobId: string; replayed: boolean; status: string; result: any; blocked?: boolean; blockers?: any[]; error?: string }>('/workbench/runs', {
+      method: 'POST', body: JSON.stringify(payload),
+    }),
+  view: (runId: string) => apiClient<any>(`/workbench/runs/${runId}`),
+  recalculate: (runId: string, idempotencyKey: string) =>
+    apiClientSafe<{ jobId: string; replayed: boolean; status: string; result: any; error?: string }>(`/workbench/runs/${runId}/recalculate`, {
+      method: 'POST', body: JSON.stringify({ idempotencyKey }),
+    }),
+  blockers: (runId: string) => apiClient<{ runId: string; isWorkbenchRun: boolean; blocked: boolean; blockers: any[] }>(
+    `/workbench/runs/${runId}/blockers`,
+  ),
 };

@@ -18,3 +18,4 @@ export { aiRuns, aiSteps } from './ai-runs.js';
 export { reviewItems } from './review-items.js';
 export { classificationPatterns } from './classification-patterns.js';
 export { provisionEvents } from './provision-events.js';
+export { workbenchJobs } from './workbench-jobs.js';

@@ -39,6 +39,7 @@ import { recordUsageEvent, pricePerProvision } from '../billing/usage.js';
 import { computeBookTaxDifferences, Decimal } from '@taxpro/tax-engine';
 import { recordProvisionEvent, getEventsForRun, EVENT_TYPES } from './provision-events.js';
 import { auditSensitiveOp } from './audit.js';
+import { assertWorkbenchApprovalGates } from '../workbench/guard.js';
 
 const INCOME_TYPES = new Set(['Income', 'Revenue', 'OtherIncome', 'Sales', 'ServiceRevenue']);
 const EXPENSE_TYPES = new Set(['Expense', 'COGS', 'OtherExpense', 'OperatingExpense', 'SG&A', 'CostOfSales']);
@@ -1407,6 +1408,8 @@ provisionRoutes.post('/runs/:runId/finalize',
             .where(and(eq(provisionRuns.id, runId), eq(provisionRuns.tenantId, user.tenantId))).limit(1);
           if (!run) throw new BadRequestError('Provision run not found');
 
+          await assertWorkbenchApprovalGates(tx, user.tenantId, run);
+
           const openItems = await tx.select().from(reviewItems)
             .where(and(eq(reviewItems.provisionRunId, runId), eq(reviewItems.status, 'open')));
           if (openItems.length > 0) throw new BadRequestError(`Cannot finalize: ${openItems.length} review item(s) still open`);
@@ -1529,6 +1532,8 @@ provisionRoutes.post('/runs/:runId/lock',
       if (run.approvalStatus !== 'approved') {
         throw new BadRequestError('Run must be approved by a partner before locking');
       }
+
+      await assertWorkbenchApprovalGates(tx, user.tenantId, run);
 
       const now = new Date();
       await tx.update(provisionRuns).set({
