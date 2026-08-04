@@ -197,11 +197,19 @@ async function main() {
   const entitiesToSeed = usEntity ? [ukEntity, usEntity] : [ukEntity];
 
   // ── Phase B domain model: entity group, periods, rules, proposals, documents, review items ──
-  const [ukGroup] = await db.insert(entityGroups).values({
-    tenantId: tenant.id,
-    name: 'Acme Group (UK)',
-    description: 'Demo UK group: Acme UK Ltd consolidated for corporation tax',
-  }).onConflictDoNothing().returning();
+  // Entity groups, mapping proposals and review items have no natural unique
+  // constraint, so idempotency is enforced by looking up existing rows first.
+  const [existingGroup] = await db.select({ id: entityGroups.id }).from(entityGroups)
+    .where(and(eq(entityGroups.tenantId, tenant.id), eq(entityGroups.name, 'Acme Group (UK)')))
+    .limit(1);
+
+  const [ukGroup] = existingGroup
+    ? [existingGroup]
+    : await db.insert(entityGroups).values({
+        tenantId: tenant.id,
+        name: 'Acme Group (UK)',
+        description: 'Demo UK group: Acme UK Ltd consolidated for corporation tax',
+      }).returning();
 
   if (ukGroup) {
     await db.update(entities).set({ groupId: ukGroup.id, updatedAt: new Date() })
@@ -323,6 +331,14 @@ async function main() {
   ] as const;
 
   for (const item of demoReviewItems) {
+    const [existingItem] = await db.select({ id: reviewItems.id }).from(reviewItems)
+      .where(and(
+        eq(reviewItems.tenantId, tenant.id),
+        eq(reviewItems.entityId, ukEntity.id),
+        eq(reviewItems.title, item.title),
+      ))
+      .limit(1);
+    if (existingItem) continue;
     await db.insert(reviewItems).values({
       tenantId: tenant.id,
       itemType: item.itemType,
@@ -445,19 +461,28 @@ async function main() {
     .limit(1);
 
   if (hostingAccount) {
-    await db.insert(mappingProposals).values({
-      tenantId: tenant.id,
-      entityId: ukEntity.id,
-      accountId: hostingAccount.id,
-      sourceAccountExternalId: hostingAccount.externalId,
-      sourceAccountName: 'Cloud infrastructure hosting',
-      targetTaxClassification: 'MANUAL_REVIEW',
-      bookTreatment: 'manual_review',
-      proposalSource: 'rules',
-      status: 'pending',
-      version: 1,
-      decisionReason: 'Cloud hosting is generally deductible; confirm 12-month VAT-adjusted cost split before approving.',
-    }).onConflictDoNothing();
+    const [existingProposal] = await db.select({ id: mappingProposals.id }).from(mappingProposals)
+      .where(and(
+        eq(mappingProposals.tenantId, tenant.id),
+        eq(mappingProposals.accountId, hostingAccount.id),
+        eq(mappingProposals.version, 1),
+      ))
+      .limit(1);
+    if (!existingProposal) {
+      await db.insert(mappingProposals).values({
+        tenantId: tenant.id,
+        entityId: ukEntity.id,
+        accountId: hostingAccount.id,
+        sourceAccountExternalId: hostingAccount.externalId,
+        sourceAccountName: 'Cloud infrastructure hosting',
+        targetTaxClassification: 'MANUAL_REVIEW',
+        bookTreatment: 'manual_review',
+        proposalSource: 'rules',
+        status: 'pending',
+        version: 1,
+        decisionReason: 'Cloud hosting is generally deductible; confirm 12-month VAT-adjusted cost split before approving.',
+      }).onConflictDoNothing();
+    }
   }
 
   console.log(`[Seed] Demo tenant ready: demo@taxpro.ai / TaxProDemo123! (partner: partner@taxpro.ai)`);
