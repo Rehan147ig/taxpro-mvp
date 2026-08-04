@@ -46,7 +46,10 @@ function Root() {
           <nav className="flex flex-col gap-1.5">
             <NavLink to="/">Dashboard</NavLink>
             <NavLink to="/connections">Data Sources</NavLink>
+            <NavLink to="/periods">Periods</NavLink>
+            <NavLink to="/documents">Documents</NavLink>
             <NavLink to="/mapping">Tax Mapping</NavLink>
+            <NavLink to="/governance">Proposals & Rules</NavLink>
             <NavLink to="/provision">Provision</NavLink>
             <Link
               to="/review"
@@ -58,6 +61,7 @@ function Root() {
             >
               Review Queue
             </Link>
+            <NavLink to="/review-items">Review Items</NavLink>
           </nav>
         </div>
 

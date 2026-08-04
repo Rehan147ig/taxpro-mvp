@@ -11,9 +11,13 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ConnectionsRouteImport } from './routes/connections'
+import { Route as DocumentsRouteImport } from './routes/documents'
+import { Route as GovernanceRouteImport } from './routes/governance'
 import { Route as MappingRouteImport } from './routes/mapping'
+import { Route as PeriodsRouteImport } from './routes/periods'
 import { Route as ProvisionRouteImport } from './routes/provision'
 import { Route as ReviewRouteImport } from './routes/review'
+import { Route as ReviewItemsRouteImport } from './routes/review-items'
 import { Route as RunsRunIdRouteImport } from './routes/runs.$runId'
 import { Route as RunsRunIdIndexRouteImport } from './routes/runs.$runId.index'
 import { Route as RunsRunIdAuditRouteImport } from './routes/runs.$runId.audit'
@@ -30,9 +34,24 @@ const ConnectionsRoute = ConnectionsRouteImport.update({
   path: '/connections',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DocumentsRoute = DocumentsRouteImport.update({
+  id: '/documents',
+  path: '/documents',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GovernanceRoute = GovernanceRouteImport.update({
+  id: '/governance',
+  path: '/governance',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MappingRoute = MappingRouteImport.update({
   id: '/mapping',
   path: '/mapping',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PeriodsRoute = PeriodsRouteImport.update({
+  id: '/periods',
+  path: '/periods',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProvisionRoute = ProvisionRouteImport.update({
@@ -43,6 +62,11 @@ const ProvisionRoute = ProvisionRouteImport.update({
 const ReviewRoute = ReviewRouteImport.update({
   id: '/review',
   path: '/review',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReviewItemsRoute = ReviewItemsRouteImport.update({
+  id: '/review-items',
+  path: '/review-items',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RunsRunIdRoute = RunsRunIdRouteImport.update({
@@ -74,9 +98,13 @@ const RunsRunIdFindingsRoute = RunsRunIdFindingsRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/connections': typeof ConnectionsRoute
+  '/documents': typeof DocumentsRoute
+  '/governance': typeof GovernanceRoute
   '/mapping': typeof MappingRoute
+  '/periods': typeof PeriodsRoute
   '/provision': typeof ProvisionRoute
   '/review': typeof ReviewRoute
+  '/review-items': typeof ReviewItemsRoute
   '/runs/$runId': typeof RunsRunIdRouteWithChildren
   '/runs/$runId/audit': typeof RunsRunIdAuditRoute
   '/runs/$runId/export': typeof RunsRunIdExportRoute
@@ -86,9 +114,13 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/connections': typeof ConnectionsRoute
+  '/documents': typeof DocumentsRoute
+  '/governance': typeof GovernanceRoute
   '/mapping': typeof MappingRoute
+  '/periods': typeof PeriodsRoute
   '/provision': typeof ProvisionRoute
   '/review': typeof ReviewRoute
+  '/review-items': typeof ReviewItemsRoute
   '/runs/$runId/audit': typeof RunsRunIdAuditRoute
   '/runs/$runId/export': typeof RunsRunIdExportRoute
   '/runs/$runId/findings': typeof RunsRunIdFindingsRoute
@@ -98,9 +130,13 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/connections': typeof ConnectionsRoute
+  '/documents': typeof DocumentsRoute
+  '/governance': typeof GovernanceRoute
   '/mapping': typeof MappingRoute
+  '/periods': typeof PeriodsRoute
   '/provision': typeof ProvisionRoute
   '/review': typeof ReviewRoute
+  '/review-items': typeof ReviewItemsRoute
   '/runs/$runId': typeof RunsRunIdRouteWithChildren
   '/runs/$runId/audit': typeof RunsRunIdAuditRoute
   '/runs/$runId/export': typeof RunsRunIdExportRoute
@@ -112,9 +148,13 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/connections'
+    | '/documents'
+    | '/governance'
     | '/mapping'
+    | '/periods'
     | '/provision'
     | '/review'
+    | '/review-items'
     | '/runs/$runId'
     | '/runs/$runId/audit'
     | '/runs/$runId/export'
@@ -124,9 +164,13 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/connections'
+    | '/documents'
+    | '/governance'
     | '/mapping'
+    | '/periods'
     | '/provision'
     | '/review'
+    | '/review-items'
     | '/runs/$runId/audit'
     | '/runs/$runId/export'
     | '/runs/$runId/findings'
@@ -135,9 +179,13 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/connections'
+    | '/documents'
+    | '/governance'
     | '/mapping'
+    | '/periods'
     | '/provision'
     | '/review'
+    | '/review-items'
     | '/runs/$runId'
     | '/runs/$runId/audit'
     | '/runs/$runId/export'
@@ -148,9 +196,13 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ConnectionsRoute: typeof ConnectionsRoute
+  DocumentsRoute: typeof DocumentsRoute
+  GovernanceRoute: typeof GovernanceRoute
   MappingRoute: typeof MappingRoute
+  PeriodsRoute: typeof PeriodsRoute
   ProvisionRoute: typeof ProvisionRoute
   ReviewRoute: typeof ReviewRoute
+  ReviewItemsRoute: typeof ReviewItemsRoute
   RunsRunIdRoute: typeof RunsRunIdRouteWithChildren
 }
 
@@ -170,11 +222,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ConnectionsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/documents': {
+      id: '/documents'
+      path: '/documents'
+      fullPath: '/documents'
+      preLoaderRoute: typeof DocumentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/governance': {
+      id: '/governance'
+      path: '/governance'
+      fullPath: '/governance'
+      preLoaderRoute: typeof GovernanceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/mapping': {
       id: '/mapping'
       path: '/mapping'
       fullPath: '/mapping'
       preLoaderRoute: typeof MappingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/periods': {
+      id: '/periods'
+      path: '/periods'
+      fullPath: '/periods'
+      preLoaderRoute: typeof PeriodsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/provision': {
@@ -189,6 +262,13 @@ declare module '@tanstack/react-router' {
       path: '/review'
       fullPath: '/review'
       preLoaderRoute: typeof ReviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/review-items': {
+      id: '/review-items'
+      path: '/review-items'
+      fullPath: '/review-items'
+      preLoaderRoute: typeof ReviewItemsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/runs/$runId': {
@@ -250,9 +330,13 @@ const RunsRunIdRouteWithChildren = RunsRunIdRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ConnectionsRoute: ConnectionsRoute,
+  DocumentsRoute: DocumentsRoute,
+  GovernanceRoute: GovernanceRoute,
   MappingRoute: MappingRoute,
+  PeriodsRoute: PeriodsRoute,
   ProvisionRoute: ProvisionRoute,
   ReviewRoute: ReviewRoute,
+  ReviewItemsRoute: ReviewItemsRoute,
   RunsRunIdRoute: RunsRunIdRouteWithChildren,
 }
 export const routeTree = rootRouteImport

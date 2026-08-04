@@ -164,3 +164,84 @@ export const provision = {
   events: (runId: string) =>
     apiClient<any[]>(`/provision/runs/${runId}/events`),
 };
+
+// Phase B: entity groups + accounting/tax periods
+export const periods = {
+  groups: () => apiClient<any[]>('/periods/groups'),
+  accounting: () => apiClient<any[]>('/periods/accounting'),
+  tax: () => apiClient<any[]>('/periods/tax'),
+  createGroup: (payload: { name: string; description?: string; parentGroupId?: string }) =>
+    apiClient<any>('/periods/groups', { method: 'POST', body: JSON.stringify(payload) }),
+  createAccounting: (payload: { entityId: string; name: string; startDate: string; endDate: string; periodType?: string }) =>
+    apiClient<any>('/periods/accounting', { method: 'POST', body: JSON.stringify(payload) }),
+  createTax: (payload: { entityId: string; accountingPeriodId?: string; startDate: string; endDate: string; status?: string }) =>
+    apiClient<any>('/periods/tax', { method: 'POST', body: JSON.stringify(payload) }),
+};
+
+// Phase B: source-document artefact store
+export const documents = {
+  list: () => apiClient<any[]>('/documents'),
+  upload: (file: File, documentType: string, entityId?: string) => {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('documentType', documentType);
+    if (entityId) form.append('entityId', entityId);
+    const token = getToken();
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    return fetch('/api/documents', { method: 'POST', body: form, headers }).then((res) => {
+      if (!res.ok) return res.json().then((b) => Promise.reject(new Error(b.error || `HTTP ${res.status}`)));
+      return res.json();
+    });
+  },
+  detail: (id: string) => apiClient<any>(`/documents/${id}`),
+  replace: (id: string, file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    const token = getToken();
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    return fetch(`/api/documents/${id}/replace`, { method: 'POST', body: form, headers }).then((res) => {
+      if (!res.ok) return res.json().then((b) => Promise.reject(new Error(b.error || `HTTP ${res.status}`)));
+      return res.json();
+    });
+  },
+  download: (id: string) => blobClient(`/documents/${id}/download`),
+};
+
+// Phase B: mapping proposals
+export const proposals = {
+  list: (status?: string) => apiClient<any[]>(`/mappings/proposals${status ? `?status=${status}` : ''}`),
+  create: (payload: any) => apiClient<any>('/mappings/proposals', { method: 'POST', body: JSON.stringify(payload) }),
+  decide: (id: string, payload: { decision: 'approved' | 'rejected'; reason: string }) =>
+    apiClient<any>(`/mappings/proposals/${id}/decide`, { method: 'POST', body: JSON.stringify(payload) }),
+  carryForward: (entityId: string) =>
+    apiClient<any>('/mappings/proposals/carry-forward', { method: 'POST', body: JSON.stringify({ entityId }) }),
+};
+
+// Phase B: UK rules registry
+export const rules = {
+  list: () => apiClient<any[]>('/rules'),
+  propose: (payload: any) => apiClient<any>('/rules/proposals', { method: 'POST', body: JSON.stringify(payload) }),
+  approve: (id: string) => apiClient<any>(`/rules/${id}/approve`, { method: 'POST' }),
+  rollback: (id: string, rationale: string) =>
+    apiClient<any>(`/rules/${id}/rollback`, { method: 'POST', body: JSON.stringify({ rationale }) }),
+  supersede: (id: string, payload: any) => apiClient<any>(`/rules/${id}/supersede`, { method: 'POST', body: JSON.stringify(payload) }),
+};
+
+// Phase B: review lifecycle
+export const reviewItems = {
+  list: (status?: string) => apiClient<any[]>(`/review-items${status ? `?status=${status}` : ''}`),
+  detail: (id: string) => apiClient<{ item: any; events: any[] }>(`/review-items/${id}`),
+  update: (id: string, payload: { ownerUserId?: string; dueDate?: string; evidenceRequested?: string }) =>
+    apiClient<any>(`/review-items/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
+  start: (id: string) => apiClient<any>(`/review-items/${id}/start`, { method: 'POST' }),
+  requestEvidence: (id: string, evidenceRequested: string) =>
+    apiClient<any>(`/review-items/${id}/request-evidence`, { method: 'POST', body: JSON.stringify({ evidenceRequested }) }),
+  attachEvidence: (id: string, documentId: string) =>
+    apiClient<any>(`/review-items/${id}/attach-evidence`, { method: 'POST', body: JSON.stringify({ documentId }) }),
+  waive: (id: string, reason: string) =>
+    apiClient<any>(`/review-items/${id}/waive`, { method: 'POST', body: JSON.stringify({ reason }) }),
+  reopen: (id: string, reason: string) =>
+    apiClient<any>(`/review-items/${id}/reopen`, { method: 'POST', body: JSON.stringify({ reason }) }),
+};
