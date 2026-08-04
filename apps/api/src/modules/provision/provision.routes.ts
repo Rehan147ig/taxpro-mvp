@@ -33,6 +33,7 @@ import { runTracedSubagent } from '../../eve/subagent-runner.js';
 import { withSpan } from '@superlog/otel-helpers';
 import { tracer, agentRunCounter, provisionRunCounter, reviewResolutionCounter, packageExportCounter } from '../../lib/observability.js';
 import { runProvisionMath, resolveJurisdiction } from './provision-calculator.js';
+import { enableUsWorkstream } from '../../config/features.js';
 import { recordUsageEvent, pricePerProvision } from '../billing/usage.js';
 import { computeBookTaxDifferences, Decimal } from '@taxpro/tax-engine';
 import { recordProvisionEvent, getEventsForRun, EVENT_TYPES } from './provision-events.js';
@@ -48,7 +49,7 @@ provisionRoutes.use('*', authMiddleware);
 provisionRoutes.get('/entities', async (c) => {
   const user = c.get('user');
   return withTenantContext(user.tenantId, async (tx) => {
-    const entityList = await tx.select({ id: entities.id, name: entities.name, type: entities.type })
+    const entityList = await tx.select({ id: entities.id, name: entities.name, type: entities.type, currency: entities.currency, taxJurisdiction: entities.taxJurisdiction })
       .from(entities).where(eq(entities.tenantId, user.tenantId));
     return c.json(entityList);
   });
@@ -626,6 +627,10 @@ provisionRoutes.get('/results/:id/ct600', async (c) => {
 });
 
 provisionRoutes.get('/results/:id/us-1120', async (c) => {
+  // US ASC 740 workstream is dormant by default (TAXPRO_ENABLE_US=false).
+  if (!enableUsWorkstream) {
+    throw new ForbiddenError('The US Form 1120 export is dormant. Enable the US workstream with TAXPRO_ENABLE_US=true.');
+  }
   const user = getUser(c);
   const format = c.req.query('format') === 'csv' ? 'csv' : 'json';
   return withTenantContext(user.tenantId, async (tx) => {

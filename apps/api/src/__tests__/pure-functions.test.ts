@@ -74,22 +74,16 @@ describe('resolveJurisdiction: exact known values', () => {
     expect(resolveJurisdiction('US_ASC740')).toBe(Jurisdiction.US_ASC740);
   });
 
-  it('defaults to US_ASC740 for null input', () => {
-    expect(resolveJurisdiction(null)).toBe(Jurisdiction.US_ASC740);
+  it('fails closed for null input (no silent US default)', () => {
+    expect(() => resolveJurisdiction(null)).toThrow(/no taxJurisdiction set/);
   });
 
-  it('defaults to US_ASC740 for undefined input', () => {
-    expect(resolveJurisdiction(undefined)).toBe(Jurisdiction.US_ASC740);
+  it('fails closed for undefined input (no silent US default)', () => {
+    expect(() => resolveJurisdiction(undefined)).toThrow(/no taxJurisdiction set/);
   });
 
-  it('warns and falls back to US_ASC740 for an unrecognized string', () => {
-    const warnSpy = vi.spyOn(logger, 'warn');
-    expect(resolveJurisdiction('UK')).toBe(Jurisdiction.US_ASC740);
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ taxJurisdiction: 'UK' }),
-      expect.stringContaining('Unrecognized taxJurisdiction string'),
-    );
-    warnSpy.mockRestore();
+  it('fails closed for an unrecognized string instead of guessing US', () => {
+    expect(() => resolveJurisdiction('UK')).toThrow(/Unrecognized taxJurisdiction 'UK'/);
   });
 
   it('does not warn for known values', () => {

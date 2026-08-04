@@ -4,6 +4,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { compress } from 'hono/compress';
 import { env } from './config/env.js';
+import { enableUsWorkstream } from './config/features.js';
 import { testConnection, closeDb, validateRuntimeRoleSecurity, logSecurityValidation } from './config/db.js';
 import { errorHandler } from './lib/middleware/error-handler.js';
 import { rateLimiter } from './lib/middleware/rate-limiter.js';
@@ -44,6 +45,9 @@ app.route('/api/health', healthRoutes);
 // Legacy health path (no auth, simple)
 app.get('/health', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }));
 
+// ── Feature flags (public: non-sensitive enablement switches) ──
+app.get('/api/config/flags', (c) => c.json({ enableUs: enableUsWorkstream }));
+
 // ── Routes ──
 app.route('/api/auth', authRoutes);
 app.route('/api/netsuite', netsuiteRoutes);
@@ -55,7 +59,11 @@ app.route('/api/demo', demoRoutes);
 app.route('/api/upload', uploadRoutes);
 app.route('/api/billing', billingRoutes);
 app.route('/api/xero', xeroRoutes);
-app.route('/api/qbo', qboRoutes);
+// QBO writes US-Federal trial-balance data — mounted only when the US
+// workstream is explicitly enabled (TAXPRO_ENABLE_US=true).
+if (enableUsWorkstream) {
+  app.route('/api/qbo', qboRoutes);
+}
 
 // ── Start ──
 async function main() {

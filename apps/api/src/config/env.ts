@@ -35,6 +35,9 @@ const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   // Run background workers in this process ('false' = dedicated worker process in production)
   RUN_WORKERS: z.enum(['true', 'false']).default('true'),
+  // US ASC 740 workstream is dormant by default (UK FRS 102 is the product).
+  // Set to 'true' only when actively developing/validating US features.
+  TAXPRO_ENABLE_US: z.enum(['true', 'false']).default('false'),
 });
 
 export const env = envSchema.parse(process.env);

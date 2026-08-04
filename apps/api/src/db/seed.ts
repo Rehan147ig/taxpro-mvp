@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
 import { migrationDb as db } from '../config/db.js';
+import { enableUsWorkstream } from '../config/features.js';
 import { tenants } from './schema/tenants.js';
 import { users } from './schema/users.js';
 import { entities } from './schema/entities.js';
@@ -10,11 +11,16 @@ import { trialBalance } from './schema/trial-balance.js';
 const DEMO_PERIOD = '2026-01-01';
 const DEMO_PERIOD_END = '2026-12-31';
 
+/**
+ * Demo chart of accounts. The default demo tenant is UK (FRS 102, GBP);
+ * when the US workstream is enabled (TAXPRO_ENABLE_US=true) the same chart is
+ * also seeded against a US entity so flag-based US development stays possible.
+ */
 const demoAccounts = [
   {
     externalId: '4000',
     accountNumber: '4000',
-    name: 'Subscription revenue',
+    name: 'Sales revenue',
     type: 'Income',
     detailType: 'Income',
     balance: '-4800000',
@@ -68,7 +74,7 @@ const demoAccounts = [
   {
     externalId: '5500',
     accountNumber: '5500',
-    name: 'Meals and entertainment',
+    name: 'Non-deductible entertaining',
     type: 'Expense',
     detailType: 'Expense',
     balance: '85000',
@@ -105,22 +111,27 @@ const demoAccounts = [
   },
 ] as const;
 
-async function main() {
-  const [tenant] = await db.insert(tenants).values({
-    name: 'Acme Demo Corp',
+async function seedTenant(tenantId: string | undefined, name: string) {
+  return db.insert(tenants).values({
+    ...(tenantId ? { id: tenantId } : {}),
+    name,
     slug: 'acme-demo',
-    taxRate: '0.21',
-    stateTaxRate: '0.05',
+    taxRate: '0.25',
+    stateTaxRate: '0',
     fiscalYearEnd: '2026-12-31',
   }).onConflictDoUpdate({
     target: tenants.slug,
     set: {
-      name: 'Acme Demo Corp',
-      taxRate: '0.21',
-      stateTaxRate: '0.05',
+      name,
+      taxRate: '0.25',
+      stateTaxRate: '0',
       updatedAt: new Date(),
     },
   }).returning();
+}
+
+async function main() {
+  const [tenant] = await seedTenant(undefined, 'Acme Demo Corp (UK)');
 
   const passwordHash = await bcrypt.hash('TaxProDemo123!', 12);
   await db.insert(users).values({
@@ -145,18 +156,37 @@ async function main() {
     set: { tenantId: tenant.id, passwordHash, role: 'admin' },
   });
 
-  const [entity] = await db.insert(entities).values({
+  const [ukEntity] = await db.insert(entities).values({
     tenantId: tenant.id,
-    externalId: 'ACME-US',
-    name: 'Acme US Inc.',
+    externalId: 'ACME-UK',
+    name: 'Acme UK Ltd',
     type: 'domestic',
-    currency: 'USD',
+    currency: 'GBP',
     isConsolidated: true,
-    taxJurisdiction: 'US-Federal',
+    taxJurisdiction: 'UK_FRS102',
   }).onConflictDoUpdate({
     target: [entities.tenantId, entities.externalId],
-    set: { name: 'Acme US Inc.', updatedAt: new Date() },
+    set: { name: 'Acme UK Ltd', taxJurisdiction: 'UK_FRS102', currency: 'GBP', updatedAt: new Date() },
   }).returning();
+
+  // The US entity is dormant by default: only seeded when TAXPRO_ENABLE_US=true
+  // (preserved as future optionality, never in the default demo tenant).
+  const [usEntity] = enableUsWorkstream
+    ? await db.insert(entities).values({
+        tenantId: tenant.id,
+        externalId: 'ACME-US',
+        name: 'Acme US Inc.',
+        type: 'domestic',
+        currency: 'USD',
+        isConsolidated: true,
+        taxJurisdiction: 'US-Federal',
+      }).onConflictDoUpdate({
+        target: [entities.tenantId, entities.externalId],
+        set: { name: 'Acme US Inc.', taxJurisdiction: 'US-Federal', currency: 'USD', updatedAt: new Date() },
+      }).returning()
+    : [null];
+
+  const entitiesToSeed = usEntity ? [ukEntity, usEntity] : [ukEntity];
 
   let accountCount = 0;
   for (const demoAccount of demoAccounts) {
@@ -181,22 +211,24 @@ async function main() {
 
     // Skip mapping for unmapped demo account (triggers missing_mapping review item)
     if (demoAccount.mapping === null) {
-      await db.insert(trialBalance).values({
-        tenantId: tenant.id,
-        entityId: entity.id,
-        accountId: account.id,
-        period: DEMO_PERIOD,
-        periodEnd: DEMO_PERIOD_END,
-        fiscalYear: 2026,
-        fiscalPeriod: 0,
-        debit: Number(demoAccount.balance) > 0 ? demoAccount.balance : '0',
-        credit: Number(demoAccount.balance) < 0 ? String(Math.abs(Number(demoAccount.balance))) : '0',
-        balance: demoAccount.balance,
-        source: 'demo',
-      }).onConflictDoUpdate({
-        target: [trialBalance.tenantId, trialBalance.entityId, trialBalance.accountId, trialBalance.period, trialBalance.source],
-        set: { balance: demoAccount.balance },
-      });
+      for (const entity of entitiesToSeed) {
+        await db.insert(trialBalance).values({
+          tenantId: tenant.id,
+          entityId: entity.id,
+          accountId: account.id,
+          period: DEMO_PERIOD,
+          periodEnd: DEMO_PERIOD_END,
+          fiscalYear: 2026,
+          fiscalPeriod: 0,
+          debit: Number(demoAccount.balance) > 0 ? demoAccount.balance : '0',
+          credit: Number(demoAccount.balance) < 0 ? String(Math.abs(Number(demoAccount.balance))) : '0',
+          balance: demoAccount.balance,
+          source: 'demo',
+        }).onConflictDoUpdate({
+          target: [trialBalance.tenantId, trialBalance.entityId, trialBalance.accountId, trialBalance.period, trialBalance.source],
+          set: { balance: demoAccount.balance },
+        });
+      }
       accountCount++;
       continue;
     }
@@ -229,31 +261,39 @@ async function main() {
       },
     });
 
-    await db.insert(trialBalance).values({
-      tenantId: tenant.id,
-      entityId: entity.id,
-      accountId: account.id,
-      period: DEMO_PERIOD,
-      periodEnd: DEMO_PERIOD_END,
-      fiscalYear: 2026,
-      fiscalPeriod: 0,
-      debit: Number(demoAccount.balance) > 0 ? demoAccount.balance : '0',
-      credit: Number(demoAccount.balance) < 0 ? String(Math.abs(Number(demoAccount.balance))) : '0',
-      balance: demoAccount.balance,
-      source: 'demo',
-    }).onConflictDoUpdate({
-      target: [trialBalance.tenantId, trialBalance.entityId, trialBalance.accountId, trialBalance.period, trialBalance.source],
-      set: {
+    for (const entity of entitiesToSeed) {
+      await db.insert(trialBalance).values({
+        tenantId: tenant.id,
+        entityId: entity.id,
+        accountId: account.id,
+        period: DEMO_PERIOD,
+        periodEnd: DEMO_PERIOD_END,
+        fiscalYear: 2026,
+        fiscalPeriod: 0,
         debit: Number(demoAccount.balance) > 0 ? demoAccount.balance : '0',
         credit: Number(demoAccount.balance) < 0 ? String(Math.abs(Number(demoAccount.balance))) : '0',
         balance: demoAccount.balance,
-      },
-    });
+        source: 'demo',
+      }).onConflictDoUpdate({
+        target: [trialBalance.tenantId, trialBalance.entityId, trialBalance.accountId, trialBalance.period, trialBalance.source],
+        set: {
+          debit: Number(demoAccount.balance) > 0 ? demoAccount.balance : '0',
+          credit: Number(demoAccount.balance) < 0 ? String(Math.abs(Number(demoAccount.balance))) : '0',
+          balance: demoAccount.balance,
+        },
+      });
+    }
 
     accountCount++;
   }
 
   console.log(`[Seed] Demo tenant ready: demo@taxpro.ai / TaxProDemo123! (partner: partner@taxpro.ai)`);
+  console.log(`[Seed] UK entity: ${ukEntity.externalId} (${ukEntity.name}, GBP, UK_FRS102)`);
+  if (usEntity) {
+    console.log(`[Seed] US entity (TAXPRO_ENABLE_US=true): ${usEntity.externalId} (${usEntity.name}, USD, US-Federal)`);
+  } else {
+    console.log(`[Seed] US entity dormant (set TAXPRO_ENABLE_US=true to seed it).`);
+  }
   console.log(`[Seed] Created ${accountCount} accounts and trial-balance rows for ${DEMO_PERIOD}.`);
 }
 

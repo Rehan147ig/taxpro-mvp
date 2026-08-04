@@ -1,6 +1,5 @@
 import Decimal from 'decimal.js';
 import { createEngine, Jurisdiction, etrAdjustmentsForMarginalRelief } from '@taxpro/tax-engine';
-import { logger } from '../../lib/logger.js';
 
 export interface ProvisionMathInput {
   bookIncome: number;
@@ -27,8 +26,7 @@ export interface ProvisionMathInput {
 /**
  * Exact set of persisted entity.taxJurisdiction values mapped to the engine
  * Jurisdiction enum. Values the app itself writes ('US-Federal', 'UK_FRS102')
- * are known; anything else is unrecognized and warns loudly instead of being
- * silently guessed.
+ * are known; anything else fails closed instead of being silently guessed.
  */
 const KNOWN_JURISDICTIONS: Record<string, Jurisdiction> = {
   UK_FRS102: Jurisdiction.UK_FRS102_S29,
@@ -38,13 +36,20 @@ const KNOWN_JURISDICTIONS: Record<string, Jurisdiction> = {
   US_ASC740: Jurisdiction.US_ASC740,
 };
 
-/** Map a persisted entity.taxJurisdiction string to the engine Jurisdiction enum. */
+/**
+ * Map a persisted entity.taxJurisdiction string to the engine Jurisdiction enum.
+ *
+ * Fails closed: a missing or unrecognized jurisdiction is an error, never a
+ * silent guess. The pre-UK-first behavior silently defaulted to US_ASC740,
+ * which could compute a provision under the wrong regime.
+ */
 export function resolveJurisdiction(taxJurisdiction?: string | null): Jurisdiction {
-  if (!taxJurisdiction) return Jurisdiction.US_ASC740;
+  if (!taxJurisdiction) {
+    throw new Error('Entity has no taxJurisdiction set — refusing to guess. Set taxJurisdiction (e.g. UK_FRS102, UK_FRS102_S29, US_ASC740) before running a provision.');
+  }
   const resolved = KNOWN_JURISDICTIONS[taxJurisdiction.trim()];
   if (resolved) return resolved;
-  logger.warn({ taxJurisdiction }, '[Jurisdiction] Unrecognized taxJurisdiction string, defaulting to US_ASC740');
-  return Jurisdiction.US_ASC740;
+  throw new Error(`Unrecognized taxJurisdiction '${taxJurisdiction}' — refusing to guess. Supported values: ${Object.keys(KNOWN_JURISDICTIONS).join(', ')}`);
 }
 
 export function runProvisionMath(input: ProvisionMathInput, jurisdiction: Jurisdiction = Jurisdiction.US_ASC740) {
