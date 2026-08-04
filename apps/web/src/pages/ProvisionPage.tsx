@@ -8,7 +8,7 @@ export default function ProvisionPage() {
   const [period, setPeriod] = useState('2024-01-01');
   const [endPeriod, setEndPeriod] = useState('');
   const [entityId, setEntityId] = useState('');
-  const [entities, setEntities] = useState<{ id: string; name: string; type: string }[]>([]);
+  const [entities, setEntities] = useState<{ id: string; name: string; type: string; currency: string | null; taxJurisdiction: string | null }[]>([]);
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState<'workpaper' | 'package' | null>(null);
   const [result, setResult] = useState<any>(null);
@@ -18,6 +18,10 @@ export default function ProvisionPage() {
   useEffect(() => {
     provApi.entities().then(setEntities).catch((err: any) => setEntitiesError(err.message || 'Failed to load entities'));
   }, []);
+
+  const selectedEntity = entities.find((e) => e.id === entityId) ?? null;
+  const isUsEntity = selectedEntity?.taxJurisdiction?.toUpperCase().startsWith('US') ?? false;
+  const currency = selectedEntity?.currency || 'GBP';
 
   const handleRun = async () => {
     setLoading(true);
@@ -36,7 +40,7 @@ export default function ProvisionPage() {
   };
 
   const fmt = (n: number) =>
-    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(n);
+    new Intl.NumberFormat(currency === 'GBP' ? 'en-GB' : 'en-US', { style: 'currency', currency, minimumFractionDigits: 0 }).format(n);
 
   const handleExport = async (type: 'workpaper' | 'package') => {
     if (!result?.id) return;
@@ -163,8 +167,10 @@ export default function ProvisionPage() {
               <div><span className="text-gray-500 font-medium">Pretax Book Income:</span> <span className="font-mono text-[#0A192F]">{fmt(result.currentTax.bookIncome)}</span></div>
               <div><span className="text-gray-500 font-medium">Permanent Differences:</span> <span className="font-mono text-[#0A192F]">{fmt(result.currentTax.totalPermanentAdjustments)}</span></div>
               <div><span className="text-gray-500 font-medium">Calculated Taxable Income:</span> <span className="font-mono text-[#0A192F]">{fmt(result.currentTax.taxableIncome)}</span></div>
-              <div><span className="text-gray-500 font-medium">Federal Tax (21% Rate):</span> <span className="font-mono text-[#0A192F]">{fmt(result.currentTax.federalTax)}</span></div>
-              <div><span className="text-gray-500 font-medium">State Income Tax:</span> <span className="font-mono text-[#0A192F]">{fmt(result.currentTax.stateTax)}</span></div>
+              <div><span className="text-gray-500 font-medium">{isUsEntity ? 'Federal Tax (21% Rate)' : 'Corporation Tax (25% main rate)'}:</span> <span className="font-mono text-[#0A192F]">{fmt(result.currentTax.federalTax)}</span></div>
+              {isUsEntity && (
+                <div><span className="text-gray-500 font-medium">State Income Tax:</span> <span className="font-mono text-[#0A192F]">{fmt(result.currentTax.stateTax)}</span></div>
+              )}
               <div><span className="text-gray-500 font-medium">Net Income Tax Payable:</span> <span className="font-mono text-[#0A192F] font-semibold">{fmt(result.currentTax.taxPayable)}</span></div>
             </div>
           </div>

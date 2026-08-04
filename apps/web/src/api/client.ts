@@ -115,7 +115,7 @@ export interface AiAgentRun {
 
 // Provision
 export const provision = {
-  entities: () => apiClient<{ id: string; name: string; type: string }[]>('/provision/entities'),
+  entities: () => apiClient<{ id: string; name: string; type: string; currency: string | null; taxJurisdiction: string | null }[]>('/provision/entities'),
   run: (payload: { period: string; endPeriod?: string; entityId?: string }) =>
     apiClient<any>('/provision/run', { method: 'POST', body: JSON.stringify(payload) }),
   results: () => apiClient<any[]>('/provision/results'),

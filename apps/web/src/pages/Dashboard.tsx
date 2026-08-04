@@ -1,8 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { provision, connections as connApi, mappings as mappingApi, apiClient } from '../api/client';
+import { useEnableUs } from '../lib/features';
+
+const gbp = (n: number) => new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', minimumFractionDigits: 0 }).format(n);
 
 export default function Dashboard() {
+  const enableUs = useEnableUs();
   const [stats, setStats] = useState({ connections: 0, mappings: 0, provisions: 0 });
   const [runStatus, setRunStatus] = useState({ needsReview: 0, awaitingApproval: 0, finalized: 0, locked: 0, total: 0 });
   const [loading, setLoading] = useState(true);
@@ -47,7 +51,7 @@ export default function Dashboard() {
     setSeedResult(null);
     try {
       const res = await apiClient<{ message: string; summary: { totalIncome: number; totalExpenses: number; pbt: number } }>('/demo/seed', { method: 'POST' });
-      setSeedResult(`Loaded! PBT: $${res.summary.pbt.toLocaleString()}. ${res.message}`);
+      setSeedResult(`Loaded! PBT: ${gbp(res.summary.pbt)}. ${res.message}`);
       loadStats();
     } catch (err: any) {
       setSeedError(err.message || 'Failed to load demo data');
@@ -57,7 +61,7 @@ export default function Dashboard() {
   }
 
   const cards = [
-    { label: 'NetSuite Connections', value: stats.connections, indicator: 'bg-[#3B82F6]' },
+    { label: 'ERP Connections', value: stats.connections, indicator: 'bg-[#3B82F6]' },
     { label: 'Accounts Mapped', value: stats.mappings, indicator: 'bg-[#10B981]' },
     { label: 'Provision Runs', value: stats.provisions, indicator: 'bg-[#8B5CF6]' },
   ];
@@ -74,7 +78,9 @@ export default function Dashboard() {
       <div className="flex items-center justify-between pb-2 border-b border-gray-200">
         <div>
           <h2 className="text-2xl font-serif font-semibold text-[#0A192F] tracking-tight">Executive Dashboard</h2>
-          <p className="text-xs text-gray-500 mt-1 font-sans">Multi-jurisdiction corporate tax provision overview</p>
+          <p className="text-xs text-gray-500 mt-1 font-sans">
+            {enableUs ? 'Multi-jurisdiction corporate tax provision overview' : 'UK FRS 102 corporate tax provision workbench'}
+          </p>
         </div>
         <button
           onClick={loadDemoData}
@@ -133,16 +139,16 @@ export default function Dashboard() {
         <h3 className="text-lg font-serif font-semibold text-[#0A192F] mb-4 tracking-tight">Provision Workflow Checklist</h3>
         <ol className="list-decimal list-inside text-xs text-gray-600 space-y-2.5">
           <li className={stats.connections > 0 ? 'line-through text-[#10B981] font-medium' : ''}>
-            Connect NetSuite ERP or upload trial balance CSV
+            Connect an ERP (NetSuite/Xero) or upload a trial balance CSV
           </li>
           <li className={stats.mappings > 0 ? 'line-through text-[#10B981] font-medium' : ''}>
-            Run AI Auto-Mapping and approve precedent classifications
+            Run AI auto-mapping and approve proposed classifications
           </li>
           <li className={stats.provisions > 0 ? 'line-through text-[#10B981] font-medium' : ''}>
-            Execute ASC 740 / FRS 102 tax engine calculation
+            Execute {enableUs ? 'ASC 740 / FRS 102' : 'UK FRS 102'} tax engine calculation
           </li>
           <li className={runStatus.locked > 0 ? 'line-through text-[#10B981] font-medium' : ''}>
-            Partner sign-off, lock provision run, and export Excel workpapers
+            Partner sign-off, lock provision run, and export workpapers
           </li>
         </ol>
       </div>
