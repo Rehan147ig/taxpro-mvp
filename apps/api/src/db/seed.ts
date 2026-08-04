@@ -4,9 +4,17 @@ import { enableUsWorkstream } from '../config/features.js';
 import { tenants } from './schema/tenants.js';
 import { users } from './schema/users.js';
 import { entities } from './schema/entities.js';
+import { entityGroups } from './schema/entity-groups.js';
+import { accountingPeriods } from './schema/accounting-periods.js';
+import { taxPeriods } from './schema/tax-periods.js';
+import { sourceDocuments } from './schema/source-documents.js';
 import { accounts } from './schema/accounts.js';
 import { taxMappings } from './schema/tax-mappings.js';
+import { mappingProposals } from './schema/mapping-proposals.js';
+import { ukRules } from './schema/uk-rules.js';
+import { reviewItems } from './schema/review-items.js';
 import { trialBalance } from './schema/trial-balance.js';
+import { and, eq } from 'drizzle-orm';
 
 const DEMO_PERIOD = '2026-01-01';
 const DEMO_PERIOD_END = '2026-12-31';
@@ -188,6 +196,169 @@ async function main() {
 
   const entitiesToSeed = usEntity ? [ukEntity, usEntity] : [ukEntity];
 
+  // ── Phase B domain model: entity group, periods, rules, proposals, documents, review items ──
+  const [ukGroup] = await db.insert(entityGroups).values({
+    tenantId: tenant.id,
+    name: 'Acme Group (UK)',
+    description: 'Demo UK group: Acme UK Ltd consolidated for corporation tax',
+  }).onConflictDoNothing().returning();
+
+  if (ukGroup) {
+    await db.update(entities).set({ groupId: ukGroup.id, updatedAt: new Date() })
+      .where(eq(entities.id, ukEntity.id));
+  }
+
+  const [ukAccountingPeriod] = await db.insert(accountingPeriods).values({
+    tenantId: tenant.id,
+    entityId: ukEntity.id,
+    name: 'FY2026 (12 months)',
+    startDate: '2026-01-01',
+    endDate: '2026-12-31',
+    periodType: 'annual',
+    status: 'open',
+  }).onConflictDoNothing().returning();
+
+  const [ukTaxPeriod] = await db.insert(taxPeriods).values({
+    tenantId: tenant.id,
+    entityId: ukEntity.id,
+    accountingPeriodId: ukAccountingPeriod?.id ?? null,
+    startDate: '2026-01-01',
+    endDate: '2026-12-31',
+    durationMonths: 12,
+    isStandardDuration: true,
+    status: 'open',
+  }).onConflictDoNothing().returning();
+
+  // Approved UK rules registry: what calculations must snapshot as "used".
+  // Demo entries only — real rules must come through the review/approval flow.
+  const demoRules = [
+    {
+      ruleKey: 'CTA2010_S10_PERIOD_STANDARD',
+      effectiveFrom: '2026-01-01',
+      sourceUrl: 'https://www.legislation.gov.uk/ukpga/2010/4/section/10',
+      testFixtureRef: 'uk-rules/period-standard.test.ts',
+      changeRationale: 'Corporation tax accounting periods: standard period is 12 months (CTA 2010 s.10)',
+    },
+    {
+      ruleKey: 'FRCFRS102_DEPRECIATION_TEMPORARY',
+      effectiveFrom: '2026-01-01',
+      sourceUrl: 'https://www.frc.org.uk',
+      testFixtureRef: 'uk-rules/depreciation-temporary.test.ts',
+      changeRationale: 'FRS 102 depreciation gives a temporary book/tax difference; deferred tax applies',
+    },
+    {
+      ruleKey: 'CTA2009_ENTERTAINING_PERMANENT',
+      effectiveFrom: '2026-01-01',
+      sourceUrl: 'https://www.legislation.gov.uk/ukpga/2009/4',
+      testFixtureRef: 'uk-rules/entertaining-permanent.test.ts',
+      changeRationale: 'Business entertaining disallowed: permanent difference for ETR reconciliation',
+    },
+  ] as const;
+
+  for (const rule of demoRules) {
+    await db.insert(ukRules).values({
+      tenantId: tenant.id,
+      ruleKey: rule.ruleKey,
+      jurisdiction: 'UK_FRS102',
+      effectiveFrom: rule.effectiveFrom,
+      sourceUrl: rule.sourceUrl,
+      sourceSnapshotHash: 'demo-2026-01-01',
+      author: 'TaxPro Demo Seed',
+      approvalState: 'approved',
+      version: 1,
+      testFixtureRef: rule.testFixtureRef,
+      changeRationale: rule.changeRationale,
+      approvedAt: new Date(),
+    }).onConflictDoUpdate({
+      target: [ukRules.tenantId, ukRules.ruleKey, ukRules.version],
+      set: { approvalState: 'approved', updatedAt: new Date() },
+    });
+  }
+
+  // Pending mapping proposal (carry-forward style) to exercise the
+  // proposal → human-decision flow without a live run.
+  const [hostingAccount] = await db.select({ id: accounts.id, externalId: accounts.externalId })
+    .from(accounts)
+    .where(and(eq(accounts.tenantId, tenant.id), eq(accounts.externalId, '5800')))
+    .limit(1);
+
+  if (hostingAccount) {
+    await db.insert(mappingProposals).values({
+      tenantId: tenant.id,
+      entityId: ukEntity.id,
+      accountId: hostingAccount.id,
+      sourceAccountExternalId: hostingAccount.externalId,
+      sourceAccountName: 'Cloud infrastructure hosting',
+      targetTaxClassification: 'MANUAL_REVIEW',
+      bookTreatment: 'manual_review',
+      proposalSource: 'rules',
+      status: 'pending',
+      version: 1,
+      decisionReason: 'Cloud hosting is generally deductible; confirm 12-month VAT-adjusted cost split before approving.',
+    }).onConflictDoNothing();
+  }
+
+  // Demo source-document metadata (artefact store). No real bytes are
+  // written; the storage key documents provenance for the demo tenant.
+  if (ukTaxPeriod) {
+    await db.insert(sourceDocuments).values({
+      tenantId: tenant.id,
+      entityId: ukEntity.id,
+      accountingPeriodId: ukAccountingPeriod?.id ?? null,
+      taxPeriodId: ukTaxPeriod.id,
+      documentType: 'trial_balance',
+      filename: 'acme-uk-fy2026-trial-balance.csv',
+      mimeType: 'text/csv',
+      sizeBytes: 12345,
+      storageKey: `demo://${tenant.id}/trial_balance/acme-uk-fy2026.csv`,
+      sha256: '0000000000000000000000000000000000000000000000000000000000000000',
+      provenance: 'demo_seed',
+      extractionStatus: 'not_required',
+      version: 1,
+      isCurrent: true,
+      uploadedByUserId: undefined,
+    }).onConflictDoNothing();
+  }
+
+  // Demo review items on the entity (no provision run yet) — evidence flow,
+  // owner assignment and waiver are all demonstrable from the UI.
+  const demoReviewItems = [
+    {
+      itemType: 'low_confidence_mapping',
+      severity: 'medium',
+      status: 'open',
+      title: 'Software subscription costs mapping needs review',
+      description: 'Low-confidence AI mapping on account 5700 (TEMP_DEFERRED_REVENUE). Confirm it is not a fixed asset.',
+      entityId: ukEntity.id,
+      sourceRef: 'account:5700',
+      evidenceRequested: 'Supplier contract or invoice for the software subscription.',
+    },
+    {
+      itemType: 'missing_mapping',
+      severity: 'high',
+      status: 'open',
+      title: 'Cloud infrastructure hosting has no mapping',
+      description: 'Account 5800 has no tax mapping. Classify to proceed with the provision.',
+      entityId: ukEntity.id,
+      sourceRef: 'account:5800',
+      evidenceRequested: '12-month hosting invoice breakdown (VAT, term).',
+    },
+  ] as const;
+
+  for (const item of demoReviewItems) {
+    await db.insert(reviewItems).values({
+      tenantId: tenant.id,
+      itemType: item.itemType,
+      severity: item.severity,
+      status: item.status,
+      title: item.title,
+      description: item.description,
+      entityId: item.entityId,
+      sourceRef: item.sourceRef,
+      evidenceRequested: item.evidenceRequested,
+    }).onConflictDoNothing();
+  }
+
   let accountCount = 0;
   for (const demoAccount of demoAccounts) {
     const [account] = await db.insert(accounts).values({
@@ -295,6 +466,7 @@ async function main() {
     console.log(`[Seed] US entity dormant (set TAXPRO_ENABLE_US=true to seed it).`);
   }
   console.log(`[Seed] Created ${accountCount} accounts and trial-balance rows for ${DEMO_PERIOD}.`);
+  console.log(`[Seed] Phase B domain: entity group, FY2026 accounting/tax periods, 3 approved UK rules, 1 mapping proposal, 1 trial-balance doc, 2 review items.`);
 }
 
 main().catch((err) => {
