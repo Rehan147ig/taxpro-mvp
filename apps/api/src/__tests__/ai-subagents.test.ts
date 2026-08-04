@@ -190,15 +190,23 @@ describe('AI subagent lifecycle (Phase 3)', () => {
   it('times out hanging subagents and records the timeout state', async () => {
     __modelState.mode = 'hang';
 
-    await expect(runTracedSubagent(undefined, {
-      tenantId: TENANT_ID,
-      provisionRunId: RUN_ID,
-      workflowName: 'subagent_hang',
-      promptVersion: 'v1',
-      timeoutMs: 100,
-      input: { tenantId: TENANT_ID, tenantName: 'AI Subagent Test', accounts: [] },
-      execute: (input) => runMappingAgent(input),
-    })).rejects.toBeInstanceOf(SubagentTimeoutError);
+    let caught: unknown;
+    await withTenantContext(TENANT_ID, async (tx) => {
+      try {
+        await runTracedSubagent(tx, {
+          tenantId: TENANT_ID,
+          provisionRunId: RUN_ID,
+          workflowName: 'subagent_hang',
+          promptVersion: 'v1',
+          timeoutMs: 100,
+          input: { tenantId: TENANT_ID, tenantName: 'AI Subagent Test', accounts: [] },
+          execute: (input) => runMappingAgent(input),
+        });
+      } catch (err) {
+        caught = err;
+      }
+    });
+    expect(caught).toBeInstanceOf(SubagentTimeoutError);
 
     const runs = await withTenantContext(TENANT_ID, async (tx) =>
       tx.select().from(aiRuns).where(and(
@@ -212,14 +220,22 @@ describe('AI subagent lifecycle (Phase 3)', () => {
   });
 
   it('marks a run failed when execute throws and logs the failure event', async () => {
-    await expect(runTracedSubagent(undefined, {
-      tenantId: TENANT_ID,
-      provisionRunId: RUN_ID,
-      workflowName: 'subagent_throwing',
-      promptVersion: 'v1',
-      input: {},
-      execute: async () => { throw new Error('boom'); },
-    })).rejects.toThrow('boom');
+    let caught: unknown;
+    await withTenantContext(TENANT_ID, async (tx) => {
+      try {
+        await runTracedSubagent(tx, {
+          tenantId: TENANT_ID,
+          provisionRunId: RUN_ID,
+          workflowName: 'subagent_throwing',
+          promptVersion: 'v1',
+          input: {},
+          execute: async () => { throw new Error('boom'); },
+        });
+      } catch (err) {
+        caught = err;
+      }
+    });
+    expect((caught as Error).message).toBe('boom');
 
     const runs = await withTenantContext(TENANT_ID, async (tx) =>
       tx.select().from(aiRuns).where(and(

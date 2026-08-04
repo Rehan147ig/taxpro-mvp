@@ -275,29 +275,6 @@ async function main() {
     });
   }
 
-  // Pending mapping proposal (carry-forward style) to exercise the
-  // proposal → human-decision flow without a live run.
-  const [hostingAccount] = await db.select({ id: accounts.id, externalId: accounts.externalId })
-    .from(accounts)
-    .where(and(eq(accounts.tenantId, tenant.id), eq(accounts.externalId, '5800')))
-    .limit(1);
-
-  if (hostingAccount) {
-    await db.insert(mappingProposals).values({
-      tenantId: tenant.id,
-      entityId: ukEntity.id,
-      accountId: hostingAccount.id,
-      sourceAccountExternalId: hostingAccount.externalId,
-      sourceAccountName: 'Cloud infrastructure hosting',
-      targetTaxClassification: 'MANUAL_REVIEW',
-      bookTreatment: 'manual_review',
-      proposalSource: 'rules',
-      status: 'pending',
-      version: 1,
-      decisionReason: 'Cloud hosting is generally deductible; confirm 12-month VAT-adjusted cost split before approving.',
-    }).onConflictDoNothing();
-  }
-
   // Demo source-document metadata (artefact store). No real bytes are
   // written; the storage key documents provenance for the demo tenant.
   if (ukTaxPeriod) {
@@ -456,6 +433,31 @@ async function main() {
     }
 
     accountCount++;
+  }
+
+  // Pending mapping proposal (carry-forward style) to exercise the
+  // proposal → human-decision flow without a live run. Runs after the
+  // account loop so account 5800 exists; the target classification is
+  // MANUAL_REVIEW so approval of this proposal must be a human decision.
+  const [hostingAccount] = await db.select({ id: accounts.id, externalId: accounts.externalId })
+    .from(accounts)
+    .where(and(eq(accounts.tenantId, tenant.id), eq(accounts.externalId, '5800')))
+    .limit(1);
+
+  if (hostingAccount) {
+    await db.insert(mappingProposals).values({
+      tenantId: tenant.id,
+      entityId: ukEntity.id,
+      accountId: hostingAccount.id,
+      sourceAccountExternalId: hostingAccount.externalId,
+      sourceAccountName: 'Cloud infrastructure hosting',
+      targetTaxClassification: 'MANUAL_REVIEW',
+      bookTreatment: 'manual_review',
+      proposalSource: 'rules',
+      status: 'pending',
+      version: 1,
+      decisionReason: 'Cloud hosting is generally deductible; confirm 12-month VAT-adjusted cost split before approving.',
+    }).onConflictDoNothing();
   }
 
   console.log(`[Seed] Demo tenant ready: demo@taxpro.ai / TaxProDemo123! (partner: partner@taxpro.ai)`);

@@ -76,9 +76,12 @@ describe('Phase 3.1 — RLS Tenant Isolation', () => {
   });
 
   it('requireRunAccess rejects cross-tenant access', async () => {
+    // Under the NOBYPASSRLS runtime role the cross-tenant run is hidden
+    // before the middleware check runs, so access is denied fail-closed
+    // (NotFound) — the middleware's own tenant check is a second layer.
     await expect(
       requireRunAccess(RUN_A, TENANT_B),
-    ).rejects.toThrow('Cross-tenant');
+    ).rejects.toThrow(/Cross-tenant|not found|NotFound/i);
   });
 
   it('assertRunIsMutable passes for draft run of correct tenant', async () => {

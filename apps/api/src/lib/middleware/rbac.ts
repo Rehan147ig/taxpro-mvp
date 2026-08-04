@@ -1,6 +1,6 @@
 import { Context, Next } from 'hono';
 import { and, eq } from 'drizzle-orm';
-import { db } from '../../config/db.js';
+import { withTenantContext } from '../../config/db.js';
 import { provisionRuns } from '../../db/schema/provision-runs.js';
 import { UnauthorizedError, ForbiddenError, NotFoundError, ConflictError } from '../errors.js';
 import { JwtPayload } from './auth.js';
@@ -45,8 +45,22 @@ export function requireMinimumRole(minRole: Role) {
 }
 
 export async function requireRunAccess(runId: string, tenantId: string, tx?: any, forUpdate = false): Promise<{ status: string; approvalStatus: string }> {
-  const d = tx ?? db;
-  let query = d.select({
+  // Without a caller-supplied tenant-scoped transaction, run inside our own
+  // tenant context: the runtime role (NOBYPASSRLS) would otherwise see zero
+  // rows because RLS fails closed when app.tenant_id is not set.
+  if (!tx) {
+    return withTenantContext(tenantId, async (ctx) => {
+      const [run] = await ctx.select({
+        status: provisionRuns.status,
+        approvalStatus: provisionRuns.approvalStatus,
+        tenantId: provisionRuns.tenantId,
+      }).from(provisionRuns).where(eq(provisionRuns.id, runId)).limit(1);
+      if (!run) throw new NotFoundError('Provision run', runId);
+      if (run.tenantId !== tenantId) throw new ForbiddenError('Cross-tenant access denied');
+      return run;
+    });
+  }
+  let query = tx.select({
     status: provisionRuns.status,
     approvalStatus: provisionRuns.approvalStatus,
     tenantId: provisionRuns.tenantId,

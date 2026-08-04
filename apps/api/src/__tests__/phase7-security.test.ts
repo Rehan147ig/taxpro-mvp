@@ -2,7 +2,6 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { pool, withTenantContext } from '../config/db.js';
 import { provisionRuns } from '../db/schema/provision-runs.js';
-import { provisionEvents } from '../db/schema/provision-events.js';
 import { tenants } from '../db/schema/tenants.js';
 import { assertPartnerCanApprove, assertRunIsMutable } from '../lib/middleware/rbac.js';
 import { assertRuntimeDbRole, dbUserFromUrl, isSuperuserLikelyUser } from '../config/db-role-guard.js';
@@ -109,8 +108,9 @@ describe('Phase 7 — locked-run mutation rejection (endpoint semantics)', () =>
       }).onConflictDoNothing();
     });
     await expect(assertRunIsMutable(runId, TENANT_A)).rejects.toThrow(/locked/);
+    // provision_events is append-only for the runtime role; deleting the run
+    // cascades to its events (ON DELETE CASCADE), so no event cleanup here.
     await withTenantContext(TENANT_A, async (tx) => {
-      await tx.delete(provisionEvents).where(eq(provisionEvents.provisionRunId, runId));
       await tx.delete(provisionRuns).where(eq(provisionRuns.id, runId));
     });
   });
