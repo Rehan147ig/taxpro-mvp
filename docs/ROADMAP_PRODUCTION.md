@@ -2,6 +2,8 @@
 
 Launch checklist. Items are ordered; each must be verified by the gates in Phase 11 before go-live.
 
+> **Product reset (2026-08-04):** TaxPro is now a **UK-first product**. Phases 1–11 below document the engineering baseline that remains in force (all ticked). The UK pilot path is defined separately in §"UK Pilot Roadmap (Phase A–E)" and in `docs/UK_PRODUCT_ARCHITECTURE.md`. US workstream items below are preserved as dormant optionality (`TAXPRO_ENABLE_US=false`).
+
 ## Status Legend
 
 - [ ] Not started
@@ -132,3 +134,17 @@ Final report: files changed, tests run, pass/fail, remaining risks, go-to-market
 3. Deterministic engine remains the source of truth for official amounts.
 4. Human approval is mandatory before locked/final outputs.
 5. Do not remove existing user work unless verified unused and obsolete.
+6. The US ASC 740 workstream stays dormant behind `TAXPRO_ENABLE_US=false` — hidden from default UX, onboarding and demo data; preserved and tested, never deleted.
+7. No direct HMRC filing; CT600/iXBRL output is a filing-ready handoff only (see `docs/UK_NON_GOALS.md`).
+
+---
+
+## UK Pilot Roadmap (Phase A–E, from the UK-first delivery plan)
+
+| Phase | Scope | Status |
+|---|---|---|
+| **A — Product reset & safety** | UK architecture + gap report (`docs/UK_PRODUCT_ARCHITECTURE.md`); `TAXPRO_ENABLE_US` flag hiding US from all default UX; README/roadmap/readiness language; UK coverage matrix (`docs/UK_COVERAGE_MATRIX.md`); non-goals (`docs/UK_NON_GOALS.md`); jurisdiction resolution fails closed | **2026-08-04 — shipped** |
+| **B — Domain & data model** | entity/group/period/source-document/mapping/evidence/review-item/approval/tax-memory models; migrations + RLS; API contracts + tests | next |
+| **C — UK tax-close workbench** | wire UK deterministic engine end-to-end in UI/API; import → mapping review → calculate → exceptions → workpapers → approve/lock; source/rule/assumption explainability | next |
+| **D — Filing-ready handoff** | validated package exports, immutable manifests, external-filing reference recording (no HMRC submission) | next |
+| **E — Pilot readiness** | synthetic UK demo tenant; firm + direct-company E2E journeys; onboarding runbook; security boundaries; known limitations | next |

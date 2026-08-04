@@ -1,4 +1,24 @@
-# TaxPro Enterprise — Comprehensive Knowledge Transfer (KT) for AI & Systems Engineers
+# TaxPro — Comprehensive Knowledge Transfer (KT) for AI & Systems Engineers
+
+---
+
+## 0. UK-First Product Reset (2026-08-04) — READ THIS FIRST
+
+TaxPro is a **UK-first product**: controlled, reviewer-approved **UK FRS 102
+(Section 29) corporation-tax provisions** and filing-ready evidence.
+
+- **Default surface:** UK FRS 102 engine (default demo tenant Acme UK Ltd,
+  GBP), UK exports (CT600, iXBRL, CTO XML, MTD readiness, R&D), Companies
+  House import, Xero (UK).
+- **US ASC 740 is dormant, not deleted:** gated by `TAXPRO_ENABLE_US=false`
+  (`apps/api/src/config/features.ts`) — QBO routes unmounted, US 1120 export
+  403, US seed entity skipped, US UI labels hidden, `resolveJurisdiction`
+  fails closed (no silent US default). Enable only for US feature work.
+- **Docs:** `docs/UK_PRODUCT_ARCHITECTURE.md` (architecture + gap report),
+  `docs/UK_COVERAGE_MATRIX.md` (coverage contract),
+  `docs/UK_NON_GOALS.md` (no HMRC filing / no VAT MTD).
+- **Honesty bar unchanged:** not production-ready or filing-ready until
+  external tax-professional review, security review and real pilot validation.
 
 ---
 

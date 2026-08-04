@@ -1,14 +1,14 @@
-# TaxPro — Multi-Jurisdiction Tax Provision Outcome-as-a-Service
+# TaxPro — UK FRS 102 Tax Provision Operating System
 
 **TypeScript | Hono.js | React 19 | TanStack Router | Turborepo | PostgreSQL RLS | BullMQ | Playwright E2E | Direct OpenAI-compatible AI client**
 
-TaxPro turns financial trial balance data into review-ready corporate tax provisions, audit support narratives, and locked governance packages across US (ASC 740) and UK (FRS 102 Section 29) tax regimes.
+TaxPro turns accounting data and prior tax workpapers into controlled, reviewer-approved **UK FRS 102 (Section 29) corporate tax provisions** and filing-ready evidence — for accounting firms, SME finance teams and mid-market groups.
 
-TaxPro is an **Outcome-as-a-Service (OaaS)**, not an AI SaaS dashboard:
+> **Positioning:** not autonomous tax filing, not generic AI chat, not a generic tax engine, not a CT600 form filler. **AI prepares and explains; deterministic rules calculate; qualified humans approve and lock.**
 
-> **AI drafts and explains, deterministic math calculates, human CPAs approve and lock.**
+**Product decision (2026-08-04):** TaxPro is a **UK-first product**. The US ASC 740 workstream is preserved in full (code, tests, evals) but **dormant by default** — feature-flagged off (`TAXPRO_ENABLE_US=false`), hidden from default navigation, onboarding and demo data, and gated at the API. See `docs/UK_PRODUCT_ARCHITECTURE.md`, `docs/UK_COVERAGE_MATRIX.md` and `docs/UK_NON_GOALS.md`.
 
-**Official website:** [taxpro.ploy.build](https://taxpro.ploy.build/) — product overview, benchmark evidence (15/20 US, 9/9 UK, AI mapping), governance model, and pilot request. Open-source repository: this repo.
+**Official website:** [taxpro.ploy.build](https://taxpro.ploy.build/) — product overview, benchmark evidence (UK 9/9 FRS 102 filings), governance model, and pilot request. Open-source repository: this repo.
 
 ---
 
@@ -87,12 +87,12 @@ The product rests on one non-negotiable division of labor:
 
 | Area | What's included |
 |---|---|
-| **Tax engine** | ASC 740 (US) and FRS 102 Section 29 (UK) in one package: current tax, deferred tax, ETR reconciliation walk, book-tax difference computation (incl. MACRS depreciation with placed-in-service metadata), journal entries, marginal relief (UK), deterministic across runs |
+| **Tax engine** | **UK FRS 102 Section 29 (default)** and ASC 740 (US, dormant behind `TAXPRO_ENABLE_US=true`) in one package: current tax, deferred tax, ETR reconciliation walk, book-tax difference computation, journal entries, marginal relief (UK), deterministic across runs |
 | **Provision pipeline** | Eve agent analysis (`analyzeProvision`) with deterministic fallback; direct mode for deterministic-only runs; review-item generation (missing mappings, low-confidence AI mappings, missing depreciation metadata) |
 | **Subagents** | Mapping agent (functional classification + tax treatment), audit-defense (ETR walk memos + risk flags), credit-miner (R&D/energy credit extraction) — all traced, all fallback-safe |
 | **Compliance exports** | CT600 (box layout + fixtures vs HMRC guidance), iXBRL (instance + inline docs), CTO XML (GovTalk-style), MTD readiness, R&D claim package, Excel workbook, **ZIP package** with manifest + SHA-256 integrity |
 | **Governance** | Partner approval workflow, run locking, append-only audit events, role-based access (admin/partner/reviewer/preparer/auditor/client_readonly), tenant isolation at RLS level |
-| **Integrations** | NetSuite (OAuth, sandbox default), Xero, QuickBooks (QBO), Companies House import, CSV/Excel trial-balance upload |
+| **Integrations** | NetSuite (OAuth, sandbox default), Xero (UK), QuickBooks (QBO — dormant behind `TAXPRO_ENABLE_US=true`), Companies House import, CSV/Excel trial-balance upload |
 | **Operator UI** | Dashboard, Connections, Mapping, Provision, Review Queue, Run Detail, AI Findings, Audit Events, Export Package — all code-split, Playwright-covered |
 | **Observability** | OpenTelemetry (traces, metrics, logs via OTLP), structured pino logs, AI run/step traces, usage billing events |
 
@@ -131,7 +131,7 @@ AI_MODEL=gpt-4o-mini
 
 - **US ASC 740**: 21% federal rate, state tax rates, permanent/temporary differences, valuation-allowance inputs, MACRS depreciation classes with per-account placed-in-service resolution (trial-balance date → asset age → account date → flagged review item instead of a silent first-year assumption), NOL utilization, tax credits, estimated payments, ETR reconciliation.
 - **UK FRS 102 Section 29**: main rate / small profits rate / **marginal relief** (blended 23.52% transition rate — validated against the Tiny Rebel fixture, a genuine marginal-relief filing), no MACRS concepts, debtors/provisions presentation.
-- **Jurisdiction isolation**: `createEngine(jurisdiction)` is a factory; each jurisdiction has its own frozen rate tables. `resolveJurisdiction()` maps persisted strings (`UK_FRS102`, `UK_FRS102_S29`, `US-Federal`, `US_ASC740`, `US`) to the engine enum with **exact matching only** — unrecognized strings log a warning and default to US instead of being silently guessed by substring matching.
+- **Jurisdiction isolation**: `createEngine(jurisdiction)` is a factory; each jurisdiction has its own frozen rate tables. `resolveJurisdiction()` maps persisted strings (`UK_FRS102`, `UK_FRS102_S29`, `US-Federal`, `US_ASC740`, `US`) to the engine enum with **exact matching only** — a missing or unrecognized jurisdiction **fails closed with an error** instead of silently guessing a regime (previously it warned and defaulted to US).
 - **Determinism guarantees**: identical inputs → identical outputs, verified by repeated-run tests and the byte-identical package export test.
 - **118 unit tests** covering precision ($10B × 21%), current/deferred tax, ETR walk, rollforward, journal entries, depreciation metadata, marginal relief, and engine-freeze guards.
 
@@ -235,11 +235,14 @@ taxpro/
 ├── docker-compose.yml         # PostgreSQL 16 + Redis for local development
 ├── Dockerfile                 # production API image
 ├── docs/
+│   ├── UK_PRODUCT_ARCHITECTURE.md      # UK-first product architecture + gap report
+│   ├── UK_COVERAGE_MATRIX.md           # explicit UK coverage contract
+│   ├── UK_NON_GOALS.md                 # non-goals: no HMRC filing, no VAT MTD, US dormant
 │   ├── AI_EVAL.md             # eval modes + multi-agent harness contract
 │   ├── PRODUCTION_READINESS_REPORT.md   # current gates, numbers, gaps
 │   ├── PUBLIC_DATA_VALIDATION.md        # benchmark methodology (honesty contract)
 │   ├── STATE_RULE_REFRESH.md  # agentic US state rule-refresh loop (source → capture → extract → verify → diff → approve → apply → CI gate)
-│   └── ROADMAP_PRODUCTION.md  # launch checklist (Phases 1–11)
+│   └── ROADMAP_PRODUCTION.md  # launch checklist (Phases 1–11) + UK pilot phases
 ├── apps/
 │   ├── api/                   # Hono.js REST API + background workers
 │   │   ├── src/
@@ -284,8 +287,11 @@ taxpro/
 | Billing | `/api/billing` | usage events, per-provision pricing |
 | Integrations | `/api/netsuite`, `/api/xero`, `/api/qbo` | OAuth connections, sync orchestrators |
 | Demo | `/api/demo` | demo tenant data |
+| Config | `/api/config/flags` | feature flags (`enableUs` — US workstream dormant unless `TAXPRO_ENABLE_US=true`) |
 
 **RBAC roles:** `admin` > `partner` > `reviewer` > `preparer` > `auditor` > `client_readonly`. Read-only roles may only export approved/locked results; mutations require preparer+.
+
+**US dormancy:** `/api/qbo` is unmounted and `/api/provision/results/:id/us-1120` returns 403 unless `TAXPRO_ENABLE_US=true`.
 
 ---
 
@@ -320,6 +326,8 @@ npm run dev
 
 Demo credentials: `demo@taxpro.ai` / `TaxProDemo123!` (admin role; seed also creates `partner@taxpro.ai`).
 
+The default seed creates a **UK FRS 102 demo tenant** (Acme UK Ltd, GBP). Set `TAXPRO_ENABLE_US=true` in `.env` before seeding to also create the dormant US entity.
+
 **Production DB setup:** run `scripts/bootstrap-roles.sql` as superuser to create `taxpro_migrations` (schema owner) and `taxpro_app` (runtime, NOBYPASSRLS), then point `DATABASE_URL` at `taxpro_app` and `DATABASE_URL_MIGRATIONS` at `taxpro_migrations`. In production the API refuses to start if `DATABASE_URL` uses a superuser role.
 
 ---
@@ -353,6 +361,7 @@ Demo credentials: `demo@taxpro.ai` / `TaxProDemo123!` (admin role; seed also cre
 | `AGENT_HARNESS_FIXTURE_LIMIT` | no | all | bound harness fixtures |
 | `AGENT_HARNESS_TREND_FILE` | no | default path | trend log override |
 | `EVE_MODEL_TIMEOUT_MS` | no | `60000` | per-attempt model timeout |
+| `TAXPRO_ENABLE_US` | no | `false` | enable the dormant US ASC 740 workstream (QBO, US 1120 export, US seed entity, US UI labels) |
 | `TAXPRO_TEST_MODE` | no | unset | integration-test safety guard (hard-fails against production DBs) |
 
 ---
@@ -426,8 +435,9 @@ Every push/PR to `master` runs four GitHub Actions workflows (`.github/workflows
 
 **Verification complete — build verified, benchmark harnesses green, integration E2E green, deployment hardening verified. NOT filing-ready.**
 
-- UK FRS 102 engine validated against 9 curated real filings (0–5 bp ETR deltas).
-- US ASC 740 engine validated against a subset of public filings; coverage expansion in progress.
+- **UK-first product reset (2026-08-04):** UK FRS 102 is the default product surface; the US ASC 740 workstream is dormant behind `TAXPRO_ENABLE_US=false` (API-gated, hidden from default UX and seed). UK architecture, coverage matrix and non-goals: `docs/UK_PRODUCT_ARCHITECTURE.md`, `docs/UK_COVERAGE_MATRIX.md`, `docs/UK_NON_GOALS.md`.
+- UK FRS 102 engine validated against 9 curated real filings (0–5 bp ETR deltas, mean 1.3 bp).
+- US ASC 740 engine validated against a subset of public filings; dormant, preserved as future optionality.
 - Complete operator UI (Dashboard, Review Queue, Run Detail, AI Findings, Audit Events, Export Package) covered by Playwright E2E; partner approval flow and worker split shipped.
 - Compliance export package (CT600, iXBRL, MTD, CTO XML, R&D claim) includes review items, AI traces, approval trail, source hashes and a manifest — reproducible byte-identical from immutable run data. Structures are **validation-ready**, **not** HMRC/Companies House filing-ready. No claim of filing readiness is made until a real validator is integrated and tested.
 - External CPA review and a formal security audit are required before general availability.
@@ -438,9 +448,10 @@ Every push/PR to `master` runs four GitHub Actions workflows (`.github/workflows
 ## Known Gaps
 
 **Would block production go-live:**
-- External CPA review of engine outputs (required, not yet performed).
+- External tax-professional (CPA) review of engine outputs (required, not yet performed).
 - Formal security audit (required, not yet performed).
 - Compliance exports are structure generators — no HMRC/Companies House validator integrated.
+- Real pilot validation of the UK workflow (required before any production/filing-ready claim).
 
 **Must fix before major release:**
 - US EDGAR eval coverage: 5/20 filings skipped (CLX, HSY, BRO, TYL, NUE) — all tie-gate/filer-data gaps, root-caused in `docs/EDGAR_SKIP_GAP_REPORT.md`; 15/20 validated, 0 FAIL.

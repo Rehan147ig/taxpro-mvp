@@ -1,5 +1,10 @@
 # TaxPro Knowledge Index
 
+## UK-First Product (2026-08-04)
+- [[docs/UK_PRODUCT_ARCHITECTURE]] — UK-first architecture, target structure decisions, gap report
+- [[docs/UK_COVERAGE_MATRIX]] — explicit UK coverage contract (supported / partial / manual-review / out of scope)
+- [[docs/UK_NON_GOALS]] — scope contract: no HMRC filing, no VAT MTD, US ASC 740 dormant (`TAXPRO_ENABLE_US=false`)
+
 ## Project Overview
 - [[README]] — Product overview, YC thesis, quick start, architecture
 - [[TAXPRO_KT]] — Comprehensive knowledge transfer for AI engineers

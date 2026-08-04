@@ -1,10 +1,12 @@
 # TaxPro — Production Readiness Report
 
 **Status:** Verification complete — build verified, benchmark harnesses green, integration E2E green, deployment hardening verified. NOT filing-ready.
-**Date:** 2026-08-01 (re-verified 2026-08-02 and 2026-08-03)
+**Date:** 2026-08-01 (re-verified 2026-08-02 and 2026-08-03; UK-first product reset 2026-08-04)
 **Branch:** master
 **Test Suite:** 479 tests passing (118 tax-engine + 272 API + 89 tax-engine-enterprise), 0 failures
 **E2E Pipeline:** Playwright 4/4 (3 auth + full operator workflow with review items, AI findings, ZIP content verification, export language check); API integration flow 27/27 (in-process Hono + live Postgres, covers import → mapping → provision → AI trace polling → review → pre-lock export → submit → partner sign-off → lock → 409 → post-lock comprehensive package → audit → mapping audit → tenant isolation across 6 resources)
+
+> **Product reset (2026-08-04):** TaxPro is a **UK-first product** (FRS 102 Section 29). The US ASC 740 workstream is preserved in full but **dormant by default** (`TAXPRO_ENABLE_US=false`): QBO routes unmounted, US 1120 export returns 403, default seed is a UK tenant, US UI labels hidden, and jurisdiction resolution now fails closed instead of silently defaulting to US. All US code and tests remain intact and passing; nothing is deleted. UK architecture/gap report: `docs/UK_PRODUCT_ARCHITECTURE.md`; coverage contract: `docs/UK_COVERAGE_MATRIX.md`; scope contract: `docs/UK_NON_GOALS.md`. This report's US benchmark rows (EDGAR 15/20, state rates 51/51) remain valid evidence for the dormant US workstream, **not** claims about the UK product.
 
 ---
 
