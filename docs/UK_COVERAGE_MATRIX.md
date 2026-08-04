@@ -3,7 +3,7 @@
 **Status:** explicit coverage contract — nothing in this file is implied beyond
 what is listed. Unsupported cases become review items, never silent engine
 output.
-**Date:** 2026-08-04
+**Date:** 2026-08-04 (updated for Phase B — domain model, artefact store, proposals, review lifecycle, rule registry)
 
 Legend:
 - **✅ Supported** — deterministic engine or validated export covers it, tested.
@@ -63,6 +63,7 @@ Legend:
 | Temporary: depreciation, bad-debt reserve, deferred revenue, other | ✅ |
 | Permanent: meals/entertaining (50%), penalties & fines, other non-deductible | ✅ (US-derived labels reused; UK amounts are reviewer-verified via mapping review) |
 | Mixed-purpose / dual-purpose costs | 🟠 manual review |
+| Unsupported classification (outside controlled taxonomy) | 🟠 Phase B — `validateUkClassification` → `MANUAL_REVIEW` review item |
 
 ## 6. Filing Handoff
 
@@ -83,21 +84,26 @@ Legend:
 | CSV/XLSX trial-balance import + validation | ✅ |
 | Xero connector (UK, GBP) | ✅ real OAuth |
 | NetSuite connector | ✅ generic ERP (also UK-usable) |
-| QuickBooks Online connector | ✅ code, **dormant** (US; `TAXPRO_ENABLE_US=true`) |
+| QuickBooks Online connector | ✅ real OAuth — **UK data source** (defaults: `UK_FRS102`, GBP) since Phase A follow-up; US-specific sync params only with `TAXPRO_ENABLE_US=true` |
 | Companies House import | ✅ |
-| Prior-year CT600/computation/loss/PDF artefact store | ❌ Phase B |
-| Object storage abstraction | ❌ Phase B |
+| Entity groups / consolidated entity model | ✅ Phase B (`entity_groups`, `entities.group_id`) |
+| Accounting periods + tax periods (CTA 2010 s.10) | ✅ Phase B — 3–12 months standard; non-standard flagged → review item, never silent |
+| Prior-year CT600/computation/loss/PDF artefact store | ✅ Phase B — `source_documents` metadata (SHA-256, provenance, versioning, `is_current`) |
+| Object storage abstraction | ✅ Phase B — local backend (`TAXPRO_STORAGE_BACKEND=local`), interface ready for S3-class backends |
 
 ## 8. Governance
 
 | Item | Status |
 |---|---|
-| Review queue + resolution | ✅ (severity/owner/due-date/evidence-request: Phase B) |
+| Review queue + resolution | ✅ (severity/owner/due-date/evidence-request/waiver: Phase B) |
+| Review lifecycle (open → in_progress → waiting_for_evidence → resolved; waiver human-only + reason + append-only audit) | ✅ Phase B |
 | Maker-checker + partner sign-off | ✅ |
 | Locked-run immutability (409) | ✅ |
 | Evidence manifest hashes | ✅ |
-| Rule store with effective dates/source/approval/rollback | ❌ Phase B |
-| Tax Memory (prior-year positions as proposals) | ❌ Phase C/D |
+| Mapping proposals (AI/rules/import may propose; humans decide; prior-year carry-forward as proposals only) | ✅ Phase B |
+| Controlled UK taxonomy (unsupported → `MANUAL_REVIEW`) | ✅ Phase B (`uk-taxonomy.ts`, 12 classes) |
+| Rule store with effective dates/source/snapshot/approval/rollback; runs record `rules_used` | ✅ Phase B (`uk_rules`, `provision_runs.rules_used`) |
+| Tax Memory (prior-year positions as proposals) | 🟡 carry-forward proposals live (Phase B); broader positions library Phase C/D |
 | External filing reference recording | ❌ Phase D |
 
 ---

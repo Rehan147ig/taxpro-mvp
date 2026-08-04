@@ -6,7 +6,7 @@ TaxPro turns accounting data and prior tax workpapers into controlled, reviewer-
 
 > **Positioning:** not autonomous tax filing, not generic AI chat, not a generic tax engine, not a CT600 form filler. **AI prepares and explains; deterministic rules calculate; qualified humans approve and lock.**
 
-**Product decision (2026-08-04):** TaxPro is a **UK-first product**. The US ASC 740 workstream is preserved in full (code, tests, evals) but **dormant by default** — feature-flagged off (`TAXPRO_ENABLE_US=false`), hidden from default navigation, onboarding and demo data, and gated at the API. See `docs/UK_PRODUCT_ARCHITECTURE.md`, `docs/UK_COVERAGE_MATRIX.md` and `docs/UK_NON_GOALS.md`.
+**Product decision (2026-08-04):** TaxPro is a **UK-first product**. The US ASC 740 workstream is preserved in full (code, tests, evals) but **dormant by default** — feature-flagged off (`TAXPRO_ENABLE_US=false`), hidden from default navigation, onboarding and demo data, and gated at the API. UK phases A (product reset & safety) and B (domain model & data foundations: entity groups, accounting/tax periods, source-document artefact store, mapping proposals with human decisions, UK rules registry, review lifecycle with waiver) shipped 2026-08-04. See `docs/UK_PRODUCT_ARCHITECTURE.md`, `docs/UK_COVERAGE_MATRIX.md` and `docs/UK_NON_GOALS.md`.
 
 **Official website:** [taxpro.ploy.build](https://taxpro.ploy.build/) — product overview, benchmark evidence (UK 9/9 FRS 102 filings), governance model, and pilot request. Open-source repository: this repo.
 
@@ -92,7 +92,7 @@ The product rests on one non-negotiable division of labor:
 | **Subagents** | Mapping agent (functional classification + tax treatment), audit-defense (ETR walk memos + risk flags), credit-miner (R&D/energy credit extraction) — all traced, all fallback-safe |
 | **Compliance exports** | CT600 (box layout + fixtures vs HMRC guidance), iXBRL (instance + inline docs), CTO XML (GovTalk-style), MTD readiness, R&D claim package, Excel workbook, **ZIP package** with manifest + SHA-256 integrity |
 | **Governance** | Partner approval workflow, run locking, append-only audit events, role-based access (admin/partner/reviewer/preparer/auditor/client_readonly), tenant isolation at RLS level |
-| **Integrations** | NetSuite (OAuth, sandbox default), Xero (UK), QuickBooks (QBO — dormant behind `TAXPRO_ENABLE_US=true`), Companies House import, CSV/Excel trial-balance upload |
+| **Integrations** | NetSuite (OAuth, sandbox default), Xero (UK), QuickBooks (QBO — UK data source with `UK_FRS102`/GBP sync defaults), Companies House import, CSV/Excel trial-balance upload |
 | **Operator UI** | Dashboard, Connections, Mapping, Provision, Review Queue, Run Detail, AI Findings, Audit Events, Export Package — all code-split, Playwright-covered |
 | **Observability** | OpenTelemetry (traces, metrics, logs via OTLP), structured pino logs, AI run/step traces, usage billing events |
 
@@ -285,13 +285,18 @@ taxpro/
 | Agent | `/api/agent` | parse, map, pipeline (BullMQ job with jurisdiction enum) |
 | Upload | `/api/upload` | CSV/Excel trial balance upload |
 | Billing | `/api/billing` | usage events, per-provision pricing |
-| Integrations | `/api/netsuite`, `/api/xero`, `/api/qbo` | OAuth connections, sync orchestrators |
+| Integrations | `/api/netsuite`, `/api/xero`, `/api/qbo` | OAuth connections, sync orchestrators (QBO sync defaults to `UK_FRS102` + GBP) |
+| Periods | `/api/periods` | entity groups, accounting periods, tax periods (CTA 2010 s.10 validation; non-standard → review) |
+| Documents | `/api/documents` | source-document artefact store (SHA-256, provenance, versioned, immutable originals) |
+| Mappings (Phase B) | `/api/mappings/proposals` | mapping proposals — AI/rules/import/carry-forward propose; humans decide; carry-forward never applies silently |
+| Rules | `/api/rules` | UK rule registry — proposals, partner/admin approval, supersede/rollback, `rules_used` snapshots on runs |
+| Review Items | `/api/review-items` | review lifecycle — status machine, evidence request/attach, human-only waiver, append-only history |
 | Demo | `/api/demo` | demo tenant data |
 | Config | `/api/config/flags` | feature flags (`enableUs` — US workstream dormant unless `TAXPRO_ENABLE_US=true`) |
 
 **RBAC roles:** `admin` > `partner` > `reviewer` > `preparer` > `auditor` > `client_readonly`. Read-only roles may only export approved/locked results; mutations require preparer+.
 
-**US dormancy:** `/api/qbo` is unmounted and `/api/provision/results/:id/us-1120` returns 403 unless `TAXPRO_ENABLE_US=true`.
+**US dormancy:** `/api/provision/results/:id/us-1120` returns 403 and QBO sync rejects US-specific parameters unless `TAXPRO_ENABLE_US=true` (the QBO connector itself stays mounted — it is a UK data source).
 
 ---
 
@@ -299,7 +304,7 @@ taxpro/
 
 React 19 + TanStack Router SPA (operator workflows only, no marketing pages):
 
-- **Pages:** Dashboard, Connections, Mapping, Provision, Review Queue, Run Detail, AI Findings (subagent trace polling), Audit Events, Export Package.
+- **Pages:** Dashboard, Connections, Periods, Documents, Tax Mapping, Proposals & Rules, Provision, Review Queue, Review Items, Run Detail, AI Findings (subagent trace polling), Audit Events, Export Package.
 - **States handled:** loading, empty, error, locked, needs review, awaiting partner approval, finalized.
 - **Performance:** route-level code splitting via `lazyRouteComponent` (fixes > 500 kB bundle warning).
 - **E2E:** Playwright 4/4 — auth ×3 + full operator workflow (provision → review items display → AI findings page → partner sign-off → lock → 409 → audit → ZIP content verification → export language check → dashboard status).
@@ -326,7 +331,7 @@ npm run dev
 
 Demo credentials: `demo@taxpro.ai` / `TaxProDemo123!` (admin role; seed also creates `partner@taxpro.ai`).
 
-The default seed creates a **UK FRS 102 demo tenant** (Acme UK Ltd, GBP). Set `TAXPRO_ENABLE_US=true` in `.env` before seeding to also create the dormant US entity.
+The default seed creates a **UK FRS 102 demo tenant** (Acme UK Ltd, GBP) with Phase B domain data: an entity group, FY2026 accounting/tax periods, 3 approved UK rules, a pending mapping proposal, trial-balance document metadata and 2 open review items. Set `TAXPRO_ENABLE_US=true` in `.env` before seeding to also create the dormant US entity.
 
 **Production DB setup:** run `scripts/bootstrap-roles.sql` as superuser to create `taxpro_migrations` (schema owner) and `taxpro_app` (runtime, NOBYPASSRLS), then point `DATABASE_URL` at `taxpro_app` and `DATABASE_URL_MIGRATIONS` at `taxpro_migrations`. In production the API refuses to start if `DATABASE_URL` uses a superuser role.
 
@@ -361,7 +366,9 @@ The default seed creates a **UK FRS 102 demo tenant** (Acme UK Ltd, GBP). Set `T
 | `AGENT_HARNESS_FIXTURE_LIMIT` | no | all | bound harness fixtures |
 | `AGENT_HARNESS_TREND_FILE` | no | default path | trend log override |
 | `EVE_MODEL_TIMEOUT_MS` | no | `60000` | per-attempt model timeout |
-| `TAXPRO_ENABLE_US` | no | `false` | enable the dormant US ASC 740 workstream (QBO, US 1120 export, US seed entity, US UI labels) |
+| `TAXPRO_ENABLE_US` | no | `false` | enable the dormant US ASC 740 workstream (US-specific QBO sync params, US 1120 export, US seed entity, US UI labels) |
+| `TAXPRO_STORAGE_BACKEND` | no | `local` | source-document artefact storage backend (`local`; S3-class backends plug into the `StorageBackend` interface) |
+| `TAXPRO_STORAGE_DIR` | no | `./storage` | local artefact-store directory |
 | `TAXPRO_TEST_MODE` | no | unset | integration-test safety guard (hard-fails against production DBs) |
 
 ---

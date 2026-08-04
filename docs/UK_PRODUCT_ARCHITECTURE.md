@@ -1,7 +1,7 @@
 # TaxPro — UK Product Architecture
 
-**Status:** UK-first product boundary — Phase A (product reset and safety)
-**Date:** 2026-08-04
+**Status:** UK-first product boundary — Phase A (product reset and safety) + Phase B (domain model and data foundations)
+**Date:** 2026-08-04 (Phase B shipped)
 **Branch:** master
 
 TaxPro is a **UK-only, AI-native direct-tax operating system**. The initial
@@ -130,11 +130,12 @@ Legend: ✅ exists & wired · ⚠️ exists but partial/misleading/unwired · �
 | Need | Status | Notes |
 |---|---|---|
 | Entity / TB import | ✅ | CSV import (`/api/import`), Xero connector (UK, GBP), Companies House import |
-| Entity & period model | ⚠️ | `entities` + `trial_balance` exist; no first-class **accounting period / tax period** entity; periods are strings on TB rows |
-| Prior-year artefact import (CT600, computations, loss schedules, PDFs) | ❌ | Upload route exists for TB parsing (Interfaze); no artefact store, no extraction results, no provenance/hash/reconciliation model |
-| Original artefact storage + hashes | ❌ | No object-storage abstraction; exports are generated on the fly |
-| Connector interface (real, not faked) | ⚠️ | Xero + NetSuite + QBO (QBO dormant behind flag) all real OAuth; no unified connector interface |
+| Entity & period model | ✅ Phase B | `entity_groups` (with parent/description), `accounting_periods`, `tax_periods` (CTA 2010 s.10: 3–12 months standard, non-standard → `needs_review` + review item); RLS + grants shipped in `0013_phase_b_domain_models` |
+| Prior-year artefact import (CT600, computations, loss schedules, PDFs) | ✅ Phase B | `source_documents`: document-type taxonomy, SHA-256, provenance, versioning (`parent_document_id`, `is_current`, originals immutable), extraction-status fields |
+| Original artefact storage + hashes | ✅ Phase B | `apps/api/src/lib/storage/` — `StorageBackend` interface + local backend (`TAXPRO_STORAGE_BACKEND=local`, `TAXPRO_STORAGE_DIR`); tenant-scoped versioned keys; no cloud creds committed; S3-class backend is a drop-in |
+| Connector interface (real, not faked) | ⚠️ | Xero + NetSuite + QBO all real OAuth; no unified connector interface |
 | Trial-balance validation | ✅ | Validation on import (400s), template export |
+| QBO as a UK source | ✅ Phase A follow-up | `/api/qbo` always mounted; sync defaults `UK_FRS102` + GBP; US-specific params gated by `TAXPRO_ENABLE_US` |
 
 ### 4.2 Tax Close (UK rules)
 
@@ -145,16 +146,17 @@ Legend: ✅ exists & wired · ⚠️ exists but partial/misleading/unwired · �
 | ETR reconciliation | ✅ | engine + `etrAdjustmentsForMarginalRelief` wired in `provision-calculator.ts` |
 | Losses / group relief | ⚠️ | group relief exists in `tax-engine-enterprise` (UNVALIDATED, dormant); standalone loss model missing |
 | Supported-adjustments matrix | ⚠️ | mapping categories cover common adjustments; explicit UK coverage matrix is new (`docs/UK_COVERAGE_MATRIX.md`) |
-| Rule versioning (effective date, source URL, snapshot hash, author, approval, rollback) | ⚠️ | rate tables are versioned code constants; **no DB-backed rule store** with source snapshots/hashes/approval |
-| Calculation explainability (inputs, rule version, assumptions, warnings) | ⚠️ | run provenance hashes exist; per-calculation rule-version/assumption surface is partial (assumptions.json in package export) |
-| Jurisdiction resolution fails closed | ✅ | `resolveJurisdiction` now throws on missing/unrecognized values (was: silent US default) |
+| Rule versioning (effective date, source URL, snapshot hash, author, approval, rollback) | ✅ Phase B | `uk_rules` registry — proposals must be approved by partner/admin before use; supersede/rollback chained; runs snapshot `rules_used` at creation (approved + effective at period end) |
+| Calculation explainability (inputs, rule version, assumptions, warnings) | ⚠️ | run provenance hashes exist; `rules_used` per-run snapshot is new (Phase B); per-calculation assumption surface remains partial (assumptions.json in package export) |
+| Jurisdiction resolution fails closed | ✅ | `resolveJurisdiction` now throws on missing/unrecognized values (was: silent US default); `'UK'` legacy alias → `UK_FRS102_S29` |
 
 ### 4.3 Review & Evidence
 
 | Need | Status | Notes |
 |---|---|---|
-| Review queue with severity/owner/due date/status/evidence | ⚠️ | Review items exist (missing_mapping, low_confidence, missing_depreciation_metadata) with resolution flow; no severity/owner/due-date/evidence-request fields |
-| AI proposals: accept / edit / reject / escalate | ⚠️ | Accept/reject/override exist; edit + escalate not first-class |
+| Review queue with severity/owner/due date/status/evidence | ✅ Phase B | `review_items` extended: `owner_user_id`, `due_date`, `evidence_requested`, `document_id` |
+| Review lifecycle (status machine) | ✅ Phase B | open → in_progress → waiting_for_evidence → resolved/rejected/waived; waiver requires partner/admin + mandatory reason; reopen requires reason; every move on append-only `review_item_events` (DB trigger blocks UPDATE/DELETE) |
+| AI proposals: accept / edit / reject / escalate | ⚠️ | accept/reject/override exist; edit + escalate not first-class |
 | Maker-checker enforcement | ✅ | RBAC roles + `assertPartnerCanApprove`; configurable policies partial |
 | Immutable locked runs | ✅ | 409 on mutation; versioned corrections pattern documented |
 | Evidence manifest with hashes | ✅ | package-export manifest.json (SHA-256 per file, schema v1.0.0) |
@@ -175,17 +177,19 @@ Legend: ✅ exists & wired · ⚠️ exists but partial/misleading/unwired · �
 
 | Need | Status | Notes |
 |---|---|---|
-| Approved prior-year mappings reused as proposals | ⚠️ | `classification_patterns` + mapping versioning exist; no "new period setup copies as proposals" flow |
-| Movement highlighting / material-change confirmation | ❌ | no period-over-period proposal flow |
+| Approved prior-year mappings reused as proposals | ✅ Phase B | `mapping_proposals` (`proposal_source=carry_forward`, `carries_forward`, `prior_mapping_id`) — prior-year approved mappings are carried forward **as pending proposals** requiring human confirmation, never applied silently |
+| Mapping proposals (AI may propose; human decides) | ✅ Phase B | `POST /api/mappings/proposals` (ai/rules/manual/import/carry_forward) → `POST /api/mappings/proposals/:id/decide` (approved applies a new versioned `tax_mappings` row; rejected records reason); every decision has reviewer + reason |
+| Controlled UK taxonomy | ✅ Phase B | `uk-taxonomy.ts` — 12 explicit classes; anything outside → `MANUAL_REVIEW` |
+| Movement highlighting / material-change confirmation | ❌ | no period-over-period proposal flow beyond carry-forward |
 | Reviewer decision memory | ❌ | decisions are audited but not surfaced as reusable "positions" |
 
 ### 4.6 UI / UX
 
 | Need | Status | Notes |
 |---|---|---|
-| Professional tax-close workbench default | ⚠️ | Operator UI exists (Dashboard/Data Sources/Mapping/Provision/Review Queue/Run Detail/AI Findings/Exports/Audit Events); nav is not yet Portfolio/Entities/Tax Close/Review Queue/Evidence/Exports/Rules/Settings |
+| Professional tax-close workbench default | ⚠️ | Operator UI exists (Dashboard/Data Sources/Mapping/Provision/Review Queue/Run Detail/AI Findings/Exports/Audit Events); Phase B adds Periods, Documents, Proposals & Rules, Review Items pages; nav is not yet Portfolio/Entities/Tax Close/Review Queue/Evidence/Exports/Rules/Settings |
 | UK-first presentation | ✅ Phase A | GBP default, UK labels default, US labels only for US entities with flag on; sidebar branded "UK FRS 102 Tax Provision" |
-| US UI hidden unless flag on | ✅ Phase A | flag endpoint `/api/config/flags`; US 1120 export 403 when off; QBO unmounted when off; seed is UK by default |
+| US UI hidden unless flag on | ✅ Phase A | flag endpoint `/api/config/flags`; US 1120 export 403 when off; QBO mounted but UK-defaulted; seed is UK by default |
 | No fake metrics | ✅ | counts only |
 
 ### 4.7 Security, Ops, Quality
@@ -211,7 +215,9 @@ Legend: ✅ exists & wired · ⚠️ exists but partial/misleading/unwired · �
 - Exposed to the UI via `GET /api/config/flags` → `{ enableUs }`;
   web fails closed to UK-first defaults (`apps/web/src/lib/features.ts`).
 - What is gated when `false`:
-  - `/api/qbo` routes unmounted (QBO writes `US-Federal` data).
+  - US-specific QBO sync parameters rejected (connector itself is always
+    mounted — it is a UK data source since the Phase A follow-up; sync
+    defaults to `UK_FRS102` + GBP).
   - `/api/provision/results/:id/us-1120` → 403 with explicit message.
   - Default seed creates the UK tenant only (US entity skipped).
   - UI labels/currency default to UK; US labels render only for US entities.
@@ -225,8 +231,8 @@ Legend: ✅ exists & wired · ⚠️ exists but partial/misleading/unwired · �
 
 | Phase | Scope | Status |
 |---|---|---|
-| **A** | Product reset: UK architecture doc, US-dormancy flag, README/roadmap/readiness language, coverage matrix, non-goals | **This phase** |
-| B | Domain model: entities/groups/periods/source documents/mappings/evidence/review items/approvals/tax memory + migrations + RLS + API contracts + tests | next |
+| **A** | Product reset: UK architecture doc, US-dormancy flag, README/roadmap/readiness language, coverage matrix, non-goals | **2026-08-04 — shipped** |
+| **B** | Domain model: entities/groups/periods/source documents/mappings/evidence/review items/approvals/tax memory + migrations + RLS + API contracts + tests | **2026-08-04 — shipped** (see §8 Phase B summary) |
 | C | UK tax-close workbench end-to-end (import → mapping review → calculate → exceptions → workpapers → approve/lock) with source/rule/assumption explainability | next |
 | D | Filing-ready handoff: validated package exports, immutable manifests, external-filing recording (no HMRC submission) | next |
 | E | Pilot readiness: synthetic UK demo tenant, firm + direct-company E2E journeys, onboarding runbook, security boundaries, known limitations | next |
@@ -250,3 +256,29 @@ adapting working components; update docs with code.
 
 See `docs/UK_COVERAGE_MATRIX.md` (coverage contract), `docs/UK_NON_GOALS.md`
 (non-goals), `docs/PRODUCTION_READINESS_REPORT.md` (verification evidence).
+
+---
+
+## 8. Phase B Summary (domain model and data foundations)
+
+Shipped 2026-08-04 in six coherent commits (after the Phase A QBO follow-up):
+
+| Commit | Contents |
+|---|---|
+| Phase B migration + schemas | `0013_phase_b_domain_models` — `entity_groups`, `accounting_periods`, `tax_periods`, `source_documents`, `mapping_proposals`, `uk_rules`, `review_item_events` (append-only trigger), `review_items` owner/due-date/evidence/document columns, `provision_runs.rules_used`; RLS on all new tables + `qbo_connections`/`xero_connections`; grants in `migrate.ts` + `bootstrap-roles.sql` |
+| Source-document artefact store | `lib/storage` (backend interface + local), `/api/documents` (upload/list/get/replace/download, 25MB cap, magic-byte sniffing, immutable originals, version chaining) |
+| Periods | `modules/periods` — entity groups, accounting periods, tax periods; CTA 2010 s.10 validation; non-standard → `needs_review` + review item |
+| Mapping proposals + rules | `uk-taxonomy.ts` (controlled list, unsupported → `MANUAL_REVIEW`), `/api/mappings/proposals` (create/decide/carry-forward), `/api/rules` (registry, proposals, approve/rollback/supersede), runs snapshot `rules_used` at creation |
+| Review lifecycle | `/api/review-items` — status machine (open/in_progress/waiting_for_evidence/resolved/waived), evidence request/attach, human-only waiver with reason, reopen, append-only history |
+| Seed + web UI | Seed: group, FY2026 periods, 3 approved UK rules, pending proposal, demo document metadata, 2 review items. Web: Periods, Documents, Proposals & Rules, Review Items pages |
+
+**Verification (no DB):** `tsc --noEmit` clean; Phase B suites `phase-b-*`
+60/60 passing (taxonomy 5, periods 6, documents 5, review lifecycle 6 + prior
+suites). **Not yet verified against live Postgres** — migration SQL is applied
+only via `db:migrate` with Docker Postgres (local daemon unavailable at build
+time); RLS/integration tests remain blocked in this environment.
+
+**Phase B invariants (do not weaken):** AI never decides (proposals only);
+waivers are human + reason + append-only; unsupported classifications route to
+`MANUAL_REVIEW`; non-standard periods are flagged; rules must be approved
+before a run records them as used; source-document originals are immutable.

@@ -11,9 +11,11 @@ TaxPro is a **UK-first product**: controlled, reviewer-approved **UK FRS 102
   GBP), UK exports (CT600, iXBRL, CTO XML, MTD readiness, R&D), Companies
   House import, Xero (UK).
 - **US ASC 740 is dormant, not deleted:** gated by `TAXPRO_ENABLE_US=false`
-  (`apps/api/src/config/features.ts`) — QBO routes unmounted, US 1120 export
-  403, US seed entity skipped, US UI labels hidden, `resolveJurisdiction`
-  fails closed (no silent US default). Enable only for US feature work.
+  (`apps/api/src/config/features.ts`) — US-specific QBO sync params rejected
+  (the QBO connector is a UK data source and stays mounted, UK sync defaults),
+  US 1120 export 403, US seed entity skipped, US UI labels hidden,
+  `resolveJurisdiction` fails closed (no silent US default). Enable only for
+  US feature work.
 - **Docs:** `docs/UK_PRODUCT_ARCHITECTURE.md` (architecture + gap report),
   `docs/UK_COVERAGE_MATRIX.md` (coverage contract),
   `docs/UK_NON_GOALS.md` (no HMRC filing / no VAT MTD).
