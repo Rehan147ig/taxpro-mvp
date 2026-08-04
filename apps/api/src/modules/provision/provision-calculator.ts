@@ -31,6 +31,9 @@ export interface ProvisionMathInput {
 const KNOWN_JURISDICTIONS: Record<string, Jurisdiction> = {
   UK_FRS102: Jurisdiction.UK_FRS102_S29,
   UK_FRS102_S29: Jurisdiction.UK_FRS102_S29,
+  // 'UK' is a legacy value written by the Xero connector's sync; it means UK
+  // FRS 102 in this product and is preserved as an explicit alias.
+  UK: Jurisdiction.UK_FRS102_S29,
   US: Jurisdiction.US_ASC740,
   'US-Federal': Jurisdiction.US_ASC740,
   US_ASC740: Jurisdiction.US_ASC740,

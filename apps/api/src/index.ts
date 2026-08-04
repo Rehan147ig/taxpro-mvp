@@ -59,11 +59,10 @@ app.route('/api/demo', demoRoutes);
 app.route('/api/upload', uploadRoutes);
 app.route('/api/billing', billingRoutes);
 app.route('/api/xero', xeroRoutes);
-// QBO writes US-Federal trial-balance data — mounted only when the US
-// workstream is explicitly enabled (TAXPRO_ENABLE_US=true).
-if (enableUsWorkstream) {
-  app.route('/api/qbo', qboRoutes);
-}
+// QuickBooks Online is a UK accounting-data source too: the connector is
+// always mounted. Sync defaults to a UK FRS 102 entity in GBP; only the
+// US-specific mappings/exports remain behind TAXPRO_ENABLE_US.
+app.route('/api/qbo', qboRoutes);
 
 // ── Start ──
 async function main() {

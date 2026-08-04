@@ -152,7 +152,9 @@ uploadRoutes.post('/trial-balance', zValidator('form', uploadSchema), async (c) 
     });
   }
 
-  const jurisdiction = (c.req.valid('form').jurisdiction ?? 'US-Federal');
+  // UK-first product default: a new entity from an uploaded trial balance is
+  // UK FRS 102 unless the caller explicitly passes another jurisdiction.
+  const jurisdiction = (c.req.valid('form').jurisdiction ?? 'UK_FRS102');
   const defaultPeriod = c.req.valid('form').period ?? '2026-01-01';
   const entityName = c.req.valid('form').entityName ?? 'Uploaded Entity';
 

@@ -11,6 +11,7 @@ import { authMiddleware } from '../../../lib/middleware/auth.js';
 import { getUser } from '../../../lib/middleware/rbac.js';
 import { BadRequestError } from '../../../lib/errors.js';
 import { buildQboAuthUrl, exchangeQboCode, refreshQboTokens, fetchQboTrialBalance, encryptToken, decryptToken, QBO_BASE_URLS } from './quickbooks-client.js';
+import { syncParamsSchema } from './sync-options.js';
 
 export const qboRoutes = new Hono();
 qboRoutes.use('*', authMiddleware);
@@ -71,13 +72,9 @@ qboRoutes.get('/connections', async (c) => {
   });
 });
 
-qboRoutes.post('/connections/:id/sync', zValidator('json', z.object({
-  periodStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  periodEnd: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  entityName: z.string().max(255).optional(),
-})), async (c) => {
+qboRoutes.post('/connections/:id/sync', zValidator('json', syncParamsSchema), async (c) => {
   const user = getUser(c);
-  const { periodStart, periodEnd, entityName } = c.req.valid('json');
+  const { periodStart, periodEnd, entityName, jurisdiction, currency } = c.req.valid('json');
   const connId = c.req.param('id');
   if (!QBO_CLIENT_ID || !QBO_CLIENT_SECRET) throw new BadRequestError('QBO app credentials not configured');
 
@@ -111,12 +108,12 @@ qboRoutes.post('/connections/:id/sync', zValidator('json', z.object({
       externalId: conn.realmId,
       name: entityName ?? conn.label,
       type: 'domestic',
-      currency: 'USD',
+      currency,
       isConsolidated: true,
-      taxJurisdiction: 'US-Federal',
+      taxJurisdiction: jurisdiction,
     }).onConflictDoUpdate({
       target: [entities.tenantId, entities.externalId],
-      set: { name: entityName ?? conn.label, updatedAt: new Date() },
+      set: { name: entityName ?? conn.label, currency, taxJurisdiction: jurisdiction, updatedAt: new Date() },
     }).returning();
     const entityId = entity.id;
 

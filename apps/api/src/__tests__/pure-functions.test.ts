@@ -82,8 +82,12 @@ describe('resolveJurisdiction: exact known values', () => {
     expect(() => resolveJurisdiction(undefined)).toThrow(/no taxJurisdiction set/);
   });
 
+  it("maps 'UK' (legacy Xero connector value) to UK_FRS102_S29", () => {
+    expect(resolveJurisdiction('UK')).toBe(Jurisdiction.UK_FRS102_S29);
+  });
+
   it('fails closed for an unrecognized string instead of guessing US', () => {
-    expect(() => resolveJurisdiction('UK')).toThrow(/Unrecognized taxJurisdiction 'UK'/);
+    expect(() => resolveJurisdiction('UK_VAT')).toThrow(/Unrecognized taxJurisdiction 'UK_VAT'/);
   });
 
   it('does not warn for known values', () => {
