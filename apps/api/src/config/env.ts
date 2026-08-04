@@ -35,6 +35,10 @@ const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   // Run background workers in this process ('false' = dedicated worker process in production)
   RUN_WORKERS: z.enum(['true', 'false']).default('true'),
+  // Source-document artefact storage. 'local' works with no cloud
+  // credentials (default); object storage plugs in behind the same interface.
+  TAXPRO_STORAGE_BACKEND: z.enum(['local']).default('local'),
+  TAXPRO_STORAGE_DIR: z.string().default('./storage'),
   // US ASC 740 workstream is dormant by default (UK FRS 102 is the product).
   // Set to 'true' only when actively developing/validating US features.
   TAXPRO_ENABLE_US: z.enum(['true', 'false']).default('false'),
