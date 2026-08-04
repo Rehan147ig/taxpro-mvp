@@ -33,7 +33,7 @@ async function applyRuntimeGrants(): Promise<void> {
         'classification_patterns', 'connections', 'users', 'usage_events',
         'entity_groups', 'accounting_periods', 'tax_periods',
         'source_documents', 'mapping_proposals', 'uk_rules',
-        'qbo_connections', 'xero_connections'
+        'workbench_jobs', 'qbo_connections', 'xero_connections'
       ];
     BEGIN
       FOREACH t IN ARRAY full_access_tables
@@ -52,6 +52,10 @@ async function applyRuntimeGrants(): Promise<void> {
       IF to_regclass('review_item_events') IS NOT NULL THEN
         EXECUTE 'GRANT SELECT, INSERT ON review_item_events TO taxpro_app';
         EXECUTE 'REVOKE UPDATE, DELETE ON review_item_events FROM taxpro_app';
+      END IF;
+      IF to_regclass('external_filings') IS NOT NULL THEN
+        EXECUTE 'GRANT SELECT, INSERT ON external_filings TO taxpro_app';
+        EXECUTE 'REVOKE UPDATE, DELETE ON external_filings FROM taxpro_app';
       END IF;
     END $$;
     GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO taxpro_app;

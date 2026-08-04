@@ -19,3 +19,4 @@ export { reviewItems } from './review-items.js';
 export { classificationPatterns } from './classification-patterns.js';
 export { provisionEvents } from './provision-events.js';
 export { workbenchJobs } from './workbench-jobs.js';
+export { externalFilings } from './external-filings.js';

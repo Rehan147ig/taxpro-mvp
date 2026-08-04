@@ -40,6 +40,7 @@ import { computeBookTaxDifferences, Decimal } from '@taxpro/tax-engine';
 import { recordProvisionEvent, getEventsForRun, EVENT_TYPES } from './provision-events.js';
 import { auditSensitiveOp } from './audit.js';
 import { assertWorkbenchApprovalGates } from '../workbench/guard.js';
+import { assertMakerChecker } from '../handoff/guard.js';
 
 const INCOME_TYPES = new Set(['Income', 'Revenue', 'OtherIncome', 'Sales', 'ServiceRevenue']);
 const EXPENSE_TYPES = new Set(['Expense', 'COGS', 'OtherExpense', 'OperatingExpense', 'SG&A', 'CostOfSales']);
@@ -1495,6 +1496,8 @@ provisionRoutes.post('/runs/:runId/partner-approve',
 
       assertPartnerCanApprove(run, user.userId);
 
+      await assertMakerChecker(tx, user.tenantId, run, user.userId);
+
       const now = new Date();
       await tx.update(provisionRuns).set({
         approvalStatus: 'approved',
@@ -1535,6 +1538,8 @@ provisionRoutes.post('/runs/:runId/lock',
 
       await assertWorkbenchApprovalGates(tx, user.tenantId, run);
 
+      await assertMakerChecker(tx, user.tenantId, run, user.userId);
+
       const now = new Date();
       await tx.update(provisionRuns).set({
         status: 'locked',
@@ -1573,11 +1578,17 @@ provisionRoutes.post('/runs/:runId/unlock',
         throw new BadRequestError('Run is not locked');
       }
 
+      if (run.filedExternallyAt) {
+        throw new BadRequestError('An external filing is recorded for this run. Unlocking is not permitted — corrections must be a new run version (recalculate).');
+      }
+
       const now = new Date();
       await tx.update(provisionRuns).set({
         status: 'draft',
         lockedAt: null,
         lockedByUserId: null,
+        handoffReadyAt: null,
+        handoffReadyByUserId: null,
         updatedAt: now,
       }).where(eq(provisionRuns.id, runId));
 

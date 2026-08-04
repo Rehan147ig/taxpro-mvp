@@ -50,4 +50,11 @@ export const provisionRuns = pgTable('provision_runs', {
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
   finalizedAt: timestamp('finalized_at'),
+  // ── Phase D filing-handoff contract (migration 0016) ──
+  // Filing-ready handoff: entered by an authorised user on a locked run.
+  handoffReadyAt: timestamp('handoff_ready_at'),
+  handoffReadyByUserId: uuid('handoff_ready_by_user_id').references(() => users.id),
+  // External filing recorded after the event happened outside TaxPro.
+  filedExternallyAt: timestamp('filed_externally_at'),
+  filedExternallyByUserId: uuid('filed_externally_by_user_id').references(() => users.id),
 });

@@ -291,3 +291,84 @@ export const workbench = {
     `/workbench/runs/${runId}/blockers`,
   ),
 };
+
+// Phase D: external filing handoff (TaxPro never submits to HMRC — these are
+// bookkeeping states/events; the honesty contract is rendered in the UI).
+export interface HandoffFilingRecord {
+  id: string;
+  filingProvider: string;
+  filingReference: string;
+  submittedDate: string;
+  recordedByUserId: string;
+  confirmationDocumentId: string | null;
+  confirmationDocumentHash: string | null;
+  manifestChecksum: string;
+  supersedesFilingId: string | null;
+  createdAt: string;
+}
+
+export interface HandoffView {
+  runId: string;
+  lifecycle: { stage: string; label: string };
+  run: {
+    id: string;
+    period: string;
+    endPeriod: string | null;
+    entityId: string | null;
+    status: string;
+    approvalStatus: string;
+    submittedAt: string | null;
+    submittedByUserId: string | null;
+    approvedAt: string | null;
+    approvedByUserId: string | null;
+    lockedAt: string | null;
+    lockedByUserId: string | null;
+    handoffReadyAt: string | null;
+    handoffReadyByUserId: string | null;
+    filedExternallyAt: string | null;
+    filedExternallyByUserId: string | null;
+    sourceDocumentId: string | null;
+  };
+  blockers: Array<{ code: string; message: string }>;
+  validation: {
+    ct600: { valid: boolean; rulesRun: number; violations: any[]; skipped: any[] } | null;
+    ixbrl: { included: boolean; valid: boolean | null; checksRun: number | null; violations: string[] } | null;
+  };
+  externalFilings: HandoffFilingRecord[];
+  reviewItems: any[];
+  approvalEvents: any[];
+  honesty: { note: string; notFiledByTaxPro: boolean };
+}
+
+export const handoff = {
+  view: (runId: string) => apiClient<HandoffView>(`/handoff/runs/${runId}`),
+  handoffReady: (runId: string) =>
+    apiClientSafe<{ runId: string; handoffReadyAt?: string; handoffReadyByUserId?: string; blocked?: boolean; blockers?: any[] }>(
+      `/handoff/runs/${runId}/handoff-ready`, { method: 'POST' },
+    ),
+  recordFiling: (runId: string, payload: {
+    filingProvider: string;
+    filingReference: string;
+    submittedDate: string;
+    manifestChecksum: string;
+    confirmationDocumentId?: string;
+    supersedesFilingId?: string;
+  }) =>
+    apiClient<any>(`/handoff/runs/${runId}/record-filing`, { method: 'POST', body: JSON.stringify(payload) }),
+  manifest: (runId: string) =>
+    apiClient<{ sha256: string; manifest: any }>(`/handoff/runs/${runId}/manifest`),
+  packageDownload: async (runId: string): Promise<{ blob: Blob; manifestSha256: string | null }> => {
+    const token = getToken();
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const res = await fetch(`${BASE_URL}/handoff/runs/${runId}/package`, { headers });
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      if (res.status === 403 || res.status === 401) {
+        throw new Error('You do not have access to this provision or its records.');
+      }
+      throw new Error(body?.error || `HTTP ${res.status}`);
+    }
+    return { blob: await res.blob(), manifestSha256: res.headers.get('x-manifest-sha256') };
+  },
+};

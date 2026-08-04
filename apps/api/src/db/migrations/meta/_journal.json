@@ -113,6 +113,13 @@
                         "when":  1787250000000,
                         "tag":  "connections_last_sync",
                         "breakpoints":  true
+                    },
+                    {
+                        "idx":  16,
+                        "version":  "0016_phase_d_handoff",
+                        "when":  1787500000000,
+                        "tag":  "phase_d_handoff",
+                        "breakpoints":  true
                     }
                 ]
 }

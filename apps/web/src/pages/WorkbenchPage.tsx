@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from '@tanstack/react-router';
-import { workbench } from '../api/client';
+import { workbench, handoff } from '../api/client';
 import { RunStatusBadge } from '../components/RunStatusBadge';
 
 const SAMPLE_CSV = [
@@ -64,6 +64,14 @@ export default function WorkbenchPage() {
   const [view, setView] = useState<any>(null);
   const [viewing, setViewing] = useState(false);
   const [recalculating, setRecalculating] = useState(false);
+
+  // Phase D — filing handoff state
+  const [handoffView, setHandoffView] = useState<any>(null);
+  const [handoffLoading, setHandoffLoading] = useState(false);
+  const [handoffError, setHandoffError] = useState<string | null>(null);
+  const [handoffWorking, setHandoffWorking] = useState(false);
+  const [manifestSha, setManifestSha] = useState('');
+  const [filing, setFiling] = useState({ filingProvider: '', filingReference: '', submittedDate: '', manifestChecksum: '', confirmationDocumentId: '' });
 
   const ukEntities = (setup?.entities ?? []).filter(
     (e: any) => e.taxJurisdiction && ['UK_FRS102', 'UK_FRS102_S29', 'UK'].includes(e.taxJurisdiction.trim()),
@@ -183,13 +191,124 @@ export default function WorkbenchPage() {
     setViewing(true);
     setError(null);
     setView(null);
+    setHandoffView(null);
+    setManifestSha('');
     try {
-      setView(await workbench.view(id));
+      const data = await workbench.view(id);
+      setView(data);
+      if (data.run && (data.run.status === 'locked' || data.run.status === 'finalized')) {
+        loadHandoff(id);
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to load run details');
     } finally {
       setViewing(false);
     }
+  };
+
+  // ── Phase D: filing handoff ────────────────────────────────────────────────
+
+  const loadHandoff = async (runId: string) => {
+    setHandoffLoading(true);
+    setHandoffError(null);
+    try {
+      const hv = await handoff.view(runId);
+      setHandoffView(hv);
+      if (!manifestSha && hv.run?.handoffReadyAt) {
+        try {
+          const m = await handoff.manifest(runId);
+          setManifestSha(m.sha256);
+        } catch { /* manifest fetch is best-effort */ }
+      }
+    } catch (err: any) {
+      setHandoffError(err.message || 'Failed to load filing handoff state');
+    } finally {
+      setHandoffLoading(false);
+    }
+  };
+
+  const handleHandoffReady = async () => {
+    const runId = view?.run?.id;
+    if (!runId) return;
+    setHandoffWorking(true);
+    setHandoffError(null);
+    try {
+      const res = await handoff.handoffReady(runId);
+      if (!res.ok) {
+        const blockers = res.body?.blockers ?? [];
+        setHandoffError(
+          blockers.length > 0
+            ? `Handoff blocked by ${blockers.length} gate(s): ${blockers.map((b: any) => b.message).join(' ')}`
+            : 'Handoff was not allowed.',
+        );
+      } else {
+        await loadHandoff(runId);
+      }
+    } catch (err: any) {
+      setHandoffError(err.message || 'Handoff failed');
+    } finally {
+      setHandoffWorking(false);
+    }
+  };
+
+  const handleDownloadPackage = async () => {
+    const runId = view?.run?.id;
+    if (!runId) return;
+    setHandoffWorking(true);
+    setHandoffError(null);
+    try {
+      const { blob, manifestSha256 } = await handoff.packageDownload(runId);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `taxpro-uk-filing-package-${view.run.period}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      if (manifestSha256) {
+        setManifestSha(manifestSha256);
+        setFiling((f) => ({ ...f, manifestChecksum: manifestSha256 }));
+      }
+      await loadHandoff(runId);
+    } catch (err: any) {
+      setHandoffError(err.message || 'Package download failed');
+    } finally {
+      setHandoffWorking(false);
+    }
+  };
+
+  const handleRecordFiling = async () => {
+    const runId = view?.run?.id;
+    if (!runId) return;
+    if (!filing.filingProvider || !filing.filingReference || !filing.submittedDate || !filing.manifestChecksum) {
+      setHandoffError('Complete the filing record: provider, reference, submitted date and manifest SHA-256 are required.');
+      return;
+    }
+    setHandoffWorking(true);
+    setHandoffError(null);
+    try {
+      await handoff.recordFiling(runId, {
+        filingProvider: filing.filingProvider,
+        filingReference: filing.filingReference,
+        submittedDate: filing.submittedDate,
+        manifestChecksum: filing.manifestChecksum,
+        ...(filing.confirmationDocumentId ? { confirmationDocumentId: filing.confirmationDocumentId } : {}),
+      });
+      setFiling({ filingProvider: '', filingReference: '', submittedDate: '', manifestChecksum: '', confirmationDocumentId: '' });
+      await loadHandoff(runId);
+    } catch (err: any) {
+      setHandoffError(err.message || 'Recording the filing failed');
+    } finally {
+      setHandoffWorking(false);
+    }
+  };
+
+  const copyManifest = async () => {
+    if (!manifestSha) return;
+    try {
+      await navigator.clipboard.writeText(manifestSha);
+    } catch { /* clipboard may be unavailable */ }
   };
 
   const selectCls = 'px-3 py-2 border border-gray-300 rounded-button text-xs bg-white text-[#0A192F] focus:ring-2 focus:ring-[#0A192F]';
@@ -486,6 +605,187 @@ export default function WorkbenchPage() {
                     <div className="bg-gray-50 rounded-card p-2"><span className="text-gray-500">Total</span><div className="font-semibold text-[#0A192F]">{fmt(view.result.totalTaxExpense)}</div></div>
                     <div className="bg-gray-50 rounded-card p-2"><span className="text-gray-500">Tax payable</span><div className="font-semibold text-[#0A192F]">{fmt(view.result.taxPayable)}</div></div>
                   </div>
+                </div>
+              )}
+
+              {handoffView && (
+                <div className="border-t border-gray-200 pt-4 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <h4 className="text-xs font-semibold text-[#0A192F]">Filing handoff</h4>
+                    <div className="flex items-center gap-2">
+                      <span className={`px-2 py-0.5 rounded-button text-[10px] font-semibold border ${
+                        handoffView.lifecycle?.stage === 'filed_externally'
+                          ? 'bg-[#E8F7F0] text-[#0B5C3C] border-[#10B981]/30'
+                          : handoffView.lifecycle?.stage === 'filing_ready'
+                            ? 'bg-[#E8F7F0] text-[#0B5C3C] border-[#10B981]/30'
+                            : 'bg-amber-50 text-amber-800 border-amber-200'
+                      }`}>
+                        {handoffView.lifecycle?.label ?? handoffView.lifecycle?.stage}
+                      </span>
+                      {handoffLoading && <span className="text-[10px] text-gray-400">refreshing…</span>}
+                    </div>
+                  </div>
+
+                  <div className="bg-gray-50 border border-gray-200 rounded-card p-3 text-[11px]">
+                    <span className="font-semibold text-[#0A192F]">Honesty contract:</span>{' '}
+                    <span className="text-gray-600">{handoffView.honesty?.note ?? 'TaxPro does not submit to HMRC — handoff and filing records are bookkeeping.'}</span>
+                  </div>
+
+                  {handoffError && (
+                    <div className="bg-red-50 border border-red-200 text-red-700 rounded-card p-3 text-[11px] font-medium">{handoffError}</div>
+                  )}
+
+                  {handoffView.blockers && handoffView.blockers.length > 0 && (
+                    <div className="bg-red-50 border border-red-200 text-red-700 rounded-card p-3 text-[11px] space-y-1">
+                      <p className="font-semibold">Filing-ready handoff is blocked — {handoffView.blockers.length} gate(s) open:</p>
+                      {handoffView.blockers.map((b: any) => <p key={b.code} className="pl-2">· {b.code}: {b.message}</p>)}
+                    </div>
+                  )}
+
+                  {handoffView.validation && (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 text-[11px]">
+                      <div className={`rounded-card border p-2 ${handoffView.validation.ct600?.valid ? 'bg-[#E8F7F0] border-[#10B981]/30' : 'bg-red-50 border-red-200'}`}>
+                        <span className="text-gray-500">CT600 figures ({handoffView.validation.ct600?.rulesRun ?? 0} rules)</span>
+                        <div className="font-semibold text-[#0A192F]">{handoffView.validation.ct600?.valid ? 'valid' : 'validation errors'}</div>
+                      </div>
+                      <div className={`rounded-card border p-2 ${handoffView.validation.ixbrl ? (handoffView.validation.ixbrl.valid ? 'bg-[#E8F7F0] border-[#10B981]/30' : 'bg-red-50 border-red-200') : 'bg-gray-50 border-gray-200'}`}>
+                        <span className="text-gray-500">iXBRL accounts document</span>
+                        <div className="font-semibold text-[#0A192F]">
+                          {handoffView.validation.ixbrl
+                            ? (handoffView.validation.ixbrl.valid ? `valid — ${handoffView.validation.ixbrl.checksRun ?? 0} checks` : 'validation errors')
+                            : 'not generated for this run'}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap gap-2">
+                    {!handoffView.run?.handoffReadyAt && (
+                      <button
+                        onClick={handleHandoffReady}
+                        disabled={handoffWorking}
+                        className="text-[10px] font-semibold bg-[#0A192F] text-white px-3 py-1.5 rounded-button disabled:opacity-50"
+                      >
+                        {handoffWorking ? 'Working…' : 'Mark filing-ready (handoff)'}
+                      </button>
+                    )}
+                    <button
+                      onClick={handleDownloadPackage}
+                      disabled={handoffWorking}
+                      className="text-[10px] font-semibold bg-white border border-gray-300 px-3 py-1.5 rounded-button shadow-sm disabled:opacity-50"
+                    >
+                      {handoffWorking ? 'Working…' : 'Download filing package (ZIP)'}
+                    </button>
+                    <button
+                      onClick={copyManifest}
+                      disabled={!manifestSha}
+                      className="text-[10px] text-[#0A192F] font-semibold bg-white border border-gray-200 px-3 py-1.5 rounded-button shadow-sm disabled:opacity-50"
+                    >
+                      {manifestSha ? 'Copy manifest SHA-256' : 'Manifest SHA-256 unavailable'}
+                    </button>
+                  </div>
+
+                  {manifestSha && (
+                    <div className="text-[10px] font-mono text-gray-500 break-all bg-gray-50 border border-gray-200 rounded-card px-3 py-2">
+                      manifest sha256: {manifestSha}
+                    </div>
+                  )}
+
+                  {!handoffView.run?.filedExternallyAt && (
+                    <div className="bg-white border border-gray-200 rounded-card p-3 space-y-2">
+                      <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Record an EXTERNAL filing (already submitted outside TaxPro)</p>
+                      <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">
+                        <input
+                          value={filing.filingProvider}
+                          onChange={(e) => setFiling((f) => ({ ...f, filingProvider: e.target.value }))}
+                          placeholder="Filing provider (e.g. IRIS)"
+                          className="px-2 py-1.5 border border-gray-300 rounded-button text-[11px] bg-white text-[#0A192F]"
+                        />
+                        <input
+                          value={filing.filingReference}
+                          onChange={(e) => setFiling((f) => ({ ...f, filingReference: e.target.value }))}
+                          placeholder="Filing reference"
+                          className="px-2 py-1.5 border border-gray-300 rounded-button text-[11px] bg-white text-[#0A192F]"
+                        />
+                        <input
+                          type="date"
+                          value={filing.submittedDate}
+                          onChange={(e) => setFiling((f) => ({ ...f, submittedDate: e.target.value }))}
+                          className="px-2 py-1.5 border border-gray-300 rounded-button text-[11px] bg-white text-[#0A192F]"
+                        />
+                        <input
+                          value={filing.manifestChecksum}
+                          onChange={(e) => setFiling((f) => ({ ...f, manifestChecksum: e.target.value }))}
+                          placeholder="Manifest SHA-256 (from package)"
+                          className="px-2 py-1.5 border border-gray-300 rounded-button text-[11px] font-mono bg-white text-[#0A192F]"
+                        />
+                        <input
+                          value={filing.confirmationDocumentId}
+                          onChange={(e) => setFiling((f) => ({ ...f, confirmationDocumentId: e.target.value }))}
+                          placeholder="Confirmation doc id (optional)"
+                          className="px-2 py-1.5 border border-gray-300 rounded-button text-[11px] bg-white text-[#0A192F]"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={handleRecordFiling}
+                          disabled={handoffWorking}
+                          className="text-[10px] font-semibold bg-[#0A192F] text-white px-3 py-1.5 rounded-button disabled:opacity-50"
+                        >
+                          {handoffWorking ? 'Working…' : 'Record filing'}
+                        </button>
+                        <span className="text-[10px] text-gray-400">
+                          The manifest checksum must match the deterministic package — it is re-verified on record.
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {handoffView.externalFilings && handoffView.externalFilings.length > 0 && (
+                    <div>
+                      <h4 className="text-xs font-semibold text-[#0A192F] mb-1">External filing records</h4>
+                      <table className="w-full text-[11px]">
+                        <thead className="bg-[#F8F9FA] border-b border-gray-200">
+                          <tr>
+                            <th className="text-left px-2 py-1.5 font-semibold text-[#0A192F]">Provider</th>
+                            <th className="text-left px-2 py-1.5 font-semibold text-[#0A192F]">Reference</th>
+                            <th className="text-left px-2 py-1.5 font-semibold text-[#0A192F]">Submitted</th>
+                            <th className="text-left px-2 py-1.5 font-semibold text-[#0A192F]">Manifest checksum</th>
+                            <th className="text-left px-2 py-1.5 font-semibold text-[#0A192F]">Recorded</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {handoffView.externalFilings.map((f: any) => (
+                            <tr key={f.id}>
+                              <td className="px-2 py-1.5 text-[#0A192F]">{f.filingProvider}</td>
+                              <td className="px-2 py-1.5 font-mono text-[10px] text-[#0A192F]">{f.filingReference}</td>
+                              <td className="px-2 py-1.5 text-gray-500">{f.submittedDate}</td>
+                              <td className="px-2 py-1.5 font-mono text-[10px] text-gray-500 break-all">{f.manifestChecksum.slice(0, 16)}…</td>
+                              <td className="px-2 py-1.5 text-gray-500">{f.createdAt ? new Date(f.createdAt).toLocaleString() : ''}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      <p className="text-[10px] text-gray-400 mt-1">
+                        Append-only records — recorded by user {handoffView.run?.filedExternallyByUserId?.slice(0, 8) ?? '—'} at {handoffView.run?.filedExternallyAt ? new Date(handoffView.run.filedExternallyAt).toLocaleString() : '—'}. TaxPro did not submit this return.
+                      </p>
+                    </div>
+                  )}
+
+                  {handoffView.approvalEvents && handoffView.approvalEvents.length > 0 && (
+                    <div>
+                      <h4 className="text-xs font-semibold text-[#0A192F] mb-1">Approval trail</h4>
+                      <ul className="text-[11px] text-gray-600 space-y-1">
+                        {handoffView.approvalEvents.map((e: any, i: number) => (
+                          <li key={i} className="flex gap-2">
+                            <span className="font-mono text-[10px] text-gray-400">{e.occurredAt ? new Date(e.occurredAt).toLocaleString() : ''}</span>
+                            <span className="font-mono text-[10px] text-[#0A192F]">{e.eventType}</span>
+                            <span className="text-gray-500">— {e.reason ?? ''} (actor {e.actorUserId?.slice(0, 8) ?? e.actorType})</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
