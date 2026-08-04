@@ -184,7 +184,12 @@ reviewLifecycleRoutes.post('/:itemId/attach-evidence', requireRole('preparer', '
     const { documentId } = c.req.valid('json');
     return withTenantContext(user.tenantId, async (tx) => {
       const item = await loadOwnItem(tx, user.tenantId, itemId);
-      await assertTransition(item, ['waiting_for_evidence', 'in_progress'], 'in_progress', 'attach evidence to');
+      // Evidence attachment is legal from in_progress (supplementary
+      // documents; status stays) and from waiting_for_evidence (evidence
+      // satisfies the request; status returns to in_progress).
+      if (!['waiting_for_evidence', 'in_progress'].includes(item.status)) {
+        throw new BadRequestError(`Cannot attach evidence to a review item in status '${item.status}' (allowed: waiting_for_evidence, in_progress)`);
+      }
 
       const [doc] = await tx.select({ id: sourceDocuments.id }).from(sourceDocuments)
         .where(and(eq(sourceDocuments.id, documentId), eq(sourceDocuments.tenantId, user.tenantId)))
@@ -193,11 +198,11 @@ reviewLifecycleRoutes.post('/:itemId/attach-evidence', requireRole('preparer', '
 
       const before = { status: item.status, documentId: item.documentId };
       const [updated] = await tx.update(reviewItems).set({
-        status: 'in_progress',
+        status: item.status === 'waiting_for_evidence' ? 'in_progress' : item.status,
         documentId,
         updatedAt: new Date(),
       }).where(eq(reviewItems.id, itemId)).returning();
-      await recordEvent(tx, user.tenantId, itemId, user.userId, REVIEW_ITEM_EVENT_TYPES.EVIDENCE_ATTACHED, 'Evidence attached', before, { status: 'in_progress', documentId });
+      await recordEvent(tx, user.tenantId, itemId, user.userId, REVIEW_ITEM_EVENT_TYPES.EVIDENCE_ATTACHED, 'Evidence attached', before, { status: updated.status, documentId });
       return c.json(updated);
     });
   });
