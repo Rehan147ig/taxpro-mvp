@@ -136,6 +136,9 @@ export async function validateRuntimeRoleSecurity(): Promise<SecurityValidationR
       'review_items', 'tax_mappings', 'trial_balance',
       'accounts', 'entities', 'ai_runs', 'ai_steps',
       'classification_patterns', 'connections', 'users',
+      'entity_groups', 'accounting_periods', 'tax_periods',
+      'source_documents', 'mapping_proposals', 'uk_rules',
+      'review_item_events', 'qbo_connections', 'xero_connections',
     ];
 
     for (const t of tables) {

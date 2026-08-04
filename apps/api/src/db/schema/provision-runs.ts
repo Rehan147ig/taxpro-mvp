@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, date, timestamp, text } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, date, timestamp, text, jsonb } from 'drizzle-orm/pg-core';
 import { tenants } from './tenants.js';
 import { users } from './users.js';
 
@@ -14,6 +14,9 @@ export const provisionRuns = pgTable('provision_runs', {
   mode: varchar('mode', { length: 20 }).notNull().default('direct'),
   inputDataHash: varchar('input_data_hash', { length: 128 }),
   mappingVersionHash: varchar('mapping_version_hash', { length: 128 }),
+  // Exactly which rule versions (uk_rules keys) this run's calculation used.
+  // Populated from the rule registry at run creation; never derived from AI.
+  rulesUsed: jsonb('rules_used'),
   engineVersion: varchar('engine_version', { length: 40 }).notNull().default('tax-engine-0.1.0'),
   approvalStatus: varchar('approval_status', { length: 30 }).notNull().default('not_required'),
   resultId: uuid('result_id'),

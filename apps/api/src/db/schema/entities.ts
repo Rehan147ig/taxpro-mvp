@@ -1,5 +1,6 @@
 import { pgTable, uuid, varchar, boolean, timestamp } from 'drizzle-orm/pg-core';
 import { tenants } from './tenants.js';
+import { entityGroups } from './entity-groups.js';
 
 export const entities = pgTable('entities', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -9,6 +10,7 @@ export const entities = pgTable('entities', {
   type: varchar('type', { length: 50 }).notNull(),
   currency: varchar('currency', { length: 3 }).notNull().default('USD'),
   parentEntityId: uuid('parent_entity_id'),
+  groupId: uuid('group_id').references(() => entityGroups.id, { onDelete: 'set null' }),
   isConsolidated: boolean('is_consolidated').default(true),
   taxJurisdiction: varchar('tax_jurisdiction', { length: 100 }),
   createdAt: timestamp('created_at').defaultNow(),

@@ -1,7 +1,8 @@
-import { pgTable, uuid, varchar, timestamp, text, jsonb, integer } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, timestamp, text, jsonb, integer, date } from 'drizzle-orm/pg-core';
 import { tenants } from './tenants.js';
 import { users } from './users.js';
 import { provisionRuns } from './provision-runs.js';
+import { sourceDocuments } from './source-documents.js';
 
 export const reviewItems = pgTable('review_items', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -17,6 +18,10 @@ export const reviewItems = pgTable('review_items', {
   sourceRef: varchar('source_ref', { length: 120 }),
   confidenceScore: integer('confidence_score'),
   metadata: jsonb('metadata'),
+  ownerUserId: uuid('owner_user_id').references(() => users.id),
+  dueDate: date('due_date'),
+  evidenceRequested: text('evidence_requested'),
+  documentId: uuid('document_id').references(() => sourceDocuments.id, { onDelete: 'set null' }),
   resolvedByUserId: uuid('resolved_by_user_id').references(() => users.id),
   resolutionNote: text('resolution_note'),
   createdAt: timestamp('created_at').defaultNow(),

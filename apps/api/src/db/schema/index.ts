@@ -1,6 +1,13 @@
 export { tenants } from './tenants.js';
 export { connections } from './connections.js';
 export { entities } from './entities.js';
+export { entityGroups } from './entity-groups.js';
+export { accountingPeriods } from './accounting-periods.js';
+export { taxPeriods } from './tax-periods.js';
+export { sourceDocuments } from './source-documents.js';
+export { mappingProposals } from './mapping-proposals.js';
+export { ukRules } from './uk-rules.js';
+export { reviewItemEvents } from './review-item-events.js';
 export { accounts } from './accounts.js';
 export { trialBalance } from './trial-balance.js';
 export { taxMappings } from './tax-mappings.js';
