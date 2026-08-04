@@ -104,7 +104,24 @@ Legend:
 | Controlled UK taxonomy (unsupported → `MANUAL_REVIEW`) | ✅ Phase B (`uk-taxonomy.ts`, 12 classes) |
 | Rule store with effective dates/source/snapshot/approval/rollback; runs record `rules_used` | ✅ Phase B (`uk_rules`, `provision_runs.rules_used`) |
 | Tax Memory (prior-year positions as proposals) | 🟡 carry-forward proposals live (Phase B); broader positions library Phase C/D |
-| External filing reference recording | ❌ Phase D |
+| External filing reference recording | ✅ Phase D | `POST /api/handoff/runs/:id/record-filing` — append-only, checksum re-verified against the deterministic manifest; `run.filed_externally` audit event is bookkeeping only |
+
+## 10. Filing-Ready Handoff (Phase D — shipped 2026-08-04)
+
+| Item | Status | Evidence |
+|---|---|---|
+| Honest lifecycle (draft → needs_review → filing_ready → filed_externally) | ✅ | `deriveLifecycleStage` ladder over run status + `handoff_ready_at/by` + `filed_externally_at/by`; honest badge + honesty contract banner in the Workbench run detail |
+| Filing-ready handoff gate | ✅ | `evaluateHandoffGates` — run must be locked, not already handed off, CT600 valid, iXBRL valid; blockers surfaced in the panel and via `GET /api/handoff/runs/:id` |
+| CT600 validation (HMRC-derived rules) | ✅ | 15 rules per box set (CTM03925 etc.); band-correct small-profits / marginal-relief / main-rate ladder unit-tested |
+| iXBRL structural validation | ✅ | 14 checks against `ukgaap-frs102-2023-01-01.xsd`; "validation-ready, not filing-ready" |
+| Deterministic filing package (ZIP) | ✅ | byte-identical across downloads (normalized timestamps; export/handoff/filing events excluded from the packaged audit trail); self-verifying manifest sha256; `x-manifest-sha256` header |
+| Immutable manifest | ✅ | sha256 over canonical JSON; approvals pinned (`filed_externally_at/by = null` in the manifest) so a filing cannot mutate it |
+| External filing record (provider, reference, submitted date, checksum, confirmation doc) | ✅ | append-only `external_filings` (tenant RLS); `supersedes_filing_id` for re-filings; checksum mismatch → 400 `does not match` |
+| Maker-checker on approval/handoff | ✅ | `violatesMakerChecker` — self-approval/self-handoff is blocked (rbac); partner + admin distinct in E2E |
+| Unlock safety | ✅ | unlock refused (400) once an external filing is recorded; unlock clears handoff-ready flags |
+| UI: handoff panel + record form | ✅ | `apps/web` WorkbenchPage — mark filing-ready, download package, copy/capture checksum, record filing, append-only records table, approval trail |
+| E2E + unit coverage | ✅ | `handoff.spec.ts` (full journey + tampered checksum + tenant isolation); `phase-d-gates` (16 pure) + `phase-d-handoff` (21 live-DB) |
+| Phase D limits | 🟡 | still NOT HMRC-filing-ready: no CT600/iXBRL XSD validation, no CTO GovTalk XML submission, no MTD — package validation is against HMRC-derived rules and structural checks only |
 
 ## 9. Tax-Close Workbench (Phase C — shipped 2026-08-04)
 

@@ -32,17 +32,27 @@ claimed.
 
 ## 3. What "filing-ready handoff" means (and does not mean)
 
-**Means:** validated CT600 box figures (HMRC-derived rule validator), iXBRL
-instance/inline documents (FRS 102 taxonomy lock + structural conformance
-validator), CTO GovTalk XML, MTD readiness gate, R&D claim package, and a
-signed evidence package (workbook + audit trail + manifest with SHA-256
-hashes) — all deterministic, reproducible and locked-run immutable.
+**Means (Phase D shipped 2026-08-04):** validated CT600 box figures (HMRC-derived
+rule validator), iXBRL instance/inline documents (FRS 102 taxonomy lock +
+structural conformance validator), CTO GovTalk XML, MTD readiness gate, R&D
+claim package, and a signed evidence package (workbook + audit trail +
+manifest with SHA-256 hashes) — all deterministic, reproducible and locked-run
+immutable. Plus the filing-handoff bookkeeping: an honest lifecycle stage
+(`filing_ready` → `filed_externally`), a one-time `handoff-ready` state, an
+immutable self-hashing manifest, a byte-identical deterministic ZIP, and
+append-only external filing records (provider, reference, submitted date,
+manifest checksum, confirmation doc) re-verified against the manifest — all
+under the honesty contract that TaxPro **records** the filing, it never submits
+it (`POST /api/handoff/runs/:id/record-filing`; `run.filed_externally` is
+bookkeeping only).
 
 **Does not mean:** that TaxPro filed anything, that HMRC/Companies House
 accepted anything, or that no professional review is required. External
 tax-professional review, security review and real pilot validation are
 mandatory gates before any "production-ready" or "filing-ready" claim
 (see `docs/PRODUCTION_READINESS_REPORT.md` and `docs/EXTERNAL_REVIEW_BRIEF.md`).
+Phase D does not add HMRC/Companies House XSD validation or any submission
+channel — the CT600/iXBRL package remains "validation-ready, not filing-ready".
 
 ## 4. Honesty rules
 

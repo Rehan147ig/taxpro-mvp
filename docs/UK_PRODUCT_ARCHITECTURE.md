@@ -1,7 +1,7 @@
 # TaxPro — UK Product Architecture
 
-**Status:** UK-first product boundary — Phase A (product reset and safety) + Phase B (domain model and data foundations) + Phase C (UK tax-close workbench end-to-end)
-**Date:** 2026-08-04 (Phase C shipped; Phase B blocker resolved — migrations applied and verified against live Postgres/Redis)
+**Status:** UK-first product boundary — Phase A (product reset and safety) + Phase B (domain model and data foundations) + Phase C (UK tax-close workbench end-to-end) + Phase D (filing-ready handoff, immutable manifest, external filing record)
+**Date:** 2026-08-04 (Phases C + D shipped; Phase B blocker resolved — migrations applied and verified against live Postgres/Redis)
 **Branch:** master
 
 TaxPro is a **UK-only, AI-native direct-tax operating system**. The initial
@@ -165,13 +165,13 @@ Legend: ✅ exists & wired · ⚠️ exists but partial/misleading/unwired · �
 
 | Need | Status | Notes |
 |---|---|---|
-| Honest statuses (Draft → … → Filed Externally) | ⚠️ | Statuses cover draft→locked; no `Filing-Ready Handoff` / `Filed Externally` states |
+| Honest statuses (Draft → … → Filed Externally) | ✅ Phase D | `deriveLifecycleStage` ladder: draft → needs_review → filing_ready → filed_externally; handoff_ready_at/by + filed_externally_at/by on the run row; honest badge + honesty contract in the Workbench UI |
 | CT600 figures + validation | ✅ | box set, HMRC-derived validator (CTM03925 etc.) |
 | iXBRL instance/inline + structural validator | ✅ | taxonomy lock `ukgaap-frs102-2023-01-01.xsd` |
 | CTO GovTalk XML | ✅ | CT600 XML for Corporation Tax Online (export only) |
 | MTD readiness | ✅ | gate checklist; no submission |
 | R&D claim artefacts | ✅ | RDEC/surrender package |
-| External filing reference recording | ❌ | no way to record filing reference/date without implying TaxPro filed |
+| External filing reference recording | ✅ Phase D | `POST /api/handoff/runs/:id/record-filing` — append-only `external_filings` row (provider, reference, submitted date, manifest checksum, confirmation doc, `supersedes_filing_id`); checksum re-verified against the deterministic manifest; run row marks `filed_externally`; honesty contract: TaxPro never claims to have filed |
 
 ### 4.5 Tax Memory
 
@@ -234,7 +234,7 @@ Legend: ✅ exists & wired · ⚠️ exists but partial/misleading/unwired · �
 | **A** | Product reset: UK architecture doc, US-dormancy flag, README/roadmap/readiness language, coverage matrix, non-goals | **2026-08-04 — shipped** |
 | **B** | Domain model: entities/groups/periods/source documents/mappings/evidence/review items/approvals/tax memory + migrations + RLS + API contracts + tests | **2026-08-04 — shipped** (see §8 Phase B summary) |
 | C | UK tax-close workbench end-to-end (import → mapping review → calculate → exceptions → workpapers → approve/lock) with source/rule/assumption explainability | **2026-08-04 — shipped** (see §8.1 Phase C summary) |
-| D | Filing-ready handoff: validated package exports, immutable manifests, external-filing recording (no HMRC submission) | next |
+| D | Filing-ready handoff: validated package exports, immutable manifests, external-filing recording (no HMRC submission) | **2026-08-04 — shipped** (see §8.2 Phase D summary) |
 | E | Pilot readiness: synthetic UK demo tenant, firm + direct-company E2E journeys, onboarding runbook, security boundaries, known limitations | next |
 
 Cross-cutting rules in force: small coherent commits; run checks after each
@@ -317,3 +317,45 @@ versioned run (never mutates); import and jobs are idempotent per
 VAT MTD; filing-handoff states, evidence manifest completion and external
 filing records are Phase D; mapping decisions still require human review;
 missing depreciation metadata still routes to a review item.
+
+---
+
+## 8.2 Phase D Summary (filing-ready handoff, immutable manifest, external filing record)
+
+Shipped 2026-08-04, in coherent commits with migrations applied to live
+Postgres. Phase D turns "locked and approved" into a **bookkeeping handoff**:
+TaxPro never submits to HMRC — it records that a filing happened elsewhere.
+
+| Area | What shipped |
+|---|---|
+| Migration | `0016_phase_d_handoff.sql` — `provision_runs.handoff_ready_at` / `handoff_ready_by_user_id` / `filed_externally_at` / `filed_externally_by_user_id`, and the append-only `external_filings` table (`id`, `run_id`, `tenant_id`, `filing_provider`, `filing_reference`, `submitted_date`, `manifest_checksum`, `confirmation_document_id`, `supersedes_filing_id`, `recorded_by_user_id`, timestamps; tenant-scoped RLS: select/insert policies, no update/delete for `taxpro_app`) |
+| API module | `modules/handoff` — `GET /api/handoff/runs/:id` (lifecycle stage via `deriveLifecycleStage`: draft → needs_review → filing_ready → filed_externally; honesty contract; handoff gate blockers; CT600 validation — 15 rules — and iXBRL structural checks — 14 checks; external filing list; approval trail), `POST /runs/:id/handoff-ready` (gate-checked; must be locked; one-time per run), `POST /runs/:id/record-filing` (append-only external filing record; **manifest SHA-256 re-verified against the deterministic manifest** — a tampered checksum is refused with `does not match`; `supersedes_filing_id` links re-filings; never implies TaxPro filed), `GET /runs/:id/manifest` (immutable manifest with self-hash: sha256 over the canonical JSON), `GET /runs/:id/package` (deterministic byte-identical ZIP — normalized timestamps; `x-manifest-sha256` response header) |
+| Gates | `modules/handoff/gates.ts` — `evaluateHandoffGates` (run must be locked; not already handed off; CT600 valid; iXBRL valid), `evaluateFilingGate` (run locked, manifest checksum match, field completeness), `violatesMakerChecker` (self-approval is a blocker) |
+| Unlock hardening | `provision.routes.ts` unlock **refuses** a run with `filed_externally_at` set (400 — corrections must be a new run version via recalculate), and clears `handoff_ready_at/by` when unlocking a locked run |
+| Determinism fixes (found via live-DB tests) | (1) package/manifest exports excluded from the package's internal audit trail (`EXPORT_HANDOFF_PACKAGE`, `HANDOFF_READY`, `FILED_EXTERNALLY`) so a package's contents do not change after re-export; (2) manifest approvals pin `filed_externally_at/by = null` so the first filing cannot change the manifest (evidence chain: filing record → manifest → package), while live state stays on the run row + `external_filings`; (3) CT600 guard only surfaces the Companies House number when `externalId` matches company-number format — a 10-digit UTR no longer trips `COMPANY_NUMBER_FORMAT` |
+| Workbench UI | `apps/web` WorkbenchPage filing-handoff panel on the run detail — honest lifecycle badge, honesty-contract banner, gate blockers, CT600/iXBRL validation chips, **Mark filing-ready (handoff)**, **Download filing package (ZIP)** (`taxpro-uk-filing-package-<period>.zip`), **Copy manifest SHA-256**, auto-prefill of the manifest checksum after download, external filing record form (provider/reference/submitted date/checksum/confirmation doc) with append-only filings table, approval trail, recorded-by/filed-at footer note |
+
+**Verification (live DB):** migrations 0016 applied to Docker Postgres;
+`npm test -w @taxpro/api` **367/367** (33 files — `phase-d-gates` 16 pure unit
+tests incl. the CT600 band ladder and byte-identical ZIP self-verification via
+jszip; `phase-d-handoff` 21 live-DB tests across lifecycle, deterministic
+package+manifest, external filing record, unlock-clears-handoff, and
+maker-checker; full regression 367/367); Playwright E2E **6/6** (auth ×3 +
+operator workflow + workbench journey + `handoff.spec` — run → review → submit →
+partner sign-off → lock → filing-ready → package download → tampered checksum
+refused → external filing record → tenant isolation); web build + `tsc` clean;
+monorepo lint clean (5/5 tasks); RLS on `external_filings` verified.
+
+**Phase D invariants (do not weaken):** the filing package is byte-reproducible
+across downloads (deterministic ZIP, self-verifying manifest sha256); the
+manifest is immutable after the first export (approvals pinned); `record-filing`
+is append-only and re-verifies the checksum; filing handoff is one-way
+(filed_externally is never silently unset; unlock is refused after an external
+filing is recorded); TaxPro never claims to have filed — the honesty contract is
+rendered in the UI and the `run.filed_externally` audit event is bookkeeping
+only.
+
+**Phase D limits (explicit):** still NOT HMRC-filing-ready — no CT600/iXBRL
+schema (XSD) validation, no CTO GovTalk XML submission, no MTD; the package is
+validated against HMRC-derived rules and iXBRL structural checks only. External
+CPA review, a formal security audit, and pilot gates (Phase E) remain open.
