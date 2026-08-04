@@ -33,6 +33,7 @@ import { runTracedSubagent } from '../../eve/subagent-runner.js';
 import { withSpan } from '@superlog/otel-helpers';
 import { tracer, agentRunCounter, provisionRunCounter, reviewResolutionCounter, packageExportCounter } from '../../lib/observability.js';
 import { runProvisionMath, resolveJurisdiction } from './provision-calculator.js';
+import { resolveRulesUsed } from '../rules/rules.routes.js';
 import { enableUsWorkstream } from '../../config/features.js';
 import { recordUsageEvent, pricePerProvision } from '../billing/usage.js';
 import { computeBookTaxDifferences, Decimal } from '@taxpro/tax-engine';
@@ -115,6 +116,8 @@ provisionRoutes.post('/run',
       version: mapping.version,
     })));
 
+    const rulesUsed = await resolveRulesUsed(tx, user.tenantId, periodEnd);
+
     const [run] = await tx.insert(provisionRuns).values({
       tenantId: user.tenantId,
       requestedByUserId: user.userId,
@@ -126,6 +129,7 @@ provisionRoutes.post('/run',
       status: 'normalized',
       inputDataHash,
       mappingVersionHash,
+      rulesUsed,
     }).returning();
 
     await recordProvisionEvent({
