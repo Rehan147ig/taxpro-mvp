@@ -3,7 +3,7 @@
 **Status:** explicit coverage contract — nothing in this file is implied beyond
 what is listed. Unsupported cases become review items, never silent engine
 output.
-**Date:** 2026-08-04 (updated for Phase B — domain model, artefact store, proposals, review lifecycle, rule registry)
+**Date:** 2026-08-04 (updated for Phase C — UK tax-close workbench end-to-end)
 
 Legend:
 - **✅ Supported** — deterministic engine or validated export covers it, tested.
@@ -105,6 +105,21 @@ Legend:
 | Rule store with effective dates/source/snapshot/approval/rollback; runs record `rules_used` | ✅ Phase B (`uk_rules`, `provision_runs.rules_used`) |
 | Tax Memory (prior-year positions as proposals) | 🟡 carry-forward proposals live (Phase B); broader positions library Phase C/D |
 | External filing reference recording | ❌ Phase D |
+
+## 9. Tax-Close Workbench (Phase C — shipped 2026-08-04)
+
+| Item | Status | Evidence |
+|---|---|---|
+| Workbench setup (entity, FY2026 accounting/tax periods, TB, mappings, run state) | ✅ | `GET /api/workbench/setup`; seeded demo tenant is workbench-ready (standard 2026-01-01 period) |
+| Idempotent trial-balance import into a source document + period | ✅ | `POST /api/workbench/import` — `idempotency_key` ledger (`workbench_jobs`), replayed jobs return the prior result; tenant-scoped unique constraint |
+| Gated calculation run (deterministic UK engine snapshot) | ✅ | `POST /api/workbench/runs` — blockers gate the run (setup incomplete / mapping coverage / locked runs → blocked response), deterministic result + review items + warnings persisted |
+| Unsupported / uncovered items | 🟠 | become review items (`missing_depreciation_metadata`, low-confidence mappings) or gate blockers — never silent engine output |
+| Recalculate-as-new-version (lineage) | ✅ | `POST /api/workbench/runs/:id/recalculate` — new versioned run with `parent_run_id`; locked runs reject mutation with 409 |
+| Run provenance (source doc, periods, mapping snapshot, assumptions, warnings, `rules_used`) | ✅ | `GET /api/workbench/runs/:id` + Workbench run-detail view |
+| Approval / lock gates | ✅ | `workbench-gates.ts` — run gates + approval gates (partner rules, workbench-run awareness; legacy runs exempt); covered by `workbench-gates` unit tests |
+| Workbench UI (import → run → recalc → provenance) | ✅ | `apps/web` Workbench page, nav-labelled, recent-runs refresh after run/recalc; covered by the E2E workbench journey |
+| Tenant isolation of workbench data | ✅ | `workbench_jobs` RLS (select/insert/update policies, `taxpro_app` has no DELETE/TRUNCATE); E2E cross-tenant probe |
+| Workbench-specific limits | 🟡 | NOT HMRC-filing-ready; no CT600 submission or VAT MTD; filing-handoff states + evidence-manifest completion + external filing records are Phase D; mapping decisions remain human-owned |
 
 ---
 

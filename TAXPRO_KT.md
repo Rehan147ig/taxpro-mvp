@@ -19,6 +19,10 @@ TaxPro is a **UK-first product**: controlled, reviewer-approved **UK FRS 102
 - **Docs:** `docs/UK_PRODUCT_ARCHITECTURE.md` (architecture + gap report),
   `docs/UK_COVERAGE_MATRIX.md` (coverage contract),
   `docs/UK_NON_GOALS.md` (no HMRC filing / no VAT MTD).
+- **UK phases A + B + C shipped 2026-08-04** (see §4): the UK tax-close
+  workbench is now wired end-to-end (import → gated run → recalc lineage →
+  provenance) and verified against live Postgres/Redis with RLS (API 330/330,
+  E2E 5/5). NOT HMRC-filing-ready; filing handoff is Phase D.
 - **Honesty bar unchanged:** not production-ready or filing-ready until
   external tax-professional review, security review and real pilot validation.
 
@@ -62,9 +66,10 @@ taxpro/
 │   │   │   │   ├── model-client.ts   # Resilient JSON caller (temperature enforcement, prompt versioning)
 │   │   │   │   ├── pattern-store.ts  # Tokenized GIN-indexed fuzzy feedback memory
 │   │   │   │   └── trace-store.ts    # AI execution step logging (ai_runs, ai_steps)
-│   │   │   ├── db/schema/            # Drizzle PostgreSQL schemas (14 tables with RLS)
+│   │   │   ├── db/schema/            # Drizzle PostgreSQL schemas (25 tables, 17 with tenant-isolation RLS policies)
 │   │   │   ├── state/                # TaxProvisionState & assertNotLocked / transitionStage guards
-│   │   │   └── modules/              # Auth, Import, Mapping, NetSuite, Provision, Export, Agent
+│   │   │   └── modules/              # Auth, Import, Mapping, NetSuite, Provision, Export, Agent,
+│   │   │                             #   Periods, Documents, Rules, Review-Items, Workbench (Phase C)
 │   └── web/                          # React 18 + Vite Frontend (Port 5173)
 │       └── src/
 │           ├── pages/
@@ -125,3 +130,45 @@ locked-run packages (zip DOS timestamps now normalized from the run's
    - Engine accuracy is continuously validated against live audited corporate filings:
      - **US SEC EDGAR 10-K Suite:** mean 17.5 bp ETR delta (15/20 filings evaluated, 0 FAIL; skips are filer-data/tie-gate, never counted as validated).
      - **UK Companies House Suite:** 9/9 PASS, mean 1.3 bp ETR variance & 0.0 bp closing deferred variance.
+
+---
+
+## 4. UK Phase C — Tax-Close Workbench (shipped 2026-08-04)
+
+The workbench wires the UK deterministic engine end-to-end in API + UI, with
+the Phase B blocker (no live DB) resolved — migrations 0013–0015 are applied
+to live Postgres and RLS/integration gates verified.
+
+- **Migrations:** `0014` — workbench run contract on `provision_runs`
+  (`source_document_id`, `accounting_period_id`, `tax_period_id`,
+  `parent_run_id` recalc lineage, `mapping_snapshot`/`assumptions`/`warnings`
+  jsonb, `correlation_id`, `idempotency_key` + tenant-scoped unique index),
+  `trial_balance.source_document_id`, and the `workbench_jobs` idempotent job
+  ledger (tenant-isolation RLS, `taxpro_app` granted SELECT/INSERT/UPDATE only).
+  `0015` — schema-drift fix: `connections.last_sync_at` + `sync_status`
+  default `idle`.
+- **API (`apps/api/src/modules/workbench`):** `GET /workbench/setup` ·
+  `POST /workbench/import` (idempotent TB import) · `POST /workbench/runs`
+  (gated calculation; deterministic snapshot + review items + warnings) ·
+  `GET /workbench/runs/:id` (provenance) · `POST /workbench/runs/:id/recalculate`
+  (new version, never mutates) · `GET /workbench/runs/:id/blockers` ·
+  gates in `modules/workbench/gates.ts` (`evaluateRunGates`,
+  `evaluateApprovalGates`; legacy runs exempt). Jobs run through BullMQ with
+  the `workbench_jobs` ledger for idempotency (replayed jobs return the prior
+  result).
+- **UI (`apps/web`):** Workbench page (nav "Workbench") — setup panel,
+  import, run, exceptions/review items, recalc, provenance run detail;
+  recent-runs table refreshes after run/recalc.
+- **Rate limiting (dev-aware, lazy):** `AUTH_RATE_LIMIT_MAX` (prod 5/15min,
+  dev 60, launcher 200) and `API_RATE_LIMIT_MAX` (prod 100/min, dev 1000) read
+  at startup; `.env.example` documents them as development-only; the
+  `api-security` suite pins production defaults (5/100) and explicit overrides.
+- **Verification:** API 330/330 (31 files — `phase-c-workbench`,
+  `workbench-gates`, `api-security` production-bounds), Playwright E2E 5/5
+  (auth ×3 + operator workflow + workbench journey), web build + lint clean,
+  `tsc` clean, UK engine 118/118, enterprise 89/89; 17 tenant-owned tables
+  carry tenant-isolation RLS policies (incl. `workbench_jobs`).
+- **Limits:** NOT HMRC-filing-ready — no CT600 submission, no VAT MTD; filing
+  handoff, evidence-manifest completion and external filing records are Phase
+  D; mapping decisions stay human-owned; uncovered items become review items
+  or gate blockers, never silent engine output.

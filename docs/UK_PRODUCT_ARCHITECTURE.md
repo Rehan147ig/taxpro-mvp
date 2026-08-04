@@ -1,7 +1,7 @@
 # TaxPro — UK Product Architecture
 
-**Status:** UK-first product boundary — Phase A (product reset and safety) + Phase B (domain model and data foundations)
-**Date:** 2026-08-04 (Phase B shipped)
+**Status:** UK-first product boundary — Phase A (product reset and safety) + Phase B (domain model and data foundations) + Phase C (UK tax-close workbench end-to-end)
+**Date:** 2026-08-04 (Phase C shipped; Phase B blocker resolved — migrations applied and verified against live Postgres/Redis)
 **Branch:** master
 
 TaxPro is a **UK-only, AI-native direct-tax operating system**. The initial
@@ -147,7 +147,7 @@ Legend: ✅ exists & wired · ⚠️ exists but partial/misleading/unwired · �
 | Losses / group relief | ⚠️ | group relief exists in `tax-engine-enterprise` (UNVALIDATED, dormant); standalone loss model missing |
 | Supported-adjustments matrix | ⚠️ | mapping categories cover common adjustments; explicit UK coverage matrix is new (`docs/UK_COVERAGE_MATRIX.md`) |
 | Rule versioning (effective date, source URL, snapshot hash, author, approval, rollback) | ✅ Phase B | `uk_rules` registry — proposals must be approved by partner/admin before use; supersede/rollback chained; runs snapshot `rules_used` at creation (approved + effective at period end) |
-| Calculation explainability (inputs, rule version, assumptions, warnings) | ⚠️ | run provenance hashes exist; `rules_used` per-run snapshot is new (Phase B); per-calculation assumption surface remains partial (assumptions.json in package export) |
+| Calculation explainability (inputs, rule version, assumptions, warnings) | 🟡 | run provenance hashes exist; `rules_used` per-run snapshot (Phase B); Phase C workbench runs carry a deterministic snapshot (`mapping_snapshot`, `assumptions`, `warnings` jsonb), source-document/tax-period provenance and run-detail provenance view — per-calculation assumption surface is now explicit in workbench runs; export-package assumptions.json unchanged |
 | Jurisdiction resolution fails closed | ✅ | `resolveJurisdiction` now throws on missing/unrecognized values (was: silent US default); `'UK'` legacy alias → `UK_FRS102_S29` |
 
 ### 4.3 Review & Evidence
@@ -187,7 +187,7 @@ Legend: ✅ exists & wired · ⚠️ exists but partial/misleading/unwired · �
 
 | Need | Status | Notes |
 |---|---|---|
-| Professional tax-close workbench default | ⚠️ | Operator UI exists (Dashboard/Data Sources/Mapping/Provision/Review Queue/Run Detail/AI Findings/Exports/Audit Events); Phase B adds Periods, Documents, Proposals & Rules, Review Items pages; nav is not yet Portfolio/Entities/Tax Close/Review Queue/Evidence/Exports/Rules/Settings |
+| Professional tax-close workbench default | 🟡 | Operator UI exists (Dashboard/Data Sources/Mapping/Provision/Review Queue/Run Detail/AI Findings/Exports/Audit Events); Phase B adds Periods, Documents, Proposals & Rules, Review Items pages; **Phase C adds the Workbench page** (import → gated run → recalc → provenance) and nav wiring for the full close loop; nav is not yet Portfolio/Entities/Tax Close/Review Queue/Evidence/Exports/Rules/Settings |
 | UK-first presentation | ✅ Phase A | GBP default, UK labels default, US labels only for US entities with flag on; sidebar branded "UK FRS 102 Tax Provision" |
 | US UI hidden unless flag on | ✅ Phase A | flag endpoint `/api/config/flags`; US 1120 export 403 when off; QBO mounted but UK-defaulted; seed is UK by default |
 | No fake metrics | ✅ | counts only |
@@ -233,7 +233,7 @@ Legend: ✅ exists & wired · ⚠️ exists but partial/misleading/unwired · �
 |---|---|---|
 | **A** | Product reset: UK architecture doc, US-dormancy flag, README/roadmap/readiness language, coverage matrix, non-goals | **2026-08-04 — shipped** |
 | **B** | Domain model: entities/groups/periods/source documents/mappings/evidence/review items/approvals/tax memory + migrations + RLS + API contracts + tests | **2026-08-04 — shipped** (see §8 Phase B summary) |
-| C | UK tax-close workbench end-to-end (import → mapping review → calculate → exceptions → workpapers → approve/lock) with source/rule/assumption explainability | next |
+| C | UK tax-close workbench end-to-end (import → mapping review → calculate → exceptions → workpapers → approve/lock) with source/rule/assumption explainability | **2026-08-04 — shipped** (see §8.1 Phase C summary) |
 | D | Filing-ready handoff: validated package exports, immutable manifests, external-filing recording (no HMRC submission) | next |
 | E | Pilot readiness: synthetic UK demo tenant, firm + direct-company E2E journeys, onboarding runbook, security boundaries, known limitations | next |
 
@@ -274,11 +274,46 @@ Shipped 2026-08-04 in six coherent commits (after the Phase A QBO follow-up):
 
 **Verification (no DB):** `tsc --noEmit` clean; Phase B suites `phase-b-*`
 60/60 passing (taxonomy 5, periods 6, documents 5, review lifecycle 6 + prior
-suites). **Not yet verified against live Postgres** — migration SQL is applied
-only via `db:migrate` with Docker Postgres (local daemon unavailable at build
-time); RLS/integration tests remain blocked in this environment.
+suites). **Blocker since resolved (2026-08-04):** migrations 0013–0015 are now
+applied to live Docker Postgres/Redis and RLS/integration gates were verified
+as part of Phase C (see §8.1).
 
 **Phase B invariants (do not weaken):** AI never decides (proposals only);
 waivers are human + reason + append-only; unsupported classifications route to
 `MANUAL_REVIEW`; non-standard periods are flagged; rules must be approved
 before a run records them as used; source-document originals are immutable.
+
+---
+
+## 8.1 Phase C Summary (UK tax-close workbench, end-to-end)
+
+Shipped 2026-08-04 (after the Phase B commit set), in coherent commits with
+migrations applied to live Postgres:
+
+| Area | What shipped |
+|---|---|
+| Migrations | `0014` — workbench run contract on `provision_runs` (`source_document_id`, `accounting_period_id`, `tax_period_id`, `parent_run_id` lineage, `mapping_snapshot`/`assumptions`/`warnings` jsonb, `correlation_id`, `idempotency_key` + tenant-scoped unique index), `trial_balance.source_document_id`, and the `workbench_jobs` idempotent job ledger (tenant RLS: select/insert/update policies, no DELETE/TRUNCATE for `taxpro_app`); `0015` — schema-drift fix: `connections.last_sync_at` + `sync_status` default `idle` |
+| API module | `modules/workbench` — `GET /api/workbench/setup` (entity/period/TB/mapping/run state), `POST /api/workbench/import` (idempotent trial-balance import into the selected source document + period), `POST /api/workbench/runs` (gated calculation; blockers → 409/blocked response; deterministic UK engine snapshot, review items, warnings), `GET /api/workbench/runs/:id` (full provenance view), `POST /api/workbench/runs/:id/recalculate` (new versioned run, `parent_run_id` lineage), `GET /api/workbench/runs/:id/blockers` |
+| Gates | `modules/workbench/gates.ts` — `evaluateRunGates` (setup completeness, mapping coverage, deterministic item determinism, locked-run immutability) + `evaluateApprovalGates` (partner approval rules, workbench-run awareness; legacy runs exempt) |
+| Workbench UI | `apps/web` Workbench page (nav-labelled **Workbench**) — setup panel, import, run, exceptions/review-items panel, recalc (new version), provenance run detail; recent-runs table refreshes after run/recalc |
+| Rate limiting | auth + generic API limiters read **lazy** env budgets (`AUTH_RATE_LIMIT_MAX` default 5 prod / 60 dev, launcher 200; `API_RATE_LIMIT_MAX` default 100 prod / 1000 dev) — dev E2E no longer trips 429s; `api-security` production-bounds test pins prod defaults and explicit overrides |
+
+**Verification (live DB):** migrations 0013–0015 applied to Docker Postgres;
+`npm test -w @taxpro/api` **330/330** (31 files — incl. `phase-c-workbench`
+and `workbench-gates` suites and the `api-security` production-bounds test);
+Playwright E2E **5/5** (auth ×3 + operator workflow + workbench
+import→gated-run→recalc→provenance→tenant isolation); web build + `tsc`
+clean; UK engine 118/118; enterprise 89/89; RLS enforced on all tenant-owned
+tables (17 with tenant-isolation policies, incl. `workbench_jobs`).
+
+**Phase C invariants (do not weaken):** workbench runs are deterministic snapshots
+(no silent amounts — uncovered/unclassified items become review items or gate
+blockers); locked runs are immutable (409); recalculation always creates a new
+versioned run (never mutates); import and jobs are idempotent per
+`idempotency_key`; every run carries source-document/tax-period provenance and
+`rules_used`; legacy (non-workbench) runs are exempt from workbench gates.
+
+**Phase C limits (explicit):** NOT HMRC-filing-ready — no CT600 submission, no
+VAT MTD; filing-handoff states, evidence manifest completion and external
+filing records are Phase D; mapping decisions still require human review;
+missing depreciation metadata still routes to a review item.

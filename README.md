@@ -6,7 +6,7 @@ TaxPro turns accounting data and prior tax workpapers into controlled, reviewer-
 
 > **Positioning:** not autonomous tax filing, not generic AI chat, not a generic tax engine, not a CT600 form filler. **AI prepares and explains; deterministic rules calculate; qualified humans approve and lock.**
 
-**Product decision (2026-08-04):** TaxPro is a **UK-first product**. The US ASC 740 workstream is preserved in full (code, tests, evals) but **dormant by default** — feature-flagged off (`TAXPRO_ENABLE_US=false`), hidden from default navigation, onboarding and demo data, and gated at the API. UK phases A (product reset & safety) and B (domain model & data foundations: entity groups, accounting/tax periods, source-document artefact store, mapping proposals with human decisions, UK rules registry, review lifecycle with waiver) shipped 2026-08-04. See `docs/UK_PRODUCT_ARCHITECTURE.md`, `docs/UK_COVERAGE_MATRIX.md` and `docs/UK_NON_GOALS.md`.
+**Product decision (2026-08-04):** TaxPro is a **UK-first product**. The US ASC 740 workstream is preserved in full (code, tests, evals) but **dormant by default** — feature-flagged off (`TAXPRO_ENABLE_US=false`), hidden from default navigation, onboarding and demo data, and gated at the API. UK phases A (product reset & safety), B (domain model & data foundations: entity groups, accounting/tax periods, source-document artefact store, mapping proposals with human decisions, UK rules registry, review lifecycle with waiver) and **C (UK tax-close workbench end-to-end: import → gated run → deterministic calculation → review/exceptions → recalc lineage → approval/lock gates → provenance, wired into the Workbench UI)** shipped 2026-08-04, verified against live Postgres/Redis with RLS. See `docs/UK_PRODUCT_ARCHITECTURE.md`, `docs/UK_COVERAGE_MATRIX.md` and `docs/UK_NON_GOALS.md`.
 
 **Official website:** [taxpro.ploy.build](https://taxpro.ploy.build/) — product overview, benchmark evidence (UK 9/9 FRS 102 filings), governance model, and pilot request. Open-source repository: this repo.
 
@@ -93,7 +93,7 @@ The product rests on one non-negotiable division of labor:
 | **Compliance exports** | CT600 (box layout + fixtures vs HMRC guidance), iXBRL (instance + inline docs), CTO XML (GovTalk-style), MTD readiness, R&D claim package, Excel workbook, **ZIP package** with manifest + SHA-256 integrity |
 | **Governance** | Partner approval workflow, run locking, append-only audit events, role-based access (admin/partner/reviewer/preparer/auditor/client_readonly), tenant isolation at RLS level |
 | **Integrations** | NetSuite (OAuth, sandbox default), Xero (UK), QuickBooks (QBO — UK data source with `UK_FRS102`/GBP sync defaults), Companies House import, CSV/Excel trial-balance upload |
-| **Operator UI** | Dashboard, Connections, Mapping, Provision, Review Queue, Run Detail, AI Findings, Audit Events, Export Package — all code-split, Playwright-covered |
+| **Operator UI** | Dashboard, Connections, Mapping, Provision, **Workbench (Phase C: import → gated run → recalc → provenance)**, Review Queue, Run Detail, AI Findings, Audit Events, Export Package — all code-split, Playwright-covered |
 | **Observability** | OpenTelemetry (traces, metrics, logs via OTLP), structured pino logs, AI run/step traces, usage billing events |
 
 ---
@@ -160,7 +160,7 @@ All subagent outputs are **structural-only**: the deterministic engine remains t
 5. **Locked runs** block modification with `409 Conflict` (FOR UPDATE row locks at the app layer too).
 6. **AI traces** persist `started/completed/failed/timeout/fallback` states with input hashes and output JSON for every agent and subagent call.
 7. **Runtime role guard**: API startup fails fast when `NODE_ENV=production` and `DATABASE_URL` resolves to a superuser-like role; `validateRuntimeRoleSecurity()` refuses to start in non-dev if the connected role bypasses RLS or owns tenant tables.
-8. **Rate limiting**: universal `/api/*` limiter (100 req/min) in **all environments**, strict 20 req/min on `/api/provision/run` + `/api/provision/eve/ask`, 5/15min on login/register.
+8. **Rate limiting**: universal `/api/*` limiter (100 req/min per IP in production, 1000 in development), strict 20 req/min on `/api/provision/run` + `/api/provision/eve/ask`, 5 failed login/register attempts per 15 min in production (60 in development; the dev launcher raises auth to 200). Budgets are read lazily at startup — overrides are dev-only (`AUTH_RATE_LIMIT_MAX`, `API_RATE_LIMIT_MAX`), and a production-bounds test pins production to the strict defaults.
 9. **Generic auth failures**: `Invalid email or password` / generic registration failure — no user enumeration.
 10. **RBAC on mutations**: `POST /api/provision/run` and all review/finalize/submit/approve endpoints require `preparer | reviewer | partner | admin`; `client_readonly` and `auditor` get 403 and may only export approved or locked results.
 
@@ -291,6 +291,7 @@ taxpro/
 | Mappings (Phase B) | `/api/mappings/proposals` | mapping proposals — AI/rules/import/carry-forward propose; humans decide; carry-forward never applies silently |
 | Rules | `/api/rules` | UK rule registry — proposals, partner/admin approval, supersede/rollback, `rules_used` snapshots on runs |
 | Review Items | `/api/review-items` | review lifecycle — status machine, evidence request/attach, human-only waiver, append-only history |
+| Workbench (Phase C) | `/api/workbench` | UK tax-close workbench — setup (entity/period/TB/mapping state), idempotent trial-balance import, gated calculation runs, view run (deterministic snapshot + review items + warnings), recalculate-as-new-version (lineage via `parent_run_id`), blockers check; workbench runs use the standard FY2026 period and carry explicit source-document/tax-period provenance |
 | Demo | `/api/demo` | demo tenant data |
 | Config | `/api/config/flags` | feature flags (`enableUs` — US workstream dormant unless `TAXPRO_ENABLE_US=true`) |
 
@@ -304,10 +305,10 @@ taxpro/
 
 React 19 + TanStack Router SPA (operator workflows only, no marketing pages):
 
-- **Pages:** Dashboard, Connections, Periods, Documents, Tax Mapping, Proposals & Rules, Provision, Review Queue, Review Items, Run Detail, AI Findings (subagent trace polling), Audit Events, Export Package.
+- **Pages:** Dashboard, Connections, Periods, Documents, Tax Mapping, Proposals & Rules, Provision, **Workbench (UK Tax-Close Workbench — Phase C)**, Review Queue, Review Items, Run Detail, AI Findings (subagent trace polling), Audit Events, Export Package.
 - **States handled:** loading, empty, error, locked, needs review, awaiting partner approval, finalized.
 - **Performance:** route-level code splitting via `lazyRouteComponent` (fixes > 500 kB bundle warning).
-- **E2E:** Playwright 4/4 — auth ×3 + full operator workflow (provision → review items display → AI findings page → partner sign-off → lock → 409 → audit → ZIP content verification → export language check → dashboard status).
+- **E2E:** Playwright 5/5 — auth ×3 + full operator workflow (provision → review items display → AI findings page → partner sign-off → lock → 409 → audit → ZIP content verification → export language check → dashboard status) + workbench journey (import → gated run → recalc as new version → provenance → tenant isolation).
 
 ---
 
@@ -331,7 +332,7 @@ npm run dev
 
 Demo credentials: `demo@taxpro.ai` / `TaxProDemo123!` (admin role; seed also creates `partner@taxpro.ai`).
 
-The default seed creates a **UK FRS 102 demo tenant** (Acme UK Ltd, GBP) with Phase B domain data: an entity group, FY2026 accounting/tax periods, 3 approved UK rules, a pending mapping proposal, trial-balance document metadata and 2 open review items. Set `TAXPRO_ENABLE_US=true` in `.env` before seeding to also create the dormant US entity.
+The default seed creates a **UK FRS 102 demo tenant** (Acme UK Ltd, GBP) with Phase B domain data and Phase C workbench readiness: an entity group, FY2026 accounting/tax periods (standard 2026-01-01 period), 3 approved UK rules, a pending mapping proposal, trial-balance document metadata, 2 open review items — enough to run the Workbench import → calculate flow immediately (workbench runs are created by actually running a calculation, never by the seed). Set `TAXPRO_ENABLE_US=true` in `.env` before seeding to also create the dormant US entity.
 
 **Production DB setup:** run `scripts/bootstrap-roles.sql` as superuser to create `taxpro_migrations` (schema owner) and `taxpro_app` (runtime, NOBYPASSRLS), then point `DATABASE_URL` at `taxpro_app` and `DATABASE_URL_MIGRATIONS` at `taxpro_migrations`. In production the API refuses to start if `DATABASE_URL` uses a superuser role.
 
@@ -377,10 +378,10 @@ The default seed creates a **UK FRS 102 demo tenant** (Acme UK Ltd, GBP) with Ph
 
 ```bash
 npm run lint                                   # typecheck all workspaces (tsc --noEmit)
-npm test                                       # 479 unit tests (118 engine + 272 API + 89 enterprise)
+npm test                                       # 537 unit tests (118 engine + 330 API + 89 enterprise)
 npm run build                                  # full turbo build (engine → api → web)
 npm run test:integration -w @taxpro/api        # 27/27 provision lifecycle (needs Docker Postgres/Redis)
-npm run test:e2e                               # Playwright 4/4 operator workflow + auth (needs running stack)
+npm run test:e2e                               # Playwright 5/5 operator workflow + auth + workbench (needs running stack)
 npm run harness -w @taxpro/api                 # AI subagent harness (dry-run by default; AI_EVAL_MODE=mocked|real)
 npm run harness:real -w @taxpro/api            # AI subagent harness against live provider
 OFFLINE=1 npm run eval                         # US EDGAR harness (offline cached mode)
@@ -392,20 +393,21 @@ npm run db:seed -w apps/api                    # demo/partner users + demo tenan
 npm run db:synthetic -w apps/api               # deterministic synthetic data (integration-test friendly)
 ```
 
-### Current verification state (2026-08-03)
+### Current verification state (2026-08-04 — UK Phase C shipped)
 
 | Gate | Command | Result |
 |---|---|---|
-| Lint / typecheck | `npm run lint` | PASS |
-| Unit tests | `npm test` | 479/479 PASS (118 engine + 272 API + 89 enterprise) |
+| Lint / typecheck | `npm run lint` | PASS (4/4 workspaces) |
+| Unit tests | `npm test` | 537/537 PASS (118 engine + 330 API + 89 enterprise) |
 | Build | `npm run build` | PASS |
 | Provision integration flow | `npm run test:integration -w @taxpro/api` | 27/27 PASS (import → mapping → provision → AI trace polling → review → finalize → submit → partner sign-off → lock → 409 → package → audit → tenant isolation across 6 resources) |
-| Operator workflow E2E | `npx playwright test` (apps/web) | 4/4 PASS |
+| Phase C workbench API tests | `npm test -w @taxpro/api` | 330/330 PASS (31 files) — includes `phase-c-workbench` (setup/import/gated run/view/lineage) + `workbench-gates` (run + approval gates, legacy runs exempt) + `api-security` production-bounds (auth budget 5, API budget 100 in production) |
+| Operator workflow E2E | `npx playwright test` (apps/web) | 5/5 PASS (auth ×3 + operator workflow + workbench import→run→recalc→provenance→tenant isolation) |
 | AI subagent harness | `npm run harness` (mocked) | PASS — 16/16 mapping, 16/16 audit, 15/16 credit (deliberate regression fixture), fallback 2.1% |
 | US EDGAR eval | `OFFLINE=1 npm run eval` | 12 PASS, 3 WARN, 5 SKIPPED (of 20), mean ETR delta 17.5 bp — validated 15/20, 0 FAIL; also runs live in CI (non-fatal) |
 | UK eval | `npm run eval:uk` | 9/9 PASS, mean ETR delta 1.3 bp |
 | US state rules vs live sources | `npm run verify:us-rates -w @taxpro/tax-engine-enterprise` | PASS — 51/51 rates + 51/51 apportionment weights exact vs Tax Foundation 2026 (see `docs/STATE_RULE_REFRESH.md`) |
-| CI (GitHub Actions, `master`) | all 4 workflows | PASS — CI/Semgrep/CodeQL/OSV green: lint, 479 tests on a fresh Postgres (bootstrap roles → migrate → seed), Docker build + Trivy scans |
+| CI (GitHub Actions, `master`) | all 4 workflows | PASS — CI/Semgrep/CodeQL/OSV green: lint, 537 tests on a fresh Postgres (bootstrap roles → migrate → seed), Docker build + Trivy scans |
 
 ---
 
@@ -431,10 +433,12 @@ Every push/PR to `master` runs four GitHub Actions workflows (`.github/workflows
 
 | Scope | Limit | Environment |
 |---|---|---|
-| Global `/api/*` | 100 req/min per IP | **all environments** (universal, not env-gated) |
+| Global `/api/*` | 100 req/min per IP (production); 1000/min (development) | dev-aware — production keeps the strict default |
 | `/api/provision/run` + `/api/provision/eve/ask` | 20 req/min per IP | always |
-| `/api/auth/login` + `/api/auth/register` | 5 per 15 min | always |
+| `/api/auth/login` + `/api/auth/register` | 5 per 15 min (production); 60 in development (dev launcher sets 200) | dev-aware — production keeps the strict default |
 | `/health`, `/api/health` | exempt | — |
+
+Budget overrides (`AUTH_RATE_LIMIT_MAX`, `API_RATE_LIMIT_MAX`) are documented in `.env.example` as **development-only** — production refuses to loosen them implicitly (defaults are fixed at the strict values unless an explicit reviewed override is set). `api-security` tests pin both the production defaults and explicit overrides.
 
 ---
 
@@ -443,6 +447,7 @@ Every push/PR to `master` runs four GitHub Actions workflows (`.github/workflows
 **Verification complete — build verified, benchmark harnesses green, integration E2E green, deployment hardening verified. NOT filing-ready.**
 
 - **UK-first product reset (2026-08-04):** UK FRS 102 is the default product surface; the US ASC 740 workstream is dormant behind `TAXPRO_ENABLE_US=false` (API-gated, hidden from default UX and seed). UK architecture, coverage matrix and non-goals: `docs/UK_PRODUCT_ARCHITECTURE.md`, `docs/UK_COVERAGE_MATRIX.md`, `docs/UK_NON_GOALS.md`.
+- **UK Phase C — tax-close workbench shipped (2026-08-04):** entity/period/TB setup, idempotent import, gated calculation runs, deterministic UK calc with review items (`missing_depreciation_metadata` etc.), recalc-as-new-version lineage, approval/lock gates, run detail with provenance (source/rule/assumption explainability), tenant isolation — verified end-to-end against live Postgres/Redis with RLS (API 330/330, E2E 5/5). Migrations `0014` (`workbench_runs` — run contract + `workbench_jobs` ledger with RLS) and `0015` (`connections_last_sync`) applied on the live DB. The **Phase B blocker (no live DB) is resolved**: Phase B + C are now verified on live Postgres/Redis.
 - UK FRS 102 engine validated against 9 curated real filings (0–5 bp ETR deltas, mean 1.3 bp).
 - US ASC 740 engine validated against a subset of public filings; dormant, preserved as future optionality.
 - Complete operator UI (Dashboard, Review Queue, Run Detail, AI Findings, Audit Events, Export Package) covered by Playwright E2E; partner approval flow and worker split shipped.
